@@ -1524,16 +1524,19 @@ function drawTreemap() {
   plot(el, [{
     type: "treemap", ids, labels, parents, values, branchvalues: "total", sort: true,
     customdata: cd.map((x, i) => [fmtBn(values[i]), ...x, ids[i]]),
-    texttemplate: "<b>%{label}</b><br>%{customdata[0]}<br>%{customdata[1]}",
+    // group headers large and bold, with the group's total on the same line; countries as before
+    // the tiniest countries have no text (it would be unreadable); hover still shows them
+    texttemplate: ids.map((id, i) => id.startsWith("g:") ? "<b>%{label}</b>   %{customdata[0]} · %{customdata[2]}" : id === "world" ? "<b>%{label}</b>"
+      : values[i] / world >= 0.0015 ? "<b>%{label}</b><br>%{customdata[0]}<br>%{customdata[1]}" : ""),
     hovertemplate: "<b>%{label}</b><br>%{customdata[0]} · %{customdata[2]}<br>%{customdata[1]}<extra></extra>",
-    marker: byColor ? { colors, line: { width: lw, color: lc } } : {
-      colors: colors.map(v => v ?? 0), colorscale: [0, 0.25, 0.5, 0.75, 1].map((p, i) => [p, css(`--seq-${i + 1}`)]), cmin: 0, cmax: 60, showscale: true,
+    marker: byColor ? { colors, line: { width: lw, color: lc }, pad: { t: 30, l: 3, r: 3, b: 3 } } : {
+      pad: { t: 30, l: 3, r: 3, b: 3 }, colors: colors.map(v => v ?? 0), colorscale: [0, 0.25, 0.5, 0.75, 1].map((p, i) => [p, css(`--seq-${i + 1}`)]), cmin: 0, cmax: 60, showscale: true,
       line: { width: lw, color: lc },
       colorbar: { orientation: "h", thickness: 8, len: 0.42, x: 0.5, xanchor: "center", y: -0.04, yanchor: "top", outlinewidth: 0,
         tickvals: [0, 15, 30, 45, 60], ticktext: ["0%", "15%", "30%", "45%", "60%+ of GDP"], tickfont: { color: css("--text-muted"), size: 11 } } },
-    textfont: { family: 'system-ui, -apple-system, "Segoe UI", sans-serif', size: 13 },
-    pathbar: { visible: true, textfont: { size: 12 } }, tiling: { packing: "squarify", pad: 2 }, root: { color: "rgba(0,0,0,0)" },
-  }], baseLayout({ margin: { l: 0, r: 0, t: 28, b: byColor ? 0 : 36 }, showlegend: false, uniformtext: { minsize: 8, mode: "hide" },
+    textfont: { family: 'system-ui, -apple-system, "Segoe UI", sans-serif', size: ids.map(id => id.startsWith("g:") ? 17 : 13) },
+    pathbar: { visible: true, textfont: { size: 13 } }, tiling: { packing: "squarify", pad: 3 }, root: { color: "rgba(0,0,0,0)" },
+  }], baseLayout({ margin: { l: 0, r: 0, t: 28, b: byColor ? 0 : 36 }, showlegend: false,
     uirevision: `${by}|${state.cGold}|${state.cYear}` }));
   document.getElementById("t-legend").innerHTML = byColor ? cats.map(cat => `<span><span class="dot" style="background:${css(cat.color)}"></span>${esc(cat.name)}</span>`).join("") : "";
   if (!el._tBound) {
