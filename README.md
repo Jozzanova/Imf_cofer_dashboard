@@ -26,7 +26,9 @@ Tabs:
   chart, bars show every currency on one date: the latest, or any date clicked on the chart.
 - **Changes**: the change between any two dates, by currency, in US$, % or share points, and
   each quarter's change for one currency.
-- **Data**: the numbers as a table, with a CSV download of the selection.
+- **Data** (last): the numbers as a table, with a CSV download: the world by currency (shares or
+  US$, with world GDP and FX reserves as % of it), or every country (reserves with and without
+  gold, gold, GDP and % of GDP, with its economy, region and exchange-rate regime).
 - **Countries**: each country's reserves (IMF, International Investment Position) as % of GDP
   (IMF, World Economic Outlook) or in US$, with or without gold: a group builder (groups of
   countries by region, economy and exchange-rate regime, up to four side by side as ranked bars,

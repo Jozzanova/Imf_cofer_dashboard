@@ -254,9 +254,9 @@
   <nav class="tabs" role="tablist" aria-label="Views">
     <button role="tab" id="tab-btn-shares" data-tab="shares" aria-controls="tab-shares">Currencies</button>
     <button role="tab" id="tab-btn-changes" data-tab="changes" aria-controls="tab-changes">Changes</button>
-    <button role="tab" id="tab-btn-data" data-tab="data" aria-controls="tab-data">Data</button>
     <button role="tab" id="tab-btn-countries" data-tab="countries" aria-controls="tab-countries">Countries</button>
     <button role="tab" id="tab-btn-explore" data-tab="explore" aria-controls="tab-explore">Explore ✦</button>
+    <button role="tab" id="tab-btn-data" data-tab="data" aria-controls="tab-data">Data</button>
   </nav>
 
   <section class="card controls" id="controls" aria-label="Selection">
@@ -361,13 +361,14 @@
       <div class="card-head">
         <div><h2>The numbers</h2><p class="sub" id="dt-sub"></p></div>
         <div class="row">
+          <div class="seg" id="dt-set-seg" role="group" aria-label="Dataset"><button data-v="cur">World, by currency</button><button data-v="cty">Countries</button></div>
           <div class="seg" id="dt-metric-seg" role="group" aria-label="Measure"><button data-v="share">Shares, %</button><button data-v="bn">US$ billions</button></div>
+          <select id="dt-year" aria-label="Date"></select>
           <button class="text-btn" type="button" id="dt-csv">Download CSV</button>
         </div>
       </div>
       <div class="table-wrap scroll-y"><table id="dt-table"></table></div>
-      <p class="hint">"Download CSV" saves the table as shown: the currencies, frequency and period chosen above.
-        The full dataset is on the <a href="https://data.imf.org/en/datasets/IMF.STA:COFER" target="_blank" rel="noopener">IMF data portal</a>.</p>
+      <p class="hint" id="dt-hint"></p>
     </section>
   </div>
 
@@ -661,13 +662,13 @@ const source = { kind: "snapshot", at: SNAPSHOT.downloaded, checking: true };
 const state = {
   tab: "shares", cur: CURS.map(c => c.k), freq: "Q", period: "all",
   shView: "lines", shLog: false, amView: "stack", amLog: false, sel: "", shShow: [], amShow: [],
-  chFrom: "", chTo: "", chMetric: "bn", chCur: "USD", dtMetric: "share",
+  chFrom: "", chTo: "", chMetric: "bn", chCur: "USD", dtMetric: "share", dtSet: "cur", dtYear: "latest",
   raceMetric: "share", raceNoUSD: false, raceSpeed: "1", fxBase: "2016-Q4", fxCur: "USD",
   cMeasure: "pct", cGold: "with", cYear: "latest", cSort: "v", cDir: "desc", gb: "eu_all_float", cGroup: "econ", cFilter: "all", cLines: "countries", cAgg: "combined", gScale: "log",
   bY: "bn", bColor: "econ", bEcon: ["AE", "EM"], bReg: ["peg", "managed", "float"], bRegion: "all", bSpeed: "1", cSel: ["CHE", "HKG", "SAU", "CHN", "JPN", "USA"],
 };
 const LIST_KEYS = new Set(["cur", "cSel", "bEcon", "bReg", "shShow", "amShow"]);
-const TABS = ["shares", "changes", "data", "countries", "explore"];
+const TABS = ["shares", "changes", "countries", "explore", "data"];
 function readHash() {
   const p = new URLSearchParams(location.hash.slice(1));
   for (const [k, v] of p) {
@@ -1046,27 +1047,81 @@ function renderChangesTable(f, i0, i1) {
 function dataRows() {
   const f = F(), w = windowIdx(), ks = selected(), share = state.dtMetric === "share";
   const cols = ks.map(k => ({ name: CUR[k].name, y: share ? f.share[k] : f.bn[k], d: share ? 2 : 1 }));
-  if (!share) cols.push({ name: "Unallocated", y: f.unallocated, d: 1 }, { name: "Total FX reserves", y: f.total, d: 1 });
+  if (!share) {
+    cols.push({ name: "Unallocated", y: f.unallocated, d: 1 }, { name: "Total FX reserves", y: f.total, d: 1 });
+    // world GDP (IMF, World Economic Outlook) for the period's calendar year, and FX reserves against it
+    const wgdp = f.periods.map(p => CD.gdp?.G001?.[p.slice(0, 4)] ?? null);
+    cols.push({ name: "World GDP", y: wgdp, d: 0 }, { name: "FX reserves, % of world GDP", y: f.total.map((t, i) => fin(t) && wgdp[i] > 0 ? t / wgdp[i] * 100 : null), d: 1 });
+  }
   if (f.imputed.some(fin)) cols.push({ name: "Imputed by the IMF, % of total", y: f.imputed, d: 2 });
   const rows = [];
   for (let i = w.i1; i >= w.i0; i--) rows.push({ p: f.periods[i], vals: cols.map(c => c.y[i]) });
   return { cols, rows };
 }
+// every country on one date: reserves with and without gold, gold, GDP and reserves as % of GDP
+function countryData() {
+  if (!CC) assembleCountries();
+  if (cLive.state === "idle") loadCountriesLive();
+  const lastYear = +CC_LATEST.slice(0, 4), years = [];
+  for (let y = lastYear - 1; y >= 1980; y--) years.push(String(y));
+  if (state.dtYear !== "latest" && !years.includes(state.dtYear)) state.dtYear = "latest";
+  document.getElementById("dt-year").innerHTML = `<option value="latest">Latest available</option>` +
+    years.map(y => `<option value="${y}"${y === state.dtYear ? " selected" : ""}>End of ${y}</option>`).join("");
+  document.getElementById("dt-year").value = state.dtYear;
+  const head = ["Country", "Economy", "Region", "Exchange rate", "As of", "Reserves, US$ bn", "Gold, US$ bn", "Excluding gold, US$ bn",
+    "GDP, US$ bn", "Reserves, % of GDP", "Excluding gold, % of GDP"];
+  const rows = Object.values(CC).map(c => {
+    const pt = state.dtYear === "latest" ? c.pts.at(-1) : c.pts.find(p => p.p === `${state.dtYear}-Q4`);
+    if (!pt) return null;
+    const pct = v => fin(v) && pt.gdp > 0 ? v / pt.gdp * 100 : null;
+    return { k: c.k, cells: [c.name, ({ AE: "Advanced", EM: "Emerging and developing" })[CD.groups?.econ?.[c.k]] || "",
+      GEO.find(g => g.k === geoOf(c.k))?.name || "", REGIMES[c.k]?.note || "", label(pt.p),
+      pt.res, pt.gold, pt.exGold, pt.gdp, pct(pt.res), pct(pt.exGold)] };
+  }).filter(Boolean).sort((a, b) => (b.cells[5] ?? -1) - (a.cells[5] ?? -1));
+  return { head, rows, d: [null, null, null, null, null, 1, 1, 1, 0, 1, 1] };
+}
 function renderData() {
+  setPressed(document.getElementById("dt-set-seg"), state.dtSet);
+  const cty = state.dtSet === "cty";
+  document.getElementById("dt-metric-seg").hidden = cty;
+  document.getElementById("dt-year").hidden = !cty;
+  document.getElementById("controls").hidden = cty;
+  document.getElementById("tab-data").style.marginTop = cty ? "16px" : "";  // no controls card above it then
+  if (cty) {
+    const { head, rows, d } = countryData();
+    document.getElementById("dt-sub").textContent = `${rows.length} countries, ${state.dtYear === "latest" ? "each country's latest figures" : `end of ${state.dtYear}`}, largest reserves first. ` +
+      "Reserves include gold at market value; exchange-rate regimes as measured over the last two years.";
+    document.getElementById("dt-table").innerHTML = `<thead><tr>${head.map(h => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${rows.map(r =>
+      `<tr${r.k === HOME ? ' class="home"' : ""}>${r.cells.map((v, j) => `<td${j && j < 5 ? ' class="muted" style="text-align:left"' : ""}>${d[j] == null ? esc(v) : fin(v) ? fmt(v, d[j]) : '<span class="muted">–</span>'}</td>`).join("")}</tr>`).join("")}</tbody>`;
+    document.getElementById("dt-hint").innerHTML = `Reserves: IMF, <a href="https://data.imf.org/en/datasets/IMF.STA:IIP" target="_blank" rel="noopener">International Investment Position</a>;
+      GDP: IMF, <a href="https://data.imf.org/en/datasets/IMF.RES:WEO" target="_blank" rel="noopener">World Economic Outlook</a> (the latest year an estimate).
+      "Download CSV" saves this table.`;
+    return;
+  }
   const { cols, rows } = dataRows();
   document.getElementById("dt-sub").textContent = state.dtMetric === "share"
-    ? "Share of allocated reserves, %, newest first" : "US$ billions at market exchange rates, newest first";
+    ? "Share of allocated reserves, %, newest first" : "US$ billions at market exchange rates, newest first; world GDP for the period's calendar year";
+  document.getElementById("dt-hint").innerHTML = `"Download CSV" saves the table as shown: the currencies, frequency and period chosen above.
+    The full dataset is on the <a href="https://data.imf.org/en/datasets/IMF.STA:COFER" target="_blank" rel="noopener">IMF data portal</a>.`;
   document.getElementById("dt-table").innerHTML =
     `<thead><tr><th>Period</th>${cols.map(c => `<th>${esc(c.name)}</th>`).join("")}</tr></thead>` +
     `<tbody>${rows.map(r => `<tr><td>${label(r.p)}</td>${r.vals.map((v, j) => `<td>${fin(v) ? fmt(v, cols[j].d) : '<span class="muted">–</span>'}</td>`).join("")}</tr>`).join("")}</tbody>`;
 }
 document.getElementById("dt-csv").addEventListener("click", () => {
-  const { cols, rows } = dataRows();
-  const q = s => /[",]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-  const text = [["Period", ...cols.map(c => c.name)].map(q).join(","),
-    ...rows.map(r => [r.p, ...r.vals.map(v => fin(v) ? String(+v.toFixed(6)) : "")].join(","))].join("\n");
+  const q = s => /[",]/.test(s) ? `"${String(s).replace(/"/g, '""')}"` : String(s);
+  const num = v => fin(v) ? String(+v.toFixed(6)) : "";
+  let text, name;
+  if (state.dtSet === "cty") {
+    const { head, rows, d } = countryData();
+    text = [head.map(q).join(","), ...rows.map(r => r.cells.map((v, j) => d[j] == null ? q(v) : num(v)).join(","))].join("\n");
+    name = `reserves_by_country_${state.dtYear === "latest" ? "latest" : state.dtYear}.csv`;
+  } else {
+    const { cols, rows } = dataRows();
+    text = [["Period", ...cols.map(c => c.name)].map(q).join(","), ...rows.map(r => [r.p, ...r.vals.map(num)].join(","))].join("\n");
+    name = `cofer_${state.dtMetric === "share" ? "shares" : "usd_bn"}_${state.freq === "Q" ? "quarterly" : "yearly"}.csv`;
+  }
   const url = URL.createObjectURL(new Blob([text], { type: "text/csv" }));
-  const link = Object.assign(document.createElement("a"), { href: url, download: `cofer_${state.dtMetric === "share" ? "shares" : "usd_bn"}_${state.freq === "Q" ? "quarterly" : "yearly"}.csv` });
+  const link = Object.assign(document.createElement("a"), { href: url, download: name });
   document.body.append(link); link.click(); link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 });
@@ -1110,7 +1165,7 @@ function syncControls() {
   setPressed(document.getElementById("dt-metric-seg"), state.dtMetric);
   document.getElementById("sh-log").checked = state.shLog;
   document.getElementById("am-log").checked = state.amLog;
-  document.getElementById("controls").hidden = state.tab === "explore" || state.tab === "countries";
+  document.getElementById("controls").hidden = state.tab === "explore" || state.tab === "countries" || (state.tab === "data" && state.dtSet === "cty");
   document.getElementById("hint").textContent = state.tab === "changes"
     ? "The period chosen here sets the right-hand chart; the left one compares the two dates above it." : "";
 }
@@ -1131,6 +1186,8 @@ bindSeg("sh-view-seg", "shView");
 bindSeg("am-view-seg", "amView");
 bindSeg("ch-metric-seg", "chMetric");
 bindSeg("dt-metric-seg", "dtMetric");
+bindSeg("dt-set-seg", "dtSet");
+document.getElementById("dt-year").addEventListener("change", e => { state.dtYear = e.target.value; writeHash(); renderData(); });
 document.getElementById("sh-log").addEventListener("change", e => { state.shLog = e.target.checked; onChange(); });
 document.getElementById("am-log").addEventListener("change", e => { state.amLog = e.target.checked; onChange(); });
 document.getElementById("ch-from").addEventListener("change", e => { state.chFrom = e.target.value; onChange(); });
@@ -1531,7 +1588,7 @@ function sdmxSeries(text) {
   const out = {};
   for (let n = 1; n < lines.length; n++) {
     const r = lines[n].split(","), val = parseFloat(r[v]);
-    if (!/^[A-Z]{3}$/.test(r[c]) || r[t] < "1980" || !isFinite(val)) continue;
+    if (!(/^[A-Z]{3}$/.test(r[c]) || (r[c] === "G001" && r[i] === "NGDPD")) || r[t] < "1980" || !isFinite(val)) continue;  // G001: world GDP
     ((out[r[i]] ||= {})[r[c]] ||= {})[r[t]] = Math.round(val / 1e6) / 1e3;
   }
   return out;
@@ -1991,7 +2048,7 @@ async function loadCountriesLive() {
   } catch (err) {
     cLive.state = "failed";
   }
-  if (state.tab === "countries") renderCountries(); else syncCountryControls();
+  if (state.tab === "countries") renderCountries(); else if (state.tab === "data") renderData(); else syncCountryControls();
 }
 function toggleCountry(k, addOnly = false) {
   if (k === HOME) return;  // always shown

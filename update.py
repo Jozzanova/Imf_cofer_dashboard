@@ -98,8 +98,9 @@ def series(text: str, indicator_col: str = "INDICATOR") -> dict:
     out = {}
     for line in lines[1:]:
         r = line.split(",")
-        # countries only (not aggregates such as G163, the euro area), from 1980, when the WEO's GDP starts
-        if not (len(r[c]) == 3 and r[c].isalpha()) or r[t] < "1980":
+        # countries only (not aggregates such as G163, the euro area; but G001, the world, for world GDP),
+        # from 1980, when the WEO's GDP starts
+        if not ((len(r[c]) == 3 and r[c].isalpha()) or (r[c] == "G001" and r[i] == "NGDPD")) or r[t] < "1980":
             continue
         try:
             val = float(r[v])
