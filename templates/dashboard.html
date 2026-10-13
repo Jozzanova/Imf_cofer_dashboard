@@ -185,7 +185,11 @@
   .search { font: inherit; font-size: 13px; padding: 5px 10px; border-radius: 8px; border: 1px solid var(--axis);
     background: var(--page); color: var(--text-primary); width: min(200px, 100%); }
   #c-chips { margin: 4px 0 6px; }
-  #c-table th:nth-child(2), #c-table td:nth-child(2) { text-align: left; }
+  #c-table th:nth-child(2), #c-table td:nth-child(2), #c-table th:nth-child(5), #c-table td:nth-child(5) { text-align: left; }
+  .map-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12.5px; color: var(--text-secondary); margin-top: 6px; }
+  .map-legend:empty { display: none; }
+  .map-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  #g-table td:first-child { white-space: normal; }
   @media (max-width: 520px) { .chart.map { height: 240px; } }
   h3 { font-size: 13.5px; font-weight: 600; margin: 0 0 6px; color: var(--text-secondary); }
   @media (max-width: 520px) { .race-row .rl { width: 96px; font-size: 12px; } }
@@ -345,22 +349,40 @@
           <div class="seg" id="c-measure-seg"><button data-v="pct">% of GDP</button><button data-v="bn">US$ billions</button></div>
         </div>
         <div class="control"><span class="lbl">Gold</span>
-          <div class="seg" id="c-gold-seg"><button data-v="with">Including gold</button><button data-v="without">Excluding gold</button></div>
+          <div class="seg" id="c-gold-seg"><button data-v="with">Including gold</button><button data-v="without">Excluding gold</button><button data-v="only">Only gold</button></div>
         </div>
         <div class="control"><span class="lbl">Date</span><select id="c-year" aria-label="Date"></select></div>
       </div>
       <div class="hint" id="c-status"></div>
     </section>
     <section class="card">
-      <h2 id="c-map-title">Reserves around the world</h2>
-      <p class="sub" id="c-map-sub"></p>
+      <div class="card-head">
+        <div><h2 id="c-map-title">Reserves around the world</h2><p class="sub" id="c-map-sub"></p></div>
+        <div class="control"><span class="lbl">Colour by</span>
+          <div class="seg" id="c-color-seg"><button data-v="value">Reserves</button><button data-v="group">Group</button></div></div>
+      </div>
       <div id="c-map" class="chart map"></div>
+      <div class="map-legend" id="c-map-legend"></div>
     </section>
-    <section class="grid2">
+    <section class="card">
+      <div class="card-head">
+        <div><h2>Compare groups</h2><p class="sub" id="g-sub"></p></div>
+        <div class="seg" id="c-group-seg" role="group" aria-label="Group by"><button data-v="econ">Advanced vs emerging</button><button data-v="region">Region</button><button data-v="regime">Exchange-rate regime</button></div>
+      </div>
+      <div id="g-chart" class="chart" style="height:400px"></div>
+      <div class="table-wrap" style="margin-top:12px"><table id="g-table"></table></div>
+      <p class="hint" id="g-note"></p>
+    </section>
+    <section>
       <section class="card">
         <div class="card-head">
           <div><h2>Ranking</h2><p class="sub" id="c-table-sub">Click a column to sort it, a country to add it to the chart.</p></div>
-          <input type="search" id="c-search" class="search" placeholder="Find a country" aria-label="Find a country">
+          <div class="row">
+            <select id="c-filter" aria-label="Show"><option value="all">All countries</option><option value="econ:AE">Advanced economies</option>
+              <option value="econ:EM">Emerging and developing</option><option value="regime:peg">Pegged currencies</option>
+              <option value="regime:managed">Managed currencies</option><option value="regime:float">Floating currencies</option></select>
+            <input type="search" id="c-search" class="search" placeholder="Find a country" aria-label="Find a country">
+          </div>
         </div>
         <div class="table-wrap scroll-y" style="max-height:560px"><table id="c-table" class="clickable"></table></div>
       </section>
@@ -457,7 +479,10 @@
           <a href="https://data.imf.org/en/datasets/IMF.RES:WEO" target="_blank" rel="noopener">World Economic Outlook</a> (the latest year is
           an IMF estimate). Reserves are a stock and GDP a yearly flow, the usual way to compare them. "Latest available" uses each country's most
           recent figure, if it is no more than two years old. Countries that are not IMF members (such as Taiwan) or do not report are missing.
-          These are national totals, not their currency composition: the IMF publishes that only for the world as a whole.</li>
+          These are national totals, not their currency composition: the IMF publishes that only for the world as a whole.
+          Advanced and emerging economies and the regions are the World Economic Outlook's groups. Exchange-rate regimes are measured from
+          end-of-month exchange rates over the last two years (see the note under "Compare groups"); with monthly data a few currencies
+          can land in a neighbouring category to the IMF's official one.</li>
         <li><b>Live data:</b> each time the page opens it asks the IMF's API for the current COFER release, so new quarters and revisions appear
           without rebuilding it. If the IMF cannot be reached, the page shows the copy it was built with. The IMF publishes COFER once a
           quarter, about three months after the quarter ends, and revises earlier figures when countries revise theirs.</li>
@@ -564,7 +589,7 @@ const state = {
   shView: "lines", shLog: false, amView: "stack", amLog: false,
   chFrom: "", chTo: "", chMetric: "bn", chCur: "USD", dtMetric: "share",
   raceMetric: "share", raceNoUSD: false, raceSpeed: "1", fxBase: "2016-Q4", fxCur: "USD",
-  cMeasure: "pct", cGold: "with", cYear: "latest", cSort: "v", cDir: "desc", cSel: ["CHE", "HKG", "SAU", "CHN", "JPN", "USA"],
+  cMeasure: "pct", cGold: "with", cYear: "latest", cSort: "v", cDir: "desc", cColor: "value", cGroup: "econ", cFilter: "all", cSel: ["CHE", "HKG", "SAU", "CHN", "JPN", "USA"],
 };
 const LIST_KEYS = new Set(["cur", "cSel"]);
 const TABS = ["shares", "amounts", "changes", "data", "countries", "explore"];
@@ -582,7 +607,9 @@ function readHash() {
   if (!["share", "bn"].includes(state.raceMetric)) state.raceMetric = "share";
   if (!["1", "2", "4"].includes(state.raceSpeed)) state.raceSpeed = "1";
   if (!["pct", "bn"].includes(state.cMeasure)) state.cMeasure = "pct";
-  if (!["with", "without"].includes(state.cGold)) state.cGold = "with";
+  if (!["with", "without", "only"].includes(state.cGold)) state.cGold = "with";
+  if (!["econ", "region", "regime"].includes(state.cGroup)) state.cGroup = "econ";
+  if (!["value", "group"].includes(state.cColor)) state.cColor = "value";
   state.cSel = state.cSel.slice(0, 8);
 }
 function writeHash() {
@@ -1211,6 +1238,81 @@ function renderExplore() { syncExploreControls(); renderRace(); drawFx(); drawDi
 document.getElementById("fx-base").addEventListener("change", e => { state.fxBase = e.target.value; writeHash(); drawFx(); });
 document.getElementById("fx-cur").addEventListener("change", e => { state.fxCur = e.target.value; writeHash(); drawFx(); });
 
+// ---------- country groups: the IMF's economy groups and regions, and measured exchange-rate behaviour ----------
+const GROUPINGS = {
+  econ: { label: "Economy", cats: [
+    { k: "AE", name: "Advanced economies", color: "--s1" },
+    { k: "EM", name: "Emerging and developing economies", color: "--s2" }] },
+  region: { label: "Region", cats: [
+    { k: "AE", name: "Advanced economies", color: "--s1" },
+    { k: "G505", name: "Emerging and developing Asia", color: "--s2" },
+    { k: "G903", name: "Emerging and developing Europe", color: "--s3" },
+    { k: "G205", name: "Latin America and the Caribbean", color: "--s4" },
+    { k: "G400", name: "Middle East and Central Asia", color: "--s5" },
+    { k: "G603", name: "Sub-Saharan Africa", color: "--s6" }] },
+  regime: { label: "Exchange rate", cats: [
+    { k: "peg", name: "Pegged", color: "--s1" },
+    { k: "managed", name: "Managed", color: "--s2" },
+    { k: "float", name: "Floating", color: "--s3" }] },
+};
+const ANCHOR = { USD: "the US dollar", EUR: "the euro", BASKET: "a dollar-euro basket" };
+// SDMX-CSV of monthly exchange rates -> {country: {month: rate}} (keeps G163, the euro), as in update.py
+function sdmxRates(text) {
+  const lines = text.trim().split(/\r?\n/), h = lines[0].split(",");
+  const [c, t, v] = ["COUNTRY", "TIME_PERIOD", "OBS_VALUE"].map(n => h.indexOf(n));
+  if ([c, t, v].some(x => x < 0)) throw new Error("unexpected columns");
+  const out = {};
+  for (let n = 1; n < lines.length; n++) {
+    const r = lines[n].split(","), val = parseFloat(r[v]);
+    if (val > 0 && (/^[A-Z]{3}$/.test(r[c]) || r[c] === "G163")) (out[r[c]] ||= {})[r[t]] = val;
+  }
+  return out;
+}
+// How a currency behaved over the last 25 months of end-of-month rates, after the IMF's de facto tests:
+// pegged if it stayed within a 2% range against the dollar or the euro (or is one of them); managed if in
+// most 6-month windows it stayed within a 2% band around its trend against the dollar or a 50/50
+// dollar-euro basket (stabilised, crawling or tightly managed); floating otherwise.
+function measureRegimes() {
+  const out = {}, eur = CD.rates?.G163 || {}, euro = new Set(CD.groups?.euro || []);
+  const now = new Date(), maxM = `${now.getFullYear()}-M${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const months = Object.keys(eur).filter(m => m <= maxM).sort();
+  const span = s => { const v = s.map(Math.log); return (Math.exp(Math.max(...v) - Math.min(...v)) - 1) * 100; };
+  // share of 6-month windows in which the rate stays within a 2% band around a straight-line trend
+  const banded = s => {
+    const v = s.map(Math.log); let ok = 0, n = 0;
+    for (let i = 0; i + 6 < v.length; i++) {
+      const w = v.slice(i, i + 7), my = w.reduce((a, b) => a + b, 0) / 7;
+      const b = w.reduce((a, y, x) => a + (x - 3) * (y - my), 0) / 28;
+      const res = w.map((y, x) => y - (my + b * (x - 3)));
+      n++; if ((Math.max(...res) - Math.min(...res)) * 100 <= 2) ok++;
+    }
+    return n ? ok / n : 0;
+  };
+  for (const k of Object.keys(CD.names)) {
+    if (k === "USA") { out[k] = { r: "float", note: "Floating: the US dollar" }; continue; }
+    if (euro.has(k)) { out[k] = { r: "float", note: "Floating: uses the euro" }; continue; }
+    const rs = CD.rates?.[k];
+    if (!rs) continue;
+    const ms = months.filter(m => rs[m] > 0).slice(-25);
+    if (ms.length < 19) continue;
+    const usd = ms.map(m => rs[m]), vsEur = ms.map(m => rs[m] / eur[m]), basket = ms.map(m => rs[m] / Math.sqrt(eur[m]));
+    const peg = [["USD", usd], ["EUR", vsEur]].find(([, s]) => span(s) <= 2);
+    if (peg) { out[k] = { r: "peg", a: peg[0], note: `Pegged to ${ANCHOR[peg[0]]}` }; continue; }
+    const [bu, bb] = [banded(usd), banded(basket)];
+    if (Math.max(bu, bb) >= 0.5) {
+      const a = bu >= bb ? "USD" : "BASKET";
+      out[k] = { r: "managed", a, note: `Managed against ${ANCHOR[a]}` };
+    } else out[k] = { r: "float", note: "Floating" };
+  }
+  return out;
+}
+let REGIMES = {};
+function groupOf(k, by = state.cGroup) {
+  if (by === "regime") return REGIMES[k]?.r ?? null;
+  return CD.groups?.[by]?.[k] ?? null;
+}
+const groupCat = (by, key) => GROUPINGS[by].cats.find(c => c.k === key);
+
 // ---------- Countries ----------
 // Each country's reserve assets and monetary gold (IMF, International Investment Position), quarterly
 // and yearly, and GDP in US dollars (IMF, World Economic Outlook). The same addresses as update.py.
@@ -1219,6 +1321,7 @@ const COUNTRY_URLS = {
   iipQ: IIP_URL("Q"),
   iipA: IIP_URL("A"),
   weo: "https://api.imf.org/external/sdmx/3.0/data/dataflow/IMF.RES/WEO/+/*.NGDPD.A",
+  erM: "https://api.imf.org/external/sdmx/3.0/data/dataflow/IMF.STA/ER/+/*.XDC_USD.EOP_RT.M?c%5BTIME_PERIOD%5D=ge:{start}",
 };
 const MAX_COUNTRIES = 8;
 // SDMX-CSV -> {indicator: {country: {period: US$ billions}}}, countries only, from 1980 (as in update.py)
@@ -1256,17 +1359,20 @@ function assembleCountries() {
       pt.gdp = CD.gdp[k]?.[pt.p.slice(0, 4)] ?? null;
       // a country without any gold figures is taken to hold none; a missing figure otherwise stays unknown
       pt.exGold = fin(pt.gold) ? pt.res - pt.gold : hasGold ? null : pt.res;
+      pt.goldOnly = fin(pt.gold) ? pt.gold : null;
     }
     if (list.length) out[k] = { k, name: CD.names[k] || k, pts: list };
   }
   CC = out;
+  REGIMES = measureRegimes();
   const all = Object.values(out).flatMap(c => c.pts.map(pt => pt.p));
   CC_LATEST = all.length ? all.reduce((a, b) => a > b ? a : b) : "";
 }
 let CC_LATEST = "";
+// the amount shown, in US$ billions: all reserves, without gold, or gold alone
+const cAmount = pt => !pt ? null : state.cGold === "without" ? pt.exGold : state.cGold === "only" ? pt.goldOnly : pt.res;
 const cValue = pt => {
-  if (!pt) return null;
-  const r = state.cGold === "without" ? pt.exGold : pt.res;
+  const r = cAmount(pt);
   if (!fin(r)) return null;
   if (state.cMeasure === "bn") return r;
   return fin(pt.gdp) && pt.gdp > 0 ? r / pt.gdp * 100 : null;
@@ -1284,7 +1390,7 @@ const cPointAt = (c, p) => c.pts.find(pt => pt.p === p) || null;
 const quarterBack = (p, n) => { let [y, q] = p.split("-Q").map(Number); q -= n; while (q < 1) { q += 4; y--; } return `${y}-Q${q}`; };
 const cFmt = v => !fin(v) ? "–" : state.cMeasure === "bn" ? `$${fmt(v, v < 10 ? 1 : 0)} bn` : `${fmt(v, 1)}%`;
 const cUnit = () => state.cMeasure === "bn" ? "US$ billions" : "% of GDP";
-const goldWords = () => state.cGold === "without" ? "excluding gold" : "including gold";
+const goldWords = () => ({ without: "excluding gold", only: "gold only" })[state.cGold] || "including gold";
 
 function cRows() {
   return Object.values(CC).map(c => {
@@ -1301,6 +1407,10 @@ const SLOTS = ["--s1", "--s2", "--s3", "--s4", "--s5", "--s6", "--s7", "--s8"];
 function syncCountryControls() {
   setPressed(document.getElementById("c-measure-seg"), state.cMeasure);
   setPressed(document.getElementById("c-gold-seg"), state.cGold);
+  setPressed(document.getElementById("c-color-seg"), state.cColor);
+  setPressed(document.getElementById("c-group-seg"), state.cGroup);
+  document.querySelector('#c-color-seg [data-v="group"]').textContent = GROUPINGS[state.cGroup].label;
+  document.getElementById("c-filter").value = state.cFilter;
   const years = [...new Set(Object.values(CC).flatMap(c => c.pts.filter(pt => pt.p.endsWith("Q4")).map(pt => pt.p.slice(0, 4))))].sort().reverse();
   if (state.cYear !== "latest" && !years.includes(state.cYear)) state.cYear = "latest";
   document.getElementById("c-year").innerHTML = `<option value="latest">Latest available</option>` +
@@ -1321,12 +1431,34 @@ function drawCountryMap() {
   const rows = cRows(), el = document.getElementById("c-map"), bn = state.cMeasure === "bn";
   const asOf = state.cYear === "latest" ? "latest figure for each country" : `end of ${state.cYear}`;
   document.getElementById("c-map-title").textContent = bn ? "Reserves around the world" : "Reserves as a share of GDP";
-  document.getElementById("c-map-sub").textContent = `Official reserve assets ${goldWords()}, ${cUnit()}, ${asOf}. Grey: no figures.` +
-    (bn ? " Colours on a log scale." : " Colours stop at 60%; Hong Kong, Switzerland and a few others are far above.");
+  const byGroup = state.cColor === "group", G = GROUPINGS[state.cGroup];
+  document.getElementById("c-map-sub").textContent = byGroup
+    ? `Coloured by ${G.label.toLowerCase()}${state.cGroup === "regime" ? ", measured over the last two years" : ", the IMF's World Economic Outlook groups"}; hover for each country's reserves (${cUnit()}, ${goldWords()}, ${asOf}). Grey: no figures.`
+    : `Official reserve assets ${goldWords()}, ${cUnit()}, ${asOf}. Grey: no figures.` +
+      (bn ? " Colours on a log scale." : " Colours stop at 60%; a few countries are far above.");
+  if (byGroup) document.getElementById("c-map-title").textContent = `Countries by ${G.label.toLowerCase()}`;
   // the IMF's code for Kosovo differs from the map's
   const loc = k => ({ KOS: "XKX" })[k] || k;
   const z = rows.map(r => bn ? Math.log10(Math.max(r.v, 0.01)) : Math.min(r.v, 60));
   const ticks = bn ? [0, 1, 2, 3] : [0, 15, 30, 45, 60];
+  const legend = document.getElementById("c-map-legend");
+  legend.innerHTML = "";
+  if (byGroup) {
+    // one colour per group: categories as steps of a discrete colour scale
+    const n = G.cats.length, members = Object.values(CC).map(c => ({ c, g: groupOf(c.k), pt: cPoint(c) })).filter(m => m.g);
+    const scale = G.cats.flatMap((cat, i) => [[i / n, css(cat.color)], [(i + 1) / n, css(cat.color)]]);
+    legend.innerHTML = G.cats.map(cat => `<span><span class="dot" style="background:${css(cat.color)}"></span>${esc(cat.name)}</span>`).join("");
+    plot(el, [{
+      type: "choropleth", locationmode: "ISO-3", locations: members.map(m => loc(m.c.k)),
+      z: members.map(m => G.cats.findIndex(cat => cat.k === m.g)), zmin: -0.5, zmax: n - 0.5, colorscale: scale, showscale: false,
+      marker: { line: { color: css("--surface"), width: 0.5 } },
+      customdata: members.map(m => [m.c.name, state.cGroup === "regime" ? REGIMES[m.c.k].note : groupCat(state.cGroup, m.g).name,
+        fin(cValue(m.pt)) ? `${cFmt(cValue(m.pt))} (${label(m.pt.p)})` : "no recent figures", m.c.k]),
+      hovertemplate: "<b>%{customdata[0]}</b><br>%{customdata[1]}<br>%{customdata[2]}<extra></extra>",
+    }], baseLayout({ showlegend: false, margin: { l: 0, r: 0, t: 0, b: 0 }, geo: mapGeo() }));
+    bindMapClick(el);
+    return;
+  }
   plot(el, [{
     type: "choropleth", locationmode: "ISO-3", locations: rows.map(r => loc(r.c.k)), z,
     zmin: bn ? -1 : 0, zmax: bn ? 3.6 : 60,
@@ -1336,34 +1468,85 @@ function drawCountryMap() {
     hovertemplate: "<b>%{customdata[0]}</b><br>%{customdata[1]}<br>%{customdata[2]}<extra></extra>",
     colorbar: { thickness: 10, len: 0.7, outlinewidth: 0, tickvals: ticks, tickfont: { color: css("--text-muted"), size: 11 },
       ticktext: bn ? ["$1 bn", "$10 bn", "$100 bn", "$1,000 bn"] : ["0%", "15%", "30%", "45%", "60%+"] },
-  }], baseLayout({
-    showlegend: false, margin: { l: 0, r: 0, t: 0, b: 0 },
-    geo: { projection: { type: "natural earth" }, showframe: false, showcoastlines: false, showcountries: true,
-      countrycolor: css("--surface"), showland: true, landcolor: css("--grid"), showocean: false, showlakes: false,
-      bgcolor: "rgba(0,0,0,0)", lataxis: { range: [-58, 85] } },
-  }));
-  if (!el._clickBound) {
-    el._clickBound = true;
-    el.on("plotly_click", ev => { const k = ev.points?.[0]?.customdata?.[3]; if (k) toggleCountry(k, true); });
-  }
+  }], baseLayout({ showlegend: false, margin: { l: 0, r: 0, t: 0, b: 0 }, geo: mapGeo() }));
+  bindMapClick(el);
+}
+const mapGeo = () => ({ projection: { type: "natural earth" }, showframe: false, showcoastlines: false, showcountries: true,
+  countrycolor: css("--surface"), showland: true, landcolor: css("--grid"), showocean: false, showlakes: false,
+  bgcolor: "rgba(0,0,0,0)", lataxis: { range: [-58, 85] } });
+function bindMapClick(el) {
+  if (el._clickBound) return;
+  el._clickBound = true;
+  el.on("plotly_click", ev => { const k = ev.points?.[0]?.customdata?.[3]; if (k) toggleCountry(k, true); });
+}
+
+// ---- reserves compared across groups of countries ----
+function drawGroups() {
+  const by = state.cGroup, G = GROUPINGS[by], bn = state.cMeasure === "bn";
+  const rows = cRows().map(r => ({ ...r, g: groupOf(r.c.k, by), amt: cAmount(r.pt) })).filter(r => r.g);
+  const all = rows.reduce((a, r) => a + (fin(r.amt) ? r.amt : 0), 0);
+  const median = vs => { const s = vs.slice().sort((a, b) => a - b), n = s.length; return n ? (n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2) : null; };
+  const stats = G.cats.map(cat => {
+    const rs = rows.filter(r => r.g === cat.k);
+    const tot = rs.reduce((a, r) => a + r.amt, 0);
+    const withGdp = rs.filter(r => fin(r.pt.gdp) && r.pt.gdp > 0);
+    const combined = withGdp.reduce((a, r) => a + r.amt, 0) / withGdp.reduce((a, r) => a + r.pt.gdp, 0) * 100;
+    const top = rs.slice().sort((a, b) => b.amt - a.amt).slice(0, 3).map(r => r.c.name);
+    return { cat, rs, n: rs.length, med: median(rs.map(r => r.v)), tot, share: all > 0 ? tot / all * 100 : null, combined, top };
+  });
+  const el = document.getElementById("g-chart");
+  document.getElementById("g-sub").textContent = `${cUnit()}, ${goldWords()}, ${state.cYear === "latest" ? "latest figures" : `end of ${state.cYear}`}. ` +
+    "Each dot is a country; the box spans the middle half of each group and the line in it is the median. Log scale.";
+  if (!rows.length) { empty(el, "No figures for this selection."); document.getElementById("g-table").innerHTML = ""; return; }
+  const short = cat => cat.name.replace("Emerging and developing", "Emerging &<br>developing").replace("Latin America and the Caribbean", "Latin America &<br>Caribbean").replace("Middle East and Central Asia", "Middle East &<br>Central Asia").replace("Advanced economies", "Advanced<br>economies").replace("Sub-Saharan Africa", "Sub-Saharan<br>Africa");
+  // a log scale has no zero: countries with none (of gold, say) are counted in the table but not drawn
+  const zeros = rows.filter(r => !(r.v > 0)).length;
+  plot(el, stats.filter(st => st.rs.some(r => r.v > 0)).map(st => ({
+    type: "box", name: short(st.cat), y: st.rs.filter(r => r.v > 0).map(r => r.v), boxpoints: "all", jitter: 0.6, pointpos: 0,
+    marker: { color: css(st.cat.color), size: 6, opacity: 0.85, line: { color: css("--surface"), width: 1 } },
+    line: { color: css(st.cat.color), width: 1.5 }, fillcolor: "rgba(0,0,0,0)",
+    customdata: st.rs.filter(r => r.v > 0).map(r => `${r.c.name}: ${cFmt(r.v)}`), hovertemplate: "%{customdata}<extra></extra>", hoveron: "points",
+  })), baseLayout({ showlegend: false, hovermode: "closest",
+    yaxis: { type: "log", gridcolor: css("--grid"), tickvals: bn ? [0.1, 1, 10, 100, 1000] : [0.1, 0.3, 1, 3, 10, 30, 100, 300],
+      ticktext: bn ? ["$0.1 bn", "$1 bn", "$10 bn", "$100 bn", "$1,000 bn"] : ["0.1%", "0.3%", "1%", "3%", "10%", "30%", "100%", "300%"] },
+    xaxis: { tickfont: { color: css("--text-secondary"), size: 11.5 } }, margin: { l: 8, r: 8, t: 8, b: 8 } }));
+  if (zeros) document.getElementById("g-sub").textContent += ` ${zeros} ${zeros === 1 ? "country has" : "countries have"} none and ${zeros === 1 ? "is" : "are"} left out of the chart.`;
+  const f = v => cFmt(v);
+  document.getElementById("g-table").innerHTML = `<thead><tr><th>Group</th><th>Countries</th><th>Median</th>
+    ${bn ? "" : "<th>Combined, % of GDP</th>"}<th>Total, US$ bn</th><th>Share of the total</th></tr></thead><tbody>${stats.map(st =>
+    `<tr><td><span class="name"><span class="dot" style="background:${css(st.cat.color)}"></span>${esc(st.cat.name)}</span>
+      <div class="muted" style="font-size:12px">largest: ${esc(st.top.join(", "))}</div></td><td>${st.n}</td><td>${f(st.med)}</td>
+      ${bn ? "" : `<td>${fin(st.combined) ? fmt(st.combined, 1) + "%" : "–"}</td>`}<td>${fmt(st.tot, 0)}</td><td>${fin(st.share) ? fmt(st.share, 1) + "%" : "–"}</td></tr>`).join("")}</tbody>`;
+  document.getElementById("g-note").innerHTML = by === "regime"
+    ? `Exchange-rate regimes are measured from the IMF's end-of-month exchange rates over the last two years, following the IMF's de facto tests:
+       <b>pegged</b> if the rate stayed within a 2% range against the US dollar or the euro; <b>managed</b> if, in most 6-month stretches, it stayed
+       within a 2% band around its trend against the dollar or a dollar-euro basket (stabilised, crawling and tightly managed rates); <b>floating</b>
+       otherwise. Euro-area members float with the euro. This approximates the IMF's official classification (in its AREAER report), which is not
+       available as data.`
+    : `Groups as in the IMF's World Economic Outlook. "Combined" divides a group's total reserves by its total GDP, so large economies count for more;
+       the median treats every country alike. `;
 }
 function renderCountryTable() {
   const q = document.getElementById("c-search").value.trim().toLowerCase();
   const key = { name: r => r.c.name, v: r => r.v, d: r => r.d ?? -Infinity, p: r => r.pt.p }[state.cSort] || (r => r.v);
   const dir = state.cDir === "asc" ? 1 : -1;
-  const rows = cRows().sort((a, b) => { const x = key(a), y = key(b); return (x < y ? -1 : x > y ? 1 : 0) * dir; });
-  const byValue = cRows().sort((a, b) => b.v - a.v), rank = new Map(byValue.map((r, i) => [r.c.k, i + 1]));
+  const [fBy, fKey] = state.cFilter.split(":");
+  const rows = cRows().filter(r => state.cFilter === "all" || groupOf(r.c.k, fBy) === fKey)
+    .sort((a, b) => { const x = key(a), y = key(b); return (x < y ? -1 : x > y ? 1 : 0) * dir; });
+  const byValue = rows.slice().sort((a, b) => b.v - a.v), rank = new Map(byValue.map((r, i) => [r.c.k, i + 1]));
   const arrow = k => state.cSort === k ? (state.cDir === "asc" ? " ▲" : " ▼") : "";
   const th = (k, t) => `<th class="sortable" data-sort="${k}">${t}${arrow(k)}</th>`;
   document.getElementById("c-table").innerHTML =
-    `<thead><tr><th>#</th>${th("name", "Country")}${th("v", cUnit())}${th("d", state.cMeasure === "bn" ? "1 year, bn" : "1 year, pp")}${th("p", "As of")}</tr></thead>
+    `<thead><tr><th>#</th>${th("name", "Country")}${th("v", cUnit())}${th("d", state.cMeasure === "bn" ? "1 year, bn" : "1 year, pp")}<th>Economy · exchange rate</th>${th("p", "As of")}</tr></thead>
     <tbody>${rows.filter(r => !q || r.c.name.toLowerCase().includes(q)).map(r => {
       const sel = state.cSel.includes(r.c.k);
       return `<tr data-k="${r.c.k}"${sel ? ' class="current"' : ""}><td class="muted">${rank.get(r.c.k)}</td>
         <td><span class="name">${sel ? `<span class="dot" style="background:${cColor(r.c.k)}"></span>` : '<span class="dot" style="background:transparent;border:1px solid var(--axis)"></span>'}${esc(r.c.name)}</span></td>
-        <td>${cFmt(r.v)}</td><td class="${cls(r.d)}">${signed(r.d, state.cMeasure === "bn" ? 0 : 1)}</td><td class="muted">${label(r.pt.p)}</td></tr>`;
+        <td>${cFmt(r.v)}</td><td class="${cls(r.d)}">${signed(r.d, state.cMeasure === "bn" ? 0 : 1)}</td>
+        <td class="muted">${({ AE: "Advanced", EM: "Emerging" })[CD.groups?.econ?.[r.c.k]] || "–"} · ${esc(REGIMES[r.c.k]?.note || "–")}</td><td class="muted">${label(r.pt.p)}</td></tr>`;
     }).join("")}</tbody>`;
   document.getElementById("c-table-sub").textContent = `${rows.length} countries, ${goldWords()}. Click a column to sort it, a country to add it to the chart.`;
+  // the rank is within the countries shown
 }
 function drawCountryLines() {
   const el = document.getElementById("c-line");
@@ -1384,19 +1567,22 @@ function drawCountryLines() {
 }
 function renderCountries() {
   if (!CC) assembleCountries();
-  syncCountryControls(); drawCountryMap(); renderCountryTable(); drawCountryLines();
+  syncCountryControls(); drawCountryMap(); drawGroups(); renderCountryTable(); drawCountryLines();
   if (cLive.state === "idle") loadCountriesLive();
 }
 async function loadCountriesLive() {
   cLive.state = "loading"; syncCountryControls();
   try {
-    const texts = await Promise.all(Object.values(COUNTRY_URLS).map(async url => {
+    const d = new Date(), start = `${d.getFullYear() - 3}-M${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const texts = await Promise.all(Object.values(COUNTRY_URLS).map(async u => {
+      const url = u.replace("{start}", start);
       const res = await fetch(url, { headers: { Accept: CSV_TYPE }, cache: "no-store" });
       if (!res.ok) throw new Error(`the IMF answered ${res.status}`);
       return res.text();
     }));
-    const [q, a, w] = texts.map(sdmxSeries);
-    const fresh = { names: CD.names, resQ: q.R || {}, goldQ: q.R_F11_MV || {}, resA: a.R || {}, goldA: a.R_F11_MV || {}, gdp: w.NGDPD || {} };
+    const [q, a, w] = texts.slice(0, 3).map(sdmxSeries), rates = sdmxRates(texts[3]);
+    const fresh = { names: CD.names, groups: CD.groups, resQ: q.R || {}, goldQ: q.R_F11_MV || {}, resA: a.R || {}, goldA: a.R_F11_MV || {},
+      gdp: w.NGDPD || {}, rates: rates.G163 ? rates : CD.rates };
     if (!Object.keys(fresh.resQ).length || !Object.keys(fresh.gdp).length) throw new Error("the IMF's answer had no figures");
     CD = fresh; CC = null;
     Object.assign(cLive, { state: "live", at: new Date().toISOString() });
@@ -1418,6 +1604,15 @@ document.getElementById("c-gold-seg").addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b) return;
   state.cGold = b.dataset.v; writeHash(); renderCountries();
 });
+document.getElementById("c-color-seg").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  state.cColor = b.dataset.v; writeHash(); syncCountryControls(); drawCountryMap();
+});
+document.getElementById("c-group-seg").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  state.cGroup = b.dataset.v; writeHash(); syncCountryControls(); drawGroups(); if (state.cColor === "group") drawCountryMap();
+});
+document.getElementById("c-filter").addEventListener("change", e => { state.cFilter = e.target.value; writeHash(); renderCountryTable(); });
 document.getElementById("c-year").addEventListener("change", e => { state.cYear = e.target.value; writeHash(); renderCountries(); });
 document.getElementById("c-search").addEventListener("input", renderCountryTable);
 document.getElementById("c-add").addEventListener("change", e => { if (e.target.value) toggleCountry(e.target.value, true); });

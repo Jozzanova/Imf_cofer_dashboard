@@ -43,7 +43,13 @@ COUNTRY_URLS = {
     "iipQ": IIP_URL.format(f="Q"),
     "iipA": IIP_URL.format(f="A"),
     "weo": "https://api.imf.org/external/sdmx/3.0/data/dataflow/IMF.RES/WEO/+/*.NGDPD.A",
+    # monthly end-of-month exchange rates (domestic currency per US dollar) of every country for the last
+    # three years, to measure how each currency behaves (pegged, managed or floating)
+    "erM": "https://api.imf.org/external/sdmx/3.0/data/dataflow/IMF.STA/ER/+/*.XDC_USD.EOP_RT.M?c%5BTIME_PERIOD%5D=ge:{start}",
 }
+# The IMF's grouping of countries in the World Economic Outlook: advanced economies (including the
+# euro area) and emerging and developing economies by region.
+GROUPS_URL = "https://api.imf.org/external/sdmx/3.0/structure/hierarchy/IMF.RES/H_WEO_COUNTRIES/+"
 NAMES_URL = "https://api.imf.org/external/sdmx/3.0/structure/codelist/IMF/CL_COUNTRY/+"
 CSV_TYPE = "application/vnd.sdmx.data+csv;version=2.0.0"
 
@@ -83,6 +89,46 @@ def series(text: str, indicator_col: str = "INDICATOR") -> dict:
     return out
 
 
+def monthly_rates(text: str) -> dict:
+    """SDMX-CSV of exchange rates -> {country: {month: rate}}; keeps G163 (the euro) for the comparisons."""
+    lines = text.strip().splitlines()
+    h = lines[0].split(",")
+    c, t, v = (h.index(n) for n in ("COUNTRY", "TIME_PERIOD", "OBS_VALUE"))
+    out = {}
+    for line in lines[1:]:
+        r = line.split(",")
+        try:
+            val = float(r[v])
+        except ValueError:
+            continue
+        if val > 0 and ((len(r[c]) == 3 and r[c].isalpha()) or r[c] == "G163"):
+            out.setdefault(r[c], {})[r[t]] = float(f"{val:.6g}")
+    return out
+
+
+def country_groups(text: str) -> dict:
+    """The WEO hierarchy -> {"econ": {country: "AE" or "EM"}, "region": {country: group}, "euro": [...]}."""
+    world = json.loads(text)["data"]["hierarchies"][0]["hierarchicalCodes"][0]
+    code = lambda node: node["id"].split("___")[-1]
+
+    def leaves(node):
+        kids = node.get("hierarchicalCodes", [])
+        return [code(node)] if not kids else [c for k in kids for c in leaves(k)]
+
+    econ, region, euro = {}, {}, []
+    for group in world["hierarchicalCodes"]:
+        g = code(group)
+        for sub in group.get("hierarchicalCodes", []):
+            for k in leaves(sub):
+                if not (len(k) == 3 and k.isalpha()):
+                    continue
+                econ[k] = "AE" if g == "G110" else "EM"
+                region[k] = "AE" if g == "G110" else code(sub)
+                if code(sub) == "G163":
+                    euro.append(k)
+    return {"econ": econ, "region": region, "euro": sorted(set(euro))}
+
+
 def country_names(text: str) -> dict:
     codes = json.loads(text)["data"]["codelists"][0]["codes"]
     return {x["id"]: SHORT_NAMES.get(x["id"], x["name"].split(",")[0]) for x in codes if len(x["id"]) == 3 and x["id"].isalpha()}
@@ -92,8 +138,8 @@ def countries(raw: dict) -> dict:
     q, a, weo = series(raw["iipQ"]), series(raw["iipA"]), series(raw["weo"])
     data = {"resQ": q.get("R", {}), "goldQ": q.get("R_F11_MV", {}), "resA": a.get("R", {}),
             "goldA": a.get("R_F11_MV", {}),
-            "gdp": weo.get("NGDPD", {})}
-    used = set().union(*(d.keys() for d in data.values()))
+            "gdp": weo.get("NGDPD", {}), "rates": monthly_rates(raw["erM"]), "groups": country_groups(raw["groups"])}
+    used = set().union(*(data[k].keys() for k in ("resQ", "resA", "goldQ", "goldA", "gdp")))
     names = country_names(raw["names"])
     data["names"] = {k: names.get(k, k) for k in sorted(used)}
     return data
@@ -113,18 +159,21 @@ def main():
         er = RAW_ER.read_text(encoding="utf-8") if RAW_ER.exists() else ""
         raw = {k: (RAW.parent / f"{k}.csv").read_text(encoding="utf-8") for k in COUNTRY_URLS}
         raw["names"] = (RAW.parent / "names.json").read_text(encoding="utf-8")
+        raw["groups"] = (RAW.parent / "groups.json").read_text(encoding="utf-8")
         status = json.loads(STATUS.read_text(encoding="utf-8")) if STATUS.exists() else {}
     else:
         text, er = download(DATA_URL), download(ER_URL)
-        raw = {k: download(url) for k, url in COUNTRY_URLS.items()}
-        with urllib.request.urlopen(urllib.request.Request(NAMES_URL, headers={"User-Agent": "cofer-dashboard"}), timeout=120) as res:
-            raw["names"] = res.read().decode("utf-8")
+        start = f"{datetime.now().year - 3}-M{datetime.now().month:02d}"
+        raw = {k: download(url.format(start=start)) for k, url in COUNTRY_URLS.items()}
+        for k, url in (("names", NAMES_URL), ("groups", GROUPS_URL)):
+            with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "cofer-dashboard"}), timeout=120) as res:
+                raw[k] = res.read().decode("utf-8")
         status = {"downloaded": datetime.now(timezone.utc).isoformat(timespec="seconds")}
         RAW.parent.mkdir(parents=True, exist_ok=True)
         RAW.write_text(text, encoding="utf-8")
         RAW_ER.write_text(er, encoding="utf-8")
         for k, t in raw.items():
-            (RAW.parent / f"{k}.{'json' if k == 'names' else 'csv'}").write_text(t, encoding="utf-8")
+            (RAW.parent / f"{k}.{'json' if k in ('names', 'groups') else 'csv'}").write_text(t, encoding="utf-8")
         STATUS.write_text(json.dumps(status), encoding="utf-8")
     status["latest"] = latest_quarter(text)
 
