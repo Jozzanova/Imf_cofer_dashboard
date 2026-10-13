@@ -414,6 +414,8 @@
       <div class="map-tools">
         <div class="control"><span class="lbl">Up the side</span>
           <div class="seg" id="b-y-seg"><button data-v="bn">Reserves, US$</button><button data-v="pct">% of GDP</button></div></div>
+        <div class="control"><span class="lbl">Labels</span>
+          <div class="seg" id="b-labels-seg"><button data-v="6">6</button><button data-v="10">10</button><button data-v="20">20</button><button data-v="all">All</button></div></div>
         <div class="control"><span class="lbl">Colour by</span>
           <div class="seg" id="b-color-seg"><button data-v="econ">Economy</button><button data-v="region">Region</button><button data-v="regime">Exchange rate</button></div></div>
       </div>
@@ -665,7 +667,7 @@ const state = {
   chFrom: "", chTo: "", chMetric: "bn", chCur: "USD", dtMetric: "share", dtSet: "cur", dtYear: "latest",
   raceMetric: "share", raceNoUSD: false, raceSpeed: "1", fxBase: "2016-Q4", fxCur: "USD",
   cMeasure: "pct", cGold: "with", cYear: "latest", cSort: "v", cDir: "desc", gb: "eu_AE_float~eu_AE_peg", cGroup: "regime", cFilter: "all", cLines: "regime", cAgg: "combined", gScale: "log",
-  bY: "bn", bColor: "regime", bEcon: ["AE"], bReg: ["peg", "managed", "float"], bRegion: "all", bSpeed: "4", cSel: ["CHE", "HKG", "SAU", "CHN", "JPN", "USA"],
+  bY: "bn", bColor: "regime", bEcon: ["AE"], bReg: ["peg", "managed", "float"], bRegion: "all", bSpeed: "4", bLabels: "10", cSel: ["CHE", "HKG", "SAU", "CHN", "JPN", "USA"],
 };
 const LIST_KEYS = new Set(["cur", "cSel", "bEcon", "bReg", "shShow", "amShow"]);
 const TABS = ["shares", "changes", "countries", "explore", "data"];
@@ -692,6 +694,7 @@ function readHash() {
   if (!["bn", "pct"].includes(state.bY)) state.bY = "bn";
   if (!["econ", "region", "regime"].includes(state.bColor)) state.bColor = "regime";
   if (!["1", "2", "4"].includes(state.bSpeed)) state.bSpeed = "4";
+  if (!["6", "10", "20", "all"].includes(state.bLabels)) state.bLabels = "10";
 
   state.cSel = state.cSel.slice(0, 8);
 }
@@ -2032,7 +2035,8 @@ function drawCountryLines() {
 }
 function renderCountries() {
   if (!CC) assembleCountries();
-  syncCountryControls(); drawBuilder(); drawGroups(); drawBubbles(); renderCountryTable(); drawCountryLines();
+  // a playing bubble chart carries on (it reads the new figures from the next year on)
+  syncCountryControls(); drawBuilder(); drawGroups(); if (!bub.playing) drawBubbles(); renderCountryTable(); drawCountryLines();
   if (cLive.state === "idle") loadCountriesLive();
 }
 async function loadCountriesLive() {
@@ -2134,13 +2138,15 @@ const bubKeep = r => state.bEcon.includes(r.econ) && (r.regime ? state.bReg.incl
 function bubbleTarget(y) {
   const lastYear = +CC_LATEST.slice(0, 4), pctY = state.bY === "pct";
   const { rows, world } = bubbleYear(y, lastYear), shown = rows.filter(bubKeep);
-  const named = new Set(shown.slice().sort((p, q) => q.a - p.a).slice(0, 6).map(r => r.c.k).concat(state.cSel, HOME));
+  // names on the largest holders (as many as chosen), the countries chosen for the chart over time, and Norway
+  const nLabels = state.bLabels === "all" ? Infinity : +state.bLabels;
+  const named = new Set(shown.slice().sort((p, q) => q.a - p.a).slice(0, nLabels).map(r => r.c.k).concat(state.cSel, HOME));
   const pts = new Map();
   for (const r of shown) {
     const cat = groupCat(state.bColor, r[state.bColor]);
     pts.set(r.c.k, {
       lx: Math.log10(r.gdp), ly: Math.log10(pctY ? r.pct : r.a), s: Math.max(5, 70 * Math.sqrt(r.share / MAX_SHARE)),
-      color: css(cat?.color || "--other"), text: named.has(r.c.k) ? (r.c.k === HOME ? `<b>${r.c.name}</b>` : r.c.name) : "", home: r.c.k === HOME,
+      color: css(cat?.color || "--other"), text: named.has(r.c.k) ? (r.c.k === HOME ? `★ ${r.c.name}` : r.c.name) : "", home: r.c.k === HOME,  // plain text: Plotly can drop rich text when it updates
       cd: [r.c.name, `$${fmt(r.gdp, 0)} bn`, `$${fmt(r.a, r.a < 10 ? 1 : 0)} bn`, `${fmt(r.pct, 1)}%`, `${fmt(r.share, 2)}%`, cat?.name || "–", r.c.k],
     });
   }
@@ -2158,6 +2164,7 @@ function syncBubbleControls() {
   setPressed(document.getElementById("b-y-seg"), state.bY);
   setPressed(document.getElementById("b-color-seg"), state.bColor);
   setPressed(document.getElementById("b-speed-seg"), state.bSpeed);
+  setPressed(document.getElementById("b-labels-seg"), state.bLabels);
   document.querySelectorAll("#b-filters .chip").forEach(b => {
     const [key, v] = b.dataset.f.split(":");
     b.setAttribute("aria-pressed", String(state[key].includes(v)));
@@ -2165,16 +2172,25 @@ function syncBubbleControls() {
   document.getElementById("b-region").value = state.bRegion;
 }
 const bubTrace = list => ({
-  type: "scatter", mode: "markers+text", showlegend: false,
-  x: list.map(p => 10 ** p.lx), y: list.map(p => 10 ** p.ly), text: list.map(p => p.text),
-  textposition: "top center", cliponaxis: false,
-  textfont: { size: list.map(p => p.home ? 13 : 11), color: list.map(p => css(p.home ? "--text-primary" : "--text-secondary")) },
+  type: "scatter", mode: "markers", showlegend: false,
+  x: list.map(p => 10 ** p.lx), y: list.map(p => 10 ** p.ly),
   marker: { size: list.map(p => p.s), sizemode: "diameter", color: list.map(p => p.color), opacity: 0.78,
     line: { color: list.map(p => css(p.home ? "--text-primary" : "--surface")), width: list.map(p => p.home ? 3 : 1) } },
   customdata: list.map(p => p.cd),
   hovertemplate: "<b>%{customdata[0]}</b> (%{customdata[5]})<br>GDP %{customdata[1]}<br>Reserves %{customdata[2]} = %{customdata[3]} of GDP<br>%{customdata[4]} of world reserves<extra></extra>",
 });
 const bySize = m => [...m.values()].sort((p, q) => q.s - p.s);  // the largest drawn first, so small ones stay visible
+// The names, as a series of their own: invisible markers the size of the bubbles (so the text sits just
+// above each) in a fixed order. Plotly loses labels when a series with text is re-sorted from frame to
+// frame, as the bubbles are (by size).
+const labelTrace = list => {
+  const named = list.filter(p => p.text).sort((p, q) => p.cd[6] < q.cd[6] ? -1 : 1);
+  return { type: "scatter", mode: "markers+text", showlegend: false, hoverinfo: "skip",
+    x: named.map(p => 10 ** p.lx), y: named.map(p => 10 ** p.ly), text: named.map(p => p.text),
+    textposition: "top center", cliponaxis: false,
+    textfont: { size: named.map(p => p.home ? 13 : 11), color: named.map(p => css(p.home ? "--text-primary" : "--text-secondary")) },
+    marker: { size: named.map(p => p.s), sizemode: "diameter", opacity: 0 } };
+};
 function showBubbleYear(y, sub) {
   document.getElementById("b-yearlabel").textContent = y;
   if (sub) document.getElementById("b-sub").textContent = sub;
@@ -2209,7 +2225,7 @@ function drawBubbles() {
   }
   const tick = v => `$${v >= 1000 ? fmt(v / 1000, 0) + " tn" : fmt(v, v < 1 ? 1 : 0) + " bn"}`;
   const vals = [0.1, 1, 10, 100, 1000, 10000, 100000];
-  plot(el, [bubTrace(bySize(target.pts)), ...G.cats.map(cat => ({ type: "scatter", mode: "markers", name: cat.name, x: [null], y: [null],
+  plot(el, [bubTrace(bySize(target.pts)), labelTrace(bySize(target.pts)), ...G.cats.map(cat => ({ type: "scatter", mode: "markers", name: cat.name, x: [null], y: [null],
     hoverinfo: "skip", marker: { size: 10, color: css(cat.color) } }))], baseLayout({
     hovermode: "closest", showlegend: true, shapes, annotations,
     legend: { orientation: "h", y: 1.02, yanchor: "bottom", x: 0, font: { color: css("--text-secondary") }, itemclick: false, itemdoubleclick: false },
@@ -2246,22 +2262,24 @@ function tweenBubbles(target, ms, steady, done) {
       lx: a.lx + (b.lx - a.lx) * e, ly: a.ly + (b.ly - a.ly) * e, s: a.s + (b.s - a.s) * e,
       color: e < 0.5 ? a.color : b.color, text: e < 0.5 ? a.text : b.text, cd: e < 0.5 ? a.cd : b.cd, home: a.home || b.home,
     }));
-    bubFrame(el, bubTrace(list));
+    bubFrame(el, bubTrace(list), list);
     if (!labelled && e >= 0.5) { labelled = true; showBubbleYear(target.year, target.sub); }
     if (t < 1) { bub.raf = requestAnimationFrame(step); return; }
     // finished: keep only the target's bubbles
     bub.cur = target.pts;
-    bubFrame(el, bubTrace(bySize(target.pts)));
+    bubFrame(el, bubTrace(bySize(target.pts)), bySize(target.pts));
     done?.();
   };
   bub.raf = requestAnimationFrame(step);
 }
-// one frame: Plotly's animate path without a transition or a redraw only moves the points, which is much
-// lighter than a restyle
-function bubFrame(el, tr) {
-  Plotly.animate(el, { data: [{ x: tr.x, y: tr.y, text: tr.text, customdata: tr.customdata, textfont: tr.textfont,
-    marker: { size: tr.marker.size, color: tr.marker.color, line: tr.marker.line } }], traces: [0] },
-    { transition: { duration: 0 }, frame: { duration: 0, redraw: false }, mode: "immediate" }).catch(() => {});  // a newer frame interrupted it
+// one frame: a direct update of the series (Plotly's lighter animate is asynchronous, and its queued
+// frames could land after the last one and leave out labels that had just appeared)
+function bubFrame(el, tr, list) {
+  const lt = labelTrace(list);
+  Plotly.restyle(el, { x: [tr.x, lt.x], y: [tr.y, lt.y], text: [undefined, lt.text], customdata: [tr.customdata, undefined],
+    "textfont.size": [undefined, lt.textfont.size], "textfont.color": [undefined, lt.textfont.color],
+    "marker.size": [tr.marker.size, lt.marker.size], "marker.color": [tr.marker.color, undefined],
+    "marker.line.color": [tr.marker.line.color, undefined], "marker.line.width": [tr.marker.line.width, undefined] }, [0, 1]);
 }
 const moveBubbles = (ms = 450) => { syncBubbleControls(); tweenBubbles(bubbleTarget(bub.year), ms, false); };
 function bubStop() {
@@ -2287,11 +2305,12 @@ document.getElementById("b-year").addEventListener("input", e => {
   bub.playing = false; document.getElementById("b-play").textContent = "▶ Play";
   bub.year = +e.target.value; tweenBubbles(bubbleTarget(bub.year), 300, false);
 });
-for (const [id, key] of [["b-y-seg", "bY"], ["b-color-seg", "bColor"], ["b-speed-seg", "bSpeed"]]) {
+for (const [id, key] of [["b-y-seg", "bY"], ["b-color-seg", "bColor"], ["b-speed-seg", "bSpeed"], ["b-labels-seg", "bLabels"]]) {
   document.getElementById(id).addEventListener("click", e => {
     const b = e.target.closest("button"); if (!b) return;
     state[key] = b.dataset.v; setPressed(e.currentTarget, state[key]); writeHash();
     if (key === "bSpeed") return;  // takes effect from the next year
+    if (key === "bLabels") { if (!bub.playing) moveBubbles(200); return; }
     if (key === "bColor" && !bub.playing) { drawBubbles(); return; }
     if (key === "bY") { bub.playing = false; document.getElementById("b-play").textContent = "▶ Play"; drawBubbles(); }
   });
