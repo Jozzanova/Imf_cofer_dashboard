@@ -235,8 +235,7 @@
   <section class="tiles" id="tiles" aria-label="Latest quarter"></section>
 
   <nav class="tabs" role="tablist" aria-label="Views">
-    <button role="tab" id="tab-btn-shares" data-tab="shares" aria-controls="tab-shares">Currency shares</button>
-    <button role="tab" id="tab-btn-amounts" data-tab="amounts" aria-controls="tab-amounts">Amounts</button>
+    <button role="tab" id="tab-btn-shares" data-tab="shares" aria-controls="tab-shares">Currencies</button>
     <button role="tab" id="tab-btn-changes" data-tab="changes" aria-controls="tab-changes">Changes</button>
     <button role="tab" id="tab-btn-data" data-tab="data" aria-controls="tab-data">Data</button>
     <button role="tab" id="tab-btn-countries" data-tab="countries" aria-controls="tab-countries">Countries</button>
@@ -265,7 +264,7 @@
     <div class="hint" id="hint"></div>
   </section>
 
-  <!-- Currency shares -->
+  <!-- Currencies: shares, then amounts in US dollars -->
   <div role="tabpanel" id="tab-shares" aria-labelledby="tab-btn-shares">
     <section class="card">
       <div class="card-head">
@@ -282,10 +281,6 @@
       <p class="sub" id="sh-table-sub"></p>
       <div class="table-wrap"><table id="sh-table"></table></div>
     </section>
-  </div>
-
-  <!-- Amounts -->
-  <div role="tabpanel" id="tab-amounts" aria-labelledby="tab-btn-amounts" hidden>
     <section class="card">
       <div class="card-head">
         <div><h2>Reserves by currency, in US dollars</h2><p class="sub" id="am-sub"></p></div>
@@ -515,7 +510,7 @@
           is the IMF's survey of the currencies central banks hold their foreign exchange reserves in. Countries report to the IMF in confidence; the
           IMF publishes only the world totals shown here. Foreign exchange reserves exclude gold, SDRs and the reserve position in the IMF.</li>
         <li><b>Shares</b> are percentages of <i>allocated</i> reserves: those whose currency composition is known. In the current release
-          unallocated reserves are zero from 2000 on; in 1995–1999 they were about a fifth of the total (shown grey in Amounts).
+          unallocated reserves are zero from 2000 on; in 1995–1999 they were about a fifth of the total (shown grey in the US-dollar chart).
           From 2025 Q3 the IMF also reports the part of total reserves whose composition it has imputed (estimated) itself, about 10%.</li>
         <li><b>Amounts</b> are in US dollars at each period's market exchange rates. A change in an amount therefore mixes what central banks
           bought or sold with valuation: when the dollar rises, reserves in other currencies are worth fewer dollars. The same holds for shares.</li>
@@ -655,7 +650,7 @@ const state = {
   bY: "bn", bColor: "econ", bEcon: ["AE", "EM"], bReg: ["peg", "managed", "float"], bRegion: "all", bSpeed: "1", cSel: ["CHE", "HKG", "SAU", "CHN", "JPN", "USA"],
 };
 const LIST_KEYS = new Set(["cur", "cSel", "bEcon", "bReg"]);
-const TABS = ["shares", "amounts", "changes", "data", "countries", "explore"];
+const TABS = ["shares", "changes", "data", "countries", "explore"];
 function readHash() {
   const p = new URLSearchParams(location.hash.slice(1));
   for (const [k, v] of p) {
@@ -664,6 +659,7 @@ function readHash() {
     else if (typeof state[k] === "boolean") state[k] = v === "1";
     else state[k] = v;
   }
+  if (state.tab === "amounts") state.tab = "shares";  // amounts used to have a tab of their own
   if (!TABS.includes(state.tab)) state.tab = "shares";
   if (!["Q", "A"].includes(state.freq)) state.freq = "Q";
   if (!CUR[state.chCur] || CUR[state.chCur].yearlyOnly) state.chCur = "USD";
@@ -2077,8 +2073,7 @@ document.getElementById("b-region").addEventListener("change", e => { state.bReg
 
 // ---------- tabs ----------
 function renderTab(tab) {
-  if (tab === "shares") { drawShares(); renderSharesTable(); }
-  else if (tab === "amounts") { drawAmounts(); renderAmountsTable(); }
+  if (tab === "shares") { drawShares(); renderSharesTable(); drawAmounts(); renderAmountsTable(); }
   else if (tab === "changes") drawChanges();
   else if (tab === "data") renderData();
   else if (tab === "countries") renderCountries();

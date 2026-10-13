@@ -20,9 +20,9 @@ embedded copy. The current view is stored in the URL after `#`, so a bookmarked 
 reopens the same selection.
 
 Tabs:
-- **Currency shares**: shares of allocated reserves as lines, stacked, or one chart per currency,
-  with the changes over 1 quarter, 1, 5 and 10 years and the highs and lows.
-- **Amounts**: reserves by currency in US$ billions, with growth rates.
+- **Currencies**: shares of allocated reserves as lines, stacked, or one chart per currency,
+  with the changes over 1 quarter, 1, 5 and 10 years and the highs and lows; and the same
+  currencies in US$ billions, with growth rates.
 - **Changes**: the change between any two dates, by currency, in US$, % or share points, and
   each quarter's change for one currency.
 - **Data**: the numbers as a table, with a CSV download of the selection.
