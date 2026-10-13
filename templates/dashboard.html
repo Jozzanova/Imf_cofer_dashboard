@@ -537,7 +537,8 @@
           reports quarterly and otherwise at year-end, divided by that calendar year's GDP in US dollars from the IMF's
           <a href="https://data.imf.org/en/datasets/IMF.RES:WEO" target="_blank" rel="noopener">World Economic Outlook</a> (the latest year is
           an IMF estimate). Reserves are a stock and GDP a yearly flow, the usual way to compare them. "Latest available" uses each country's most
-          recent figure, if it is no more than two years old. Countries that are not IMF members (such as Taiwan) or do not report are missing.
+          recent figure, if it is no more than two years old. Where a country stops reporting its gold (Norway after 1993, when it held
+          only about $0.04 bn), its last reported amount is assumed for later years. Countries that are not IMF members (such as Taiwan) or do not report are missing.
           These are national totals, not their currency composition: the IMF publishes that only for the world as a whole.
           Advanced and emerging economies and the regions are the World Economic Outlook's groups. Exchange-rate regimes are measured from
           end-of-month exchange rates over the last two years (see the note under "Compare groups"); with monthly data a few currencies
@@ -1434,9 +1435,13 @@ function assembleCountries() {
     }
     const hasGold = !!(CD.goldQ[k] || CD.goldA[k]);
     const list = [...pts.values()].sort((a, b) => a.p < b.p ? -1 : 1);
+    let lastGold = null;
     for (const pt of list) {
       pt.gdp = CD.gdp[k]?.[pt.p.slice(0, 4)] ?? null;
-      // a country without any gold figures is taken to hold none; a missing figure otherwise stays unknown
+      // a country that stops reporting gold (Norway after 1993, for example) is taken to keep its last
+      // reported amount; one without any gold figures is taken to hold none; before its first figure, unknown
+      if (fin(pt.gold)) lastGold = pt.gold;
+      else if (lastGold != null) pt.gold = Math.min(lastGold, pt.res);
       pt.exGold = fin(pt.gold) ? pt.res - pt.gold : hasGold ? null : pt.res;
       pt.goldOnly = fin(pt.gold) ? pt.gold : null;
     }
