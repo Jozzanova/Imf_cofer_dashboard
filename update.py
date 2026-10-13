@@ -66,7 +66,8 @@ CSV_TYPE = "application/vnd.sdmx.data+csv;version=2.0.0"
 SHORT_NAMES = {
     "CHN": "China", "HKG": "Hong Kong", "MAC": "Macao", "KOR": "South Korea", "PRK": "North Korea",
     "COD": "DR Congo", "COG": "Congo", "NLD": "Netherlands", "GMB": "Gambia", "FSM": "Micronesia",
-    "NRU": "Nauru", "TWN": "Taiwan", "LAO": "Laos", "SYR": "Syria",
+    "NRU": "Nauru", "TWN": "Taiwan", "LAO": "Laos", "SYR": "Syria", "RUS": "Russia", "IRN": "Iran", "VNM": "Vietnam",
+    "BRN": "Brunei", "MDA": "Moldova", "TZA": "Tanzania", "VEN": "Venezuela", "BOL": "Bolivia",
 }
 
 

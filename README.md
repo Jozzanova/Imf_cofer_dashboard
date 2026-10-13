@@ -29,7 +29,9 @@ Tabs:
 - **Countries**: each country's reserves (IMF, International Investment Position) as % of GDP
   (IMF, World Economic Outlook) or in US$, with or without gold: a world map, a sortable ranking
   (flat or a spinning globe, with bubbles for US$ amounts and a time-lapse since 1990) and a chart
-  over time for chosen countries; also gold alone, and comparisons of advanced and
+  over time for chosen countries; a bubble chart of GDP against reserves (bubble area: share of
+  world reserves) that plays year by year since 1990, with filters for advanced/emerging,
+  pegged/managed/floating and region; also gold alone, and comparisons of advanced and
   emerging economies, regions, and pegged, managed and floating currencies (measured from the
   IMF's monthly exchange rates), also year by year since 1980.
 - **Explore**: a bar chart race of the currencies since 1999; how much of each currency's change in
