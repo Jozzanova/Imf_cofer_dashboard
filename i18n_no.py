@@ -82,6 +82,7 @@ PAIRS = [
     ('aria-controls="tab-countries">Countries</button>', 'aria-controls="tab-countries">Land</button>'),
     ('aria-controls="tab-explore">Explore ✦</button>', 'aria-controls="tab-explore">Utforsk ✦</button>'),
     ('aria-controls="tab-data">Data</button>', 'aria-controls="tab-data">Data</button>'),
+    ('aria-controls="tab-norway">Norway</button>', 'aria-controls="tab-norway">Norge</button>'),
     ('aria-label="Selection"', 'aria-label="Utvalg"'),
     ('<span class="lbl">Currencies</span>', '<span class="lbl">Valutaer</span>'),
     ('id="cur-all">All</button>', 'id="cur-all">Alle</button>'),

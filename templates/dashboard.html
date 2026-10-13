@@ -188,7 +188,13 @@
     padding: 10px 12px; margin: 4px 0 14px; }
   .insight:empty { display: none; }
   .grid2.inner { margin-bottom: 0; }
-  #tab-explore, #tab-countries { margin-top: 16px; }
+  #tab-explore, #tab-countries, #tab-norway { margin-top: 16px; }
+  .slide-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 8px 16px; }
+  .slide-no { font-size: 11.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--accent); }
+  .slide-head h2 { font-size: 19px; margin-top: 2px; }
+  .slide-comment { font-size: 14.5px; color: var(--text-primary); margin: 8px 0 4px; max-width: 980px; }
+  .slide-refs { font-size: 12px; color: var(--text-muted); margin: 0 0 10px; max-width: 980px; }
+  .chart.slide-chart { height: 520px; }
   .bub-wrap { position: relative; }
   .gb-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr)); gap: 14px; align-items: start; }
   .gb-card { border: 1px solid var(--border); border-top: 4px solid var(--gc); border-radius: 10px; padding: 12px 14px; background: var(--page); min-width: 0; }
@@ -263,6 +269,7 @@
     <button role="tab" id="tab-btn-countries" data-tab="countries" aria-controls="tab-countries">Countries</button>
     <button role="tab" id="tab-btn-explore" data-tab="explore" aria-controls="tab-explore">Explore ✦</button>
     <button role="tab" id="tab-btn-data" data-tab="data" aria-controls="tab-data">Data</button>
+    <button role="tab" id="tab-btn-norway" data-tab="norway" aria-controls="tab-norway">Norway</button>
   </nav>
 
   <section class="card controls" id="controls" aria-label="Selection">
@@ -475,6 +482,9 @@
     </section>
   </div>
 
+  <!-- Norway: slides -->
+  <div role="tabpanel" id="tab-norway" aria-labelledby="tab-btn-norway" hidden><div id="slides"></div></div>
+
   <!-- Explore -->
   <div role="tabpanel" id="tab-explore" aria-labelledby="tab-btn-explore" hidden>
     <section class="card">
@@ -601,7 +611,7 @@ const LEGACY = ["DEM", "FRF", "NLG", "ECU"];
 const BIG4 = ["USD", "EUR", "JPY", "GBP"];
 
 // ---------- helpers ----------
-const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const css = name => (globalThis.__slideLight && globalThis.__SLIDE_LIGHT?.[name]) || getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 const fin = v => v != null && isFinite(v);
 const fmt = (v, d = 1) => fin(v) ? v.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d }) : "–";
@@ -679,7 +689,7 @@ const state = {
   bY: "bn", bColor: "regime", bEcon: ["AE"], bReg: ["peg", "managed", "float"], bRegion: "all", bSpeed: "4", bLabels: "10", cSel: ["CHE", "HKG", "SAU", "CHN", "JPN", "USA"],
 };
 const LIST_KEYS = new Set(["cur", "cSel", "bEcon", "bReg", "shShow", "amShow", "flShow", "fxShow"]);
-const TABS = ["shares", "changes", "countries", "explore", "data"];
+const TABS = ["shares", "changes", "countries", "explore", "data", "norway"];
 function readHash() {
   const p = new URLSearchParams(location.hash.slice(1));
   for (const [k, v] of p) {
@@ -1187,7 +1197,7 @@ function syncControls() {
   setPressed(document.getElementById("dt-metric-seg"), state.dtMetric);
   document.getElementById("sh-log").checked = state.shLog;
   document.getElementById("am-log").checked = state.amLog;
-  document.getElementById("controls").hidden = state.tab === "explore" || state.tab === "countries" || (state.tab === "data" && state.dtSet === "cty");
+  document.getElementById("controls").hidden = ["explore", "countries", "norway"].includes(state.tab) || (state.tab === "data" && state.dtSet === "cty");
   document.getElementById("hint").textContent = state.tab === "changes"
     ? "The period chosen here sets the right-hand chart; the left one compares the two dates above it." : "";
 }
@@ -2099,7 +2109,7 @@ async function loadCountriesLive() {
   } catch (err) {
     cLive.state = "failed";
   }
-  if (state.tab === "countries") renderCountries(); else if (state.tab === "data") renderData(); else syncCountryControls();
+  if (state.tab === "countries") renderCountries(); else if (state.tab === "data") renderData(); else if (state.tab === "norway") renderNorway(); else syncCountryControls();
 }
 function toggleCountry(k, addOnly = false) {
   if (k === HOME) return;  // always shown
@@ -2361,12 +2371,271 @@ document.getElementById("b-filters").addEventListener("click", e => {
 });
 document.getElementById("b-region").addEventListener("change", e => { state.bRegion = e.target.value; writeHash(); if (!bub.playing) moveBubbles(); });
 
+// ---------- Norway: a slide set comparing Norway with similar countries, each slide downloadable as a PNG ----------
+// Peers: advanced economies with their own floating currency (not euro-area members, whose reserves are pooled
+// in the euro area, nor the US, which issues the dollar). Groups: advanced and emerging economies by measured
+// exchange-rate regime. Latest figures: each country's newest, if no older than two years.
+const SLIDE_LIGHT = { "--surface": "#ffffff", "--page": "#ffffff", "--text-primary": "#0b0b0b", "--text-secondary": "#3d3c39", "--text-muted": "#6f6e69",
+  "--grid": "#e4e3dc", "--axis": "#bdbcb2", "--border": "rgba(11,11,11,0.10)", "--hover": "#f0efec", "--accent": "#2a78d6", "--pos": "#2a78d6", "--neg": "#e34948",
+  "--s1": "#2a78d6", "--s2": "#eb6834", "--s3": "#1baf7a", "--s4": "#eda100", "--s5": "#e87ba4", "--s6": "#008300", "--s7": "#4a3aa7", "--s8": "#e34948", "--other": "#9c9b94" };
+globalThis.__SLIDE_LIGHT = SLIDE_LIGHT;  // css() gives these colours while globalThis.__slideLight is true (for the PNGs)
+const SLIDE_GROUPS = [["AE", "float"], ["AE", "managed"], ["AE", "peg"], ["EM", "float"], ["EM", "managed"], ["EM", "peg"]];
+const SLIDE_COLORS = { "AE|float": "--s1", "AE|managed": "--s7", "AE|peg": "--s5", "EM|float": "--s3", "EM|managed": "--s4", "EM|peg": "--s2" };
+const ST = LANG === "no" ? {
+  tab: "Norge sammenlignet med lignende land", intro: "Lysbilder som sammenligner Norges valutareserver med land med flytende og fast valutakurs, avanserte og fremvoksende. Hvert lysbilde kan lastes ned som PNG (16:9, hvit bakgrunn) til presentasjoner.",
+  download: "Last ned PNG", slide: "Lysbilde", group: g => ({ "AE|float": "Avanserte, flytende (egen valuta)", "AE|managed": "Avanserte, styrt", "AE|peg": "Avanserte, fast", "EM|float": "Fremvoksende, flytende", "EM|managed": "Fremvoksende, styrt", "EM|peg": "Fremvoksende, fast" })[g],
+  norway: "Norge", median: "median", countries: "land", pctGdp: "Reserver, % av BNP", bn: "Reserver, mrd. US$", goldShare: "Gull, % av reservene", d5: "Endring på 5 år, pp", regime: "Valutaregime", n: "Antall land", country: "Land",
+  srcBase: "Kilder: IMF International Investment Position (reserver, gull til markedsverdi), IMF IRFCL (gull der det mangler), IMF World Economic Outlook (BNP). Valutaregimer målt av dette dashbordet ut fra IMFs valutakurser (Exchange Rates) over de siste to årene.",
+  srcTime: "Kilder: som over; hvert år med valutaregimet målt ut fra de to årene med valutakurser fram til årets slutt. Medianer per år for land med tall.",
+  peersNote: "Lignende land: avanserte økonomier med egen flytende valuta (ikke euroområdet, som har felles reserver, og ikke USA, som utsteder dollaren).",
+  s1t: "Norges reserver i sammenheng", s2t: "Norge og andre avanserte land med flytende valuta", s3t: "Flytende eller fast valutakurs", s4t: "Over tid: Norge og gruppenes median", s5t: "Gull i reservene", s6t: "De lignende landene i detalj",
+  latest: p => `Siste tall per ${p}.`,
+} : {
+  tab: "Norway compared with similar countries", intro: "Slides comparing Norway's foreign exchange reserves with countries with floating and fixed exchange rates, advanced and emerging. Each slide can be downloaded as a PNG (16:9, white background) for presentations.",
+  download: "Download PNG", slide: "Slide", group: g => ({ "AE|float": "Advanced, floating (own currency)", "AE|managed": "Advanced, managed", "AE|peg": "Advanced, pegged", "EM|float": "Emerging, floating", "EM|managed": "Emerging, managed", "EM|peg": "Emerging, pegged" })[g],
+  norway: "Norway", median: "median", countries: "countries", pctGdp: "Reserves, % of GDP", bn: "Reserves, US$ bn", goldShare: "Gold, % of reserves", d5: "Change in 5 years, pp", regime: "Exchange-rate regime", n: "Countries", country: "Country",
+  srcBase: "Sources: IMF International Investment Position (reserve assets, gold at market value), IMF IRFCL (gold where missing), IMF World Economic Outlook (GDP). Exchange-rate regimes measured by this dashboard from the IMF's exchange rates (Exchange Rates dataset) over the last two years.",
+  srcTime: "Sources: as above; each year with the exchange-rate regime measured from the two years of exchange rates up to its end. Medians per year of the countries with figures.",
+  peersNote: "Similar countries: advanced economies with their own floating currency (not the euro area, which pools its reserves, nor the US, which issues the dollar).",
+  s1t: "Norway's reserves in context", s2t: "Norway and other advanced economies with a floating currency", s3t: "Floating or fixed exchange rates", s4t: "Over time: Norway and the groups' medians", s5t: "Gold in the reserves", s6t: "The similar countries in detail",
+  latest: p => `Latest figures as of ${p}.`,
+};
+const medianOf = vs => { const s = vs.filter(fin).sort((a, b) => a - b), n = s.length; return n ? (n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2) : null; };
+function slideRows() {
+  if (!CC) assembleCountries();
+  const minP = `${+CC_LATEST.slice(0, 4) - 2}-${CC_LATEST.slice(5)}`, euro = new Set(CD.groups?.euro || []);
+  return Object.values(CC).map(c => {
+    let pt = null;
+    for (let i = c.pts.length - 1; i >= 0; i--) if (fin(c.pts[i].res) && c.pts[i].gdp > 0) { pt = c.pts[i]; break; }
+    const econ = CD.groups?.econ?.[c.k], reg = REGIMES[c.k]?.r;
+    if (!pt || pt.p < minP || !econ || !reg) return null;
+    const old = c.pts.find(q => q.p === quarterBack(pt.p, 20));
+    const pct = pt.res / pt.gdp * 100;
+    return { k: c.k, name: c.name, p: pt.p, econ, reg, note: REGIMES[c.k]?.note || "", res: pt.res, pct,
+      goldShare: fin(pt.gold) && pt.res > 0 ? pt.gold / pt.res * 100 : null,
+      d5: old && fin(old.res) && old.gdp > 0 ? pct - old.res / old.gdp * 100 : null,
+      own: !euro.has(c.k) && c.k !== "USA" };
+  }).filter(Boolean);
+}
+const inGroup = (r, e, g) => r.econ === e && r.reg === g && (e !== "AE" || g !== "float" || r.own);
+const pctTxt = v => fin(v) ? `${fmt(v, 1)}${LANG === "no" ? " %" : "%"}` : "–";
+
+// the slides: each gives a title, a comment, its sources and either a figure (Plotly data and layout) or a table
+function buildSlides() {
+  const rows = slideRows(), nor = rows.find(r => r.k === HOME), asOf = label(rows.reduce((a, r) => r.p > a ? r.p : a, ""));
+  const peers = rows.filter(r => inGroup(r, "AE", "float")).sort((a, b) => b.pct - a.pct);
+  const others = peers.filter(r => r.k !== HOME);
+  const groups = SLIDE_GROUPS.map(([e, g]) => ({ key: `${e}|${g}`, e, g, rows: rows.filter(r => inGroup(r, e, g) && r.k !== HOME) }));
+  const gm = key => groups.find(x => x.key === key);
+  const med = (key, f) => medianOf(gm(key).rows.map(f));
+  const no = LANG === "no", slides = [];
+  if (!nor) return slides;
+  const peerMed = medianOf(others.map(r => r.pct)), rank = peers.indexOf(nor) + 1;
+  const comp = (a, b) => no ? (a > b * 1.15 ? "høyere enn" : a < b / 1.15 ? "lavere enn" : "omtrent som") : (a > b * 1.15 ? "above" : a < b / 1.15 ? "below" : "close to");
+  const fixedMore = med("AE|peg", r => r.pct) > peerMed && med("EM|peg", r => r.pct) > med("EM|float", r => r.pct);
+  // 1: key figures
+  slides.push({ title: ST.s1t,
+    comment: no
+      ? `Norges offisielle valutareserver er ${fmt(nor.res, 0)} mrd. US$, ${pctTxt(nor.pct)} av BNP: ${comp(nor.pct, peerMed)} medianen for avanserte land med egen flytende valuta (${pctTxt(peerMed)}). ${fixedMore ? "Medianlandet med fast kurs holder mer, blant både avanserte og fremvoksende økonomier: en fast kurs må forsvares med reserver. " : ""}Statens pensjonsfond utland regnes ikke med i reservene.`
+      : `Norway's official reserves are $${fmt(nor.res, 0)} bn, ${pctTxt(nor.pct)} of GDP: ${comp(nor.pct, peerMed)} the median of advanced economies with their own floating currency (${pctTxt(peerMed)}). ${fixedMore ? "The median country with a fixed rate holds more, among both advanced and emerging economies: a peg has to be defended with reserves. " : ""}The Government Pension Fund Global is not counted as reserves.`,
+    refs: `${ST.srcBase} ${ST.latest(asOf)}`,
+    table: { head: ["", ST.n, ST.pctGdp, ST.bn, ST.goldShare, ST.d5],
+      rows: [[ST.norway, "–", pctTxt(nor.pct), fmt(nor.res, 0), pctTxt(nor.goldShare ?? 0), signed(nor.d5, 1)],
+        ...groups.map(x => [`${ST.group(x.key)} (${ST.median})`, String(x.rows.length), pctTxt(med(x.key, r => r.pct)), fmt(med(x.key, r => r.res), 0),
+          pctTxt(med(x.key, r => r.goldShare)), signed(med(x.key, r => r.d5), 1)])],
+      home: 0 } });
+  // 2: Norway among its peers
+  slides.push({ title: ST.s2t,
+    comment: no
+      ? `Blant ${peers.length} avanserte land med egen flytende valuta er Norge nummer ${rank} målt som andel av BNP. Høyest ligger ${peers[0].name} med ${pctTxt(peers[0].pct)}${peers[0].k === "CHE" ? ", etter år med valutakjøp for å dempe frankens styrke" : ""}; den stiplede linjen er medianen for de andre landene.`
+      : `Among ${peers.length} advanced economies with their own floating currency, Norway ranks ${rank} by reserves as a share of GDP. ${peers[0].name} is highest at ${pctTxt(peers[0].pct)}${peers[0].k === "CHE" ? ", after years of buying foreign currency to hold back the franc" : ""}; the dotted line is the other countries' median.`,
+    refs: `${ST.peersNote} ${ST.srcBase} ${ST.latest(asOf)}`,
+    fig: () => ({
+      data: [{ type: "bar", orientation: "h", y: peers.map(r => r.k === HOME ? `<b>★ ${esc(r.name)}</b>` : esc(r.name)), x: peers.map(r => r.pct),
+        marker: { color: peers.map(r => css(r.k === HOME ? "--text-primary" : "--s1")) }, text: peers.map(r => pctTxt(r.pct)), textposition: "outside", cliponaxis: false,
+        textfont: { color: css("--text-secondary"), size: 13 }, hovertemplate: "%{y}: %{text}<extra></extra>" }],
+      layout: baseLayout({ showlegend: false, bargap: 0.25, yaxis: { autorange: "reversed", showgrid: false, tickfont: { size: 13, color: css("--text-secondary") }, automargin: true },
+        xaxis: { showgrid: true, ticksuffix: no ? " %" : "%", rangemode: "tozero" }, margin: { l: 8, r: 70, t: 26, b: 8 },
+        shapes: [{ type: "line", xref: "x", yref: "paper", x0: peerMed, x1: peerMed, y0: 0, y1: 1, line: { color: css("--text-muted"), width: 2, dash: "dot" } }],
+        annotations: [{ x: peerMed, y: 1, xref: "x", yref: "paper", yanchor: "bottom", xanchor: "left", xshift: 4, showarrow: false,
+          text: `${ST.median} ${pctTxt(peerMed)}`, font: { size: 13, color: css("--text-muted") } }] }),
+    }) });
+  // 3: the six groups
+  const mAF = med("AE|float", r => r.pct), mAP = med("AE|peg", r => r.pct), mEF = med("EM|float", r => r.pct), mEP = med("EM|peg", r => r.pct);
+  const short = key => ST.group(key).replace(" (egen valuta)", "").replace(" (own currency)", "").replace(", ", "<br>");
+  slides.push({ title: ST.s3t,
+    comment: no
+      ? `Medianlandet med fast kurs holder mer reserver enn medianlandet med flytende kurs: ${pctTxt(mAP)} mot ${pctTxt(mAF)} av BNP blant avanserte økonomier og ${pctTxt(mEP)} mot ${pctTxt(mEF)} blant fremvoksende. Norge (★) ligger blant de avanserte landene med flytende kurs.`
+      : `The median country with a fixed rate holds more reserves than the median floater: ${pctTxt(mAP)} against ${pctTxt(mAF)} of GDP among advanced economies, and ${pctTxt(mEP)} against ${pctTxt(mEF)} among emerging ones. Norway (★) is among the advanced floaters.`,
+    refs: `${ST.peersNote} ${ST.srcBase} ${ST.latest(asOf)}`,
+    fig: () => ({
+      data: groups.filter(x => x.rows.length).map(x => ({ type: "box", name: short(x.key), y: x.rows.map(r => r.pct), boxpoints: "all", jitter: 0.6, pointpos: 0,
+        marker: { color: css(SLIDE_COLORS[x.key]), size: 7, opacity: 0.85 }, line: { color: css(SLIDE_COLORS[x.key]), width: 1.5 }, fillcolor: "rgba(0,0,0,0)",
+        customdata: x.rows.map(r => `${r.name}: ${pctTxt(r.pct)}`), hovertemplate: "%{customdata}<extra></extra>", hoveron: "points" }))
+        .concat([{ type: "scatter", mode: "markers+text", x: [short("AE|float")], y: [nor.pct], text: [`<b>★ ${ST.norway}</b>`], textposition: "middle right",
+          textfont: { size: 14, color: css("--text-primary") }, marker: { size: 15, color: css("--s1"), line: { color: css("--text-primary"), width: 3 } },
+          hovertemplate: `${ST.norway}: ${pctTxt(nor.pct)}<extra></extra>` }]),
+      layout: baseLayout({ showlegend: false, hovermode: "closest", margin: { l: 8, r: 8, t: 8, b: 8 },
+        yaxis: { type: "log", tickvals: [1, 3, 10, 30, 100, 300], ticktext: ["1%", "3%", "10%", "30%", "100%", "300%"].map(t => no ? t.replace("%", " %") : t), gridcolor: css("--grid") },
+        xaxis: { tickfont: { size: 13, color: css("--text-secondary") } } }),
+    }) });
+  // 4: over time
+  const last = +CC_LATEST.slice(0, 4), years = [];
+  for (let y = 2000; y <= last; y++) years.push(y);
+  const yearPtOf = (c, y) => y < last ? c.pts.find(q => q.p === `${y}-Q4`) : [...c.pts].reverse().find(q => q.p.startsWith(`${y}-`));
+  const euro = new Set(CD.groups?.euro || []);
+  const series = ["AE|float", "AE|peg", "EM|float", "EM|peg"].map(key => {
+    const [e, g] = key.split("|"), x = [], y = [];
+    for (const yr of years) {
+      const vs = [];
+      for (const c of Object.values(CC)) {
+        if (c.k === HOME || CD.groups?.econ?.[c.k] !== e || regimeIn(c.k, yr) !== g) continue;
+        if (e === "AE" && g === "float" && (euro.has(c.k) || c.k === "USA")) continue;
+        const q = yearPtOf(c, yr);
+        if (q && fin(q.res) && q.gdp > 0) vs.push(q.res / q.gdp * 100);
+      }
+      if (vs.length >= 3) { x.push(`${yr}-12-31`); y.push(medianOf(vs)); }
+    }
+    return { key, x, y };
+  });
+  const nx = [], ny = [];
+  for (const yr of years) { const q = yearPtOf(CC[HOME], yr); if (q && fin(q.res) && q.gdp > 0) { nx.push(`${yr}-12-31`); ny.push(q.res / q.gdp * 100); } }
+  const n1 = ny.at(-1);
+  const rise = series.filter(s => s.y.length > 1).map(s => ({ key: s.key, d: s.y.at(-1) - s.y[0], from: s.x[0].slice(0, 4) })).sort((a, b) => b.d - a.d);
+  const top = rise[0];
+  slides.push({ title: ST.s4t,
+    comment: no
+      ? `Norges reserver har ligget på ${pctTxt(Math.min(...ny))}–${pctTxt(Math.max(...ny))} av BNP siden ${nx[0]?.slice(0, 4)}, nå ${pctTxt(n1)}.${top ? ` Medianen som har steget mest siden ${top.from}, er for gruppen «${ST.group(top.key)}» (${signed(top.d, 1)} prosentpoeng).` : ""}`
+      : `Norway's reserves have ranged from ${pctTxt(Math.min(...ny))} to ${pctTxt(Math.max(...ny))} of GDP since ${nx[0]?.slice(0, 4)}, now ${pctTxt(n1)}.${top ? ` The median that has risen most since ${top.from} is that of the group “${ST.group(top.key)}” (${signed(top.d, 1)} percentage points).` : ""}`,
+    refs: `${ST.peersNote} ${ST.srcTime}`,
+    fig: () => ({
+      data: series.filter(s => s.x.length).map(s => ({ type: "scatter", mode: "lines", name: `${ST.group(s.key)}, ${ST.median}`, x: s.x, y: s.y,
+        line: { color: css(SLIDE_COLORS[s.key]), width: 3 }, hovertemplate: `%{y:.1f}%<extra>${esc(ST.group(s.key))}</extra>` }))
+        .concat([{ type: "scatter", mode: "lines", name: `★ ${ST.norway}`, x: nx, y: ny, line: { color: css("--text-primary"), width: 4, dash: "dot" },
+          hovertemplate: `%{y:.1f}%<extra>${ST.norway}</extra>` }]),
+      layout: baseLayout({ hovermode: "x unified", xaxis: { hoverformat: "%Y" }, yaxis: { ticksuffix: no ? " %" : "%", rangemode: "tozero" },
+        legend: { orientation: "h", y: 1.02, yanchor: "bottom", x: 0, font: { size: 13, color: css("--text-secondary") } }, margin: { l: 8, r: 8, t: 8, b: 8 } }),
+    }) });
+  // 5: gold
+  const gold = peers.filter(r => fin(r.goldShare) || r.k === HOME).map(r => ({ ...r, gs: r.goldShare ?? 0 })).sort((a, b) => b.gs - a.gs);
+  const goldMed = medianOf(gold.filter(r => r.k !== HOME).map(r => r.gs));
+  const goldMed5 = medianOf(gold.filter(r => r.k !== HOME).map(r => {
+    const q = CC[r.k]?.pts.find(pt => pt.p === quarterBack(r.p, 20));
+    return q && fin(q.gold) && q.res > 0 ? q.gold / q.res * 100 : null;
+  }));
+  slides.push({ title: ST.s5t,
+    comment: no
+      ? `Norges Bank solgte gullbeholdningen sin i 2004, så Norge holder ikke gull i reservene. Medianlandet blant de lignende landene har ${pctTxt(goldMed)} av reservene i gull${fin(goldMed5) ? `, mot ${pctTxt(goldMed5)} fem år tidligere` : ""}.`
+      : `Norges Bank sold its gold in 2004, so Norway holds no gold in its reserves. The median similar country holds ${pctTxt(goldMed)} of its reserves in gold${fin(goldMed5) ? `, against ${pctTxt(goldMed5)} five years earlier` : ""}.`,
+    refs: `${ST.peersNote} ${ST.srcBase} ${ST.latest(asOf)}`,
+    fig: () => ({
+      data: [{ type: "bar", orientation: "h", y: gold.map(r => r.k === HOME ? `<b>★ ${esc(r.name)}</b>` : esc(r.name)), x: gold.map(r => r.gs),
+        marker: { color: gold.map(r => css(r.k === HOME ? "--text-primary" : "--s4")) }, text: gold.map(r => pctTxt(r.gs)), textposition: "outside", cliponaxis: false,
+        textfont: { color: css("--text-secondary"), size: 13 }, hovertemplate: "%{y}: %{text}<extra></extra>" }],
+      layout: baseLayout({ showlegend: false, bargap: 0.25, yaxis: { autorange: "reversed", showgrid: false, tickfont: { size: 13, color: css("--text-secondary") }, automargin: true },
+        xaxis: { showgrid: true, ticksuffix: no ? " %" : "%", rangemode: "tozero" }, margin: { l: 8, r: 70, t: 8, b: 8 } }),
+    }) });
+  // 6: the peers in detail
+  slides.push({ title: ST.s6t,
+    comment: no
+      ? `Nøkkeltall for de ${peers.length} avanserte landene med egen flytende valuta, sortert etter reserver som andel av BNP. Endringen på fem år er i prosentpoeng av BNP.`
+      : `Key figures for the ${peers.length} advanced economies with their own floating currency, by reserves as a share of GDP. The change over five years is in percentage points of GDP.`,
+    refs: `${ST.peersNote} ${ST.srcBase} ${ST.latest(asOf)}`,
+    table: { head: [ST.country, ST.pctGdp, ST.bn, ST.d5, ST.goldShare, ST.regime],
+      rows: peers.map(r => [(r.k === HOME ? "★ " : "") + r.name, pctTxt(r.pct), fmt(r.res, 0), signed(r.d5, 1), pctTxt(r.goldShare ?? 0), r.note]),
+      home: peers.indexOf(nor) } });
+  return slides;
+}
+function renderNorway() {
+  const wrap = document.getElementById("slides");
+  const slides = buildSlides();
+  if (cLive.state === "idle") loadCountriesLive();
+  if (!slides.length) { wrap.innerHTML = `<section class="card"><div class="empty">…</div></section>`; return; }
+  wrap.innerHTML = `<section class="card"><h2>${esc(ST.tab)}</h2><p class="sub" style="margin:0">${esc(ST.intro)}</p></section>` + slides.map((s, i) => `
+    <section class="card slide" data-i="${i}">
+      <div class="slide-head"><div><span class="slide-no">${ST.slide} ${i + 1}</span><h2>${esc(s.title)}</h2></div>
+        <button class="text-btn slide-png" type="button">⬇ ${ST.download}</button></div>
+      <p class="slide-comment">${esc(s.comment)}</p>
+      <p class="slide-refs">${esc(s.refs)}</p>
+      ${s.fig ? `<div class="chart slide-chart"></div>` : `<div class="table-wrap">${slideTableHtml(s.table)}</div>`}
+    </section>`).join("");
+  wrap._slides = slides;
+  slides.forEach((s, i) => { if (s.fig) { const f = s.fig(); plot(wrap.querySelector(`.slide[data-i="${i}"] .slide-chart`), f.data, f.layout); } });
+}
+const slideTableHtml = t => `<table><thead><tr>${t.head.map(h => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${t.rows.map((r, i) =>
+  `<tr${i === t.home ? ' class="home"' : ""}>${r.map(v => `<td>${esc(v)}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+// a slide as a 16:9 PNG on a white background: title, comment and sources above the figure or table
+function wrapText(g, text, x, y, maxW, lineH) {
+  let line = "";
+  for (const word of text.split(" ")) {
+    const test = line ? `${line} ${word}` : word;
+    if (g.measureText(test).width > maxW && line) { g.fillText(line, x, y); y += lineH; line = word; } else line = test;
+  }
+  if (line) { g.fillText(line, x, y); y += lineH; }
+  return y;
+}
+async function slidePng(s, i) {
+  const W = 1600, H = 900, P = 60, S = 2, font = 'system-ui, -apple-system, "Segoe UI", sans-serif';
+  const cv = document.createElement("canvas"); cv.width = W * S; cv.height = H * S;
+  const g = cv.getContext("2d"); g.scale(S, S);
+  g.fillStyle = "#ffffff"; g.fillRect(0, 0, W, H);
+  g.fillStyle = "#2a78d6"; g.fillRect(0, 0, W, 8);
+  let y = P + 6;
+  g.fillStyle = "#0b0b0b"; g.font = `700 40px ${font}`; g.fillText(s.title, P, y + 30); y += 64;
+  g.fillStyle = "#2d2c2a"; g.font = `400 22px ${font}`; y = wrapText(g, s.comment, P, y + 6, W - 2 * P, 31) + 6;
+  g.fillStyle = "#77766f"; g.font = `400 15px ${font}`; y = wrapText(g, s.refs, P, y + 4, W - 2 * P, 21) + 14;
+  const boxH = H - y - P + 10, boxW = W - 2 * P;
+  if (s.fig) {
+    globalThis.__slideLight = true;
+    let f;
+    try { f = s.fig(); } finally { globalThis.__slideLight = false; }
+    // drawn at a smaller size and scaled up, so the chart's text is large enough on a slide
+    const Z = 1.45, cw = Math.round(boxW / Z), chh = Math.round(boxH / Z);
+    f.layout = { ...f.layout, paper_bgcolor: "#ffffff", plot_bgcolor: "#ffffff", width: cw, height: chh, font: { ...f.layout.font, color: "#3d3c39" } };
+    const url = await Plotly.toImage({ data: f.data, layout: f.layout }, { format: "png", width: cw, height: chh, scale: S * Z });
+    const img = new Image(); img.src = url; await img.decode();
+    g.drawImage(img, P, y, boxW, boxH);
+  } else drawTable(g, s.table, P, y, boxW, boxH, font);
+  g.fillStyle = "#9c9b94"; g.font = `400 13px ${font}`; g.textAlign = "right";
+  g.fillText(`IMF COFER · ${location.host || "imf-cofer.jskjeltorp.workers.dev"}`, W - P, H - 22); g.textAlign = "left";
+  const link = Object.assign(document.createElement("a"), { href: cv.toDataURL("image/png"), download: `${LANG === "no" ? "norge" : "norway"}_${i + 1}.png` });
+  document.body.append(link); link.click(); link.remove();
+}
+function drawTable(g, t, x, y, w, h, font) {
+  const n = t.rows.length + 1, rowH = Math.min(56, h / n), size = Math.max(13, Math.min(22, rowH * 0.46));
+  // column widths from the longest text in each
+  g.font = `600 ${size}px ${font}`;
+  const widths = t.head.map((hd, j) => Math.max(g.measureText(hd).width, ...t.rows.map(r => g.measureText(String(r[j])).width)) + 28);
+  const scale = Math.min(1, w / widths.reduce((a, b) => a + b, 0));
+  const cols = widths.map(v => v * (scale < 1 ? scale : w / widths.reduce((a, b) => a + b, 0)));
+  const drawRow = (cells, yy, head, home) => {
+    if (home) { g.fillStyle = "#e3eefb"; g.fillRect(x, yy, w, rowH); g.fillStyle = "#2a78d6"; g.fillRect(x, yy, 4, rowH); }
+    let xx = x;
+    cells.forEach((c, j) => {
+      g.fillStyle = head ? "#6f6e69" : "#0b0b0b"; g.font = `${head || home ? 700 : 400} ${size}px ${font}`;
+      g.textAlign = j === 0 ? "left" : "right";
+      g.fillText(String(c), j === 0 ? xx + 12 : xx + cols[j] - 12, yy + rowH * 0.64, cols[j] - 16);
+      xx += cols[j];
+    });
+    g.textAlign = "left";
+    g.fillStyle = "#e4e3dc"; g.fillRect(x, yy + rowH - 1, w, 1);
+  };
+  drawRow(t.head, y, true, false);
+  t.rows.forEach((r, i) => drawRow(r, y + rowH * (i + 1), false, i === t.home));
+}
+document.getElementById("slides").addEventListener("click", e => {
+  const b = e.target.closest(".slide-png"); if (!b) return;
+  const i = +b.closest(".slide").dataset.i, s = document.getElementById("slides")._slides?.[i];
+  if (s) { b.disabled = true; slidePng(s, i).finally(() => { b.disabled = false; }); }
+});
+
 // ---------- tabs ----------
 function renderTab(tab) {
   if (tab === "shares") { drawShares(); renderSharesTable(); drawAmounts(); renderAmountsTable(); }
   else if (tab === "changes") drawChanges();
   else if (tab === "data") renderData();
   else if (tab === "countries") renderCountries();
+  else if (tab === "norway") renderNorway();
   else renderExplore();
 }
 function showTab(tab, focus = false) {

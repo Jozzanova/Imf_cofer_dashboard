@@ -38,6 +38,11 @@ Tabs:
   pegged/managed/floating and region; also gold alone, and comparisons of advanced and
   emerging economies, regions, and pegged, managed and floating currencies (measured from the
   IMF's monthly exchange rates), also year by year since 1980.
+- **Norway** (last): a slide set comparing Norway with similar countries (advanced economies with
+  their own floating currency) and with advanced and emerging economies with floating, managed and
+  pegged currencies: key figures, the peers ranked, fixed against floating, the medians over time,
+  gold and a table. Each slide has a comment worked out from the latest figures and its sources, and
+  downloads as a 16:9 PNG on a white background for presentations.
 - **Explore**: a bar chart race of the currencies since 1999; how much of each currency's change in
   share came from exchange-rate moves and how much from central banks' holdings (with the IMF's
   exchange rates); estimated purchases and sales; and the effective number of reserve currencies.
