@@ -664,7 +664,7 @@ const state = {
   shView: "lines", shLog: false, amView: "stack", amLog: false, sel: "", shShow: [], amShow: [],
   chFrom: "", chTo: "", chMetric: "bn", chCur: "USD", dtMetric: "share", dtSet: "cur", dtYear: "latest",
   raceMetric: "share", raceNoUSD: false, raceSpeed: "1", fxBase: "2016-Q4", fxCur: "USD",
-  cMeasure: "pct", cGold: "with", cYear: "latest", cSort: "v", cDir: "desc", gb: "eu_all_float", cGroup: "econ", cFilter: "all", cLines: "countries", cAgg: "combined", gScale: "log",
+  cMeasure: "pct", cGold: "with", cYear: "latest", cSort: "v", cDir: "desc", gb: "eu_AE_float~eu_AE_peg", cGroup: "econ", cFilter: "all", cLines: "countries", cAgg: "combined", gScale: "log",
   bY: "bn", bColor: "econ", bEcon: ["AE", "EM"], bReg: ["peg", "managed", "float"], bRegion: "all", bSpeed: "1", cSel: ["CHE", "HKG", "SAU", "CHN", "JPN", "USA"],
 };
 const LIST_KEYS = new Set(["cur", "cSel", "bEcon", "bReg", "shShow", "amShow"]);
@@ -1724,7 +1724,7 @@ function gbGroups() {
     return { geo: geo === "all" || GEO.some(g => g.k === geo) ? geo : "all", econ: ["all", "AE", "EM"].includes(econ) ? econ : "all",
       reg: (reg || "").split(".").filter(r => REG_NAMES[r]) };
   }).filter(g => g.reg.length).slice(0, GB_MAX);
-  return out.length ? out : [{ geo: "eu", econ: "all", reg: ["float"] }];
+  return out.length ? out : [{ geo: "eu", econ: "AE", reg: ["float"] }, { geo: "eu", econ: "AE", reg: ["peg"] }];
 }
 const gbSave = gs => { state.gb = gs.map(g => `${g.geo}_${g.econ}_${g.reg.join(".")}`).join("~"); writeHash(); };
 const gbName = g => [g.geo === "all" ? "All regions" : GEO.find(x => x.k === g.geo).name,
