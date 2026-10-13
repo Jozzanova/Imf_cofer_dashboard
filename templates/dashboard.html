@@ -76,6 +76,8 @@
   .theme-row { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 8px;
     font-size: 12px; color: var(--text-muted); }
   .theme-row .seg button { font-size: 12px; padding: 3px 9px; }
+  .theme-row { flex-wrap: wrap; }
+  .theme-label + .seg { margin-right: 4px; }
   .update-msg { font-size: 12.5px; color: var(--text-secondary); margin-top: 6px; }
   .update-msg:empty { display: none; }
   .update-msg.error { color: var(--neg); }
@@ -244,7 +246,9 @@
         <button class="text-btn" id="update-btn" type="button">Check for updates</button>
       </div>
       <div class="update-msg" id="update-msg" role="status" aria-live="polite"></div>
-      <div class="theme-row">Theme
+      <div class="theme-row"><span class="theme-label">Language</span>
+        <div class="seg" id="lang-seg" role="group" aria-label="Language"><button data-v="en">English</button><button data-v="no">Norsk</button></div>
+        <span class="theme-label">Theme</span>
         <div class="seg" id="theme-seg" role="group" aria-label="Theme"><button data-v="dark">Dark</button><button data-v="light">Light</button><button data-v="auto">Auto</button></div>
       </div>
     </aside>
@@ -572,6 +576,9 @@
 
 <script>
 const SNAPSHOT = __SNAPSHOT__;
+// The page's language: update.py writes an English page and a Norwegian one (i18n_no.py) from this template.
+const LANG = "en";
+const SEPARATORS = ".,";  // Plotly's decimal and thousands separators
 // The same address update.py downloads from: world totals (G001), every series, as SDMX-CSV.
 const DATA_URL = "https://api.imf.org/external/sdmx/3.0/data/dataflow/IMF.STA/COFER/+/G001.*.*.*.*";
 const CSV_TYPE = "application/vnd.sdmx.data+csv;version=2.0.0";
@@ -730,7 +737,7 @@ function baseLayout(extra = {}) {
     tickfont: { color: css("--text-muted"), size: 11 }, automargin: true };
   const { xaxis = {}, yaxis = {}, ...rest } = extra;
   return {
-    paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "rgba(0,0,0,0)",
+    paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "rgba(0,0,0,0)", separators: SEPARATORS,
     font: { family: 'system-ui, -apple-system, "Segoe UI", sans-serif', color: css("--text-secondary"), size: 12 },
     margin: { l: 8, r: 8, t: 8, b: 8 },
     hoverlabel: { bgcolor: css("--surface"), bordercolor: css("--axis"), font: { color: css("--text-primary") } },
@@ -2397,6 +2404,15 @@ checkIMF(false);
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", redraw);
 new MutationObserver(redraw).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 
+// the other language's page, keeping the current view: dashboard.html / dashboard-no.html as files, / and /no/ online
+function langHref(to) {
+  const h = location.hash;
+  if (location.protocol === "file:") return location.pathname.replace(/dashboard(-no)?\.html$/, to === "no" ? "dashboard-no.html" : "dashboard.html") + h;
+  return (to === "no" ? "/no/" : "/") + h;
+}
+const langSeg = document.getElementById("lang-seg");
+setPressed(langSeg, LANG);
+langSeg.addEventListener("click", e => { const b = e.target.closest("button"); if (b && b.dataset.v !== LANG) location.href = langHref(b.dataset.v); });
 const themeSeg = document.getElementById("theme-seg");
 function syncTheme() {
   const current = document.documentElement.dataset.theme || "auto";

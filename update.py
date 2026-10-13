@@ -18,6 +18,8 @@ appears without running this script again.
 import json
 import math
 import sys
+
+import i18n_no
 import urllib.request
 import webbrowser
 from datetime import datetime, timezone
@@ -29,6 +31,7 @@ RAW_ER = ROOT / "data" / "raw" / "exchange_rates.csv"
 STATUS = ROOT / "data" / "raw" / "status.json"
 TEMPLATE = ROOT / "templates" / "dashboard.html"
 OUTPUT = ROOT / "output" / "dashboard.html"
+OUTPUT_NO = ROOT / "output" / "dashboard-no.html"  # the Norwegian page (i18n_no.py)
 
 # World totals (G001), every indicator, currency, unit and frequency, as SDMX-CSV.
 # The page itself uses the same address for its live check (DATA_URL in the template).
@@ -305,12 +308,19 @@ def main():
         STATUS.write_text(json.dumps(status), encoding="utf-8")
     status["latest"] = latest_quarter(text)
 
-    snapshot = json.dumps({"csv": text, "er": er, "countries": countries(raw), **status}, separators=(",", ":"))
-    html = TEMPLATE.read_text(encoding="utf-8").replace("__SNAPSHOT__", snapshot.replace("</", "<\\/"))
+    data = {"csv": text, "er": er, "countries": countries(raw), **status}
+    template = TEMPLATE.read_text(encoding="utf-8")
+    page = lambda tpl, d: tpl.replace("__SNAPSHOT__", json.dumps(d, separators=(",", ":")).replace("</", "<\\/"))
     OUTPUT.parent.mkdir(exist_ok=True)
-    OUTPUT.write_text(html, encoding="utf-8")
+    OUTPUT.write_text(page(template, data), encoding="utf-8")
+    # the Norwegian page: the translated template, with the countries' Norwegian names
+    template_no, missing = i18n_no.translate(template)
+    if missing:
+        sys.exit("Texts the Norwegian translation (i18n_no.py) no longer finds in the template:\n  " + "\n  ".join(m[:110] for m in missing))
+    names_no = {k: i18n_no.NAMES.get(k, v) for k, v in data["countries"]["names"].items()}
+    OUTPUT_NO.write_text(page(template_no, {**data, "countries": {**data["countries"], "names": names_no}}), encoding="utf-8")
     print(f"COFER data through {status['latest']} (downloaded {status.get('downloaded', 'unknown')})")
-    print(f"Dashboard written to {OUTPUT}")
+    print(f"Dashboard written to {OUTPUT} and, in Norwegian, to {OUTPUT_NO}")
     if "--open" in sys.argv:
         webbrowser.open(OUTPUT.as_uri())
 
