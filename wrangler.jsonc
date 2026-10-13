@@ -1,0 +1,9 @@
+{
+  // Public site: https://imf-cofer.jskjeltorp.workers.dev (Cloudflare Workers static assets).
+  // Build the site folder first (see README), then: wrangler deploy
+  "name": "imf-cofer",
+  "compatibility_date": "2026-09-18",
+  "assets": { "directory": "./site" },
+  "workers_dev": true,
+  "preview_urls": false
+}

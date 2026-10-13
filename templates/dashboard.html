@@ -1,0 +1,883 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IMF COFER Dashboard</title>
+<script>
+  // Dark by default, whatever the browser's setting; the viewer can pick light or "auto" (follow the browser).
+  try {
+    const t = localStorage.getItem("theme");
+    if (t === "light") document.documentElement.dataset.theme = "light";
+    else if (t === "auto") delete document.documentElement.dataset.theme;
+  } catch (e) { /* storage unavailable: stay dark */ }
+</script>
+<script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.2/plotly.min.js"></script>
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7;
+    --surface: #fcfcfb;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #898781;
+    --grid: #e1e0d9;
+    --axis: #c3c2b7;
+    --border: rgba(11, 11, 11, 0.10);
+    --hover: #f0efec;
+    --accent: #2a78d6;
+    --pos: #2a78d6;
+    --neg: #e34948;
+    --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+    --s5: #e87ba4; --s6: #008300; --s7: #4a3aa7; --s8: #e34948;
+    --other: #9c9b94; --unalloc: #c3c2b7;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --page: #0d0d0d; --surface: #1a1a19;
+      --text-primary: #ffffff; --text-secondary: #c3c2b7; --text-muted: #898781;
+      --grid: #2c2c2a; --axis: #383835; --border: rgba(255, 255, 255, 0.10); --hover: #262624;
+      --accent: #3987e5; --pos: #3987e5; --neg: #e66767;
+      --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+      --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+      --other: #8a8983; --unalloc: #4a4a47;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19;
+    --text-primary: #ffffff; --text-secondary: #c3c2b7; --text-muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --border: rgba(255, 255, 255, 0.10); --hover: #262624;
+    --accent: #3987e5; --pos: #3987e5; --neg: #e66767;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+    --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+    --other: #8a8983; --unalloc: #4a4a47;
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--page); color: var(--text-primary);
+    font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 28px 20px 48px; }
+  header h1 { font-size: 22px; margin: 0 0 4px; font-weight: 650; }
+  header p { margin: 0; color: var(--text-secondary); }
+  .page-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 16px 24px; }
+  .page-head > div:first-child { flex: 1 1 420px; min-width: 0; }
+  .update-box { flex: 0 1 380px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; }
+  .update-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  #data-status { font-size: 12.5px; color: var(--text-secondary); line-height: 1.6; }
+  #data-status b { color: var(--text-primary); font-weight: 600; }
+  #update-btn { white-space: nowrap; }
+  #update-btn[aria-busy="true"] { cursor: progress; }
+  .theme-row { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 8px;
+    font-size: 12px; color: var(--text-muted); }
+  .theme-row .seg button { font-size: 12px; padding: 3px 9px; }
+  .update-msg { font-size: 12.5px; color: var(--text-secondary); margin-top: 6px; }
+  .update-msg:empty { display: none; }
+  .update-msg.error { color: var(--neg); }
+  .meta { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 8px; color: var(--text-muted); font-size: 13px; }
+  .meta b { color: var(--text-secondary); font-weight: 600; }
+  h2 { font-size: 16px; font-weight: 650; margin: 0 0 2px; }
+  .sub { color: var(--text-muted); font-size: 13px; margin: 0 0 12px; }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px; margin-bottom: 16px; min-width: 0; }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 480px), 1fr)); gap: 16px; margin-bottom: 16px; }
+  .grid2 > .card { margin-bottom: 0; }
+  .card-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 8px 16px; margin-bottom: 6px; }
+  .chart { width: 100%; height: 340px; }
+  .chart.tall { height: 440px; }
+
+  /* controls */
+  .controls { margin-top: 16px; }
+  .row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 22px; }
+  .row + .row { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--grid); }
+  .control { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; color: var(--text-secondary); font-size: 13px; }
+  .control > .lbl { color: var(--text-muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+  .seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .seg button { font: inherit; font-size: 13px; padding: 5px 11px; border: 0; background: transparent; color: var(--text-secondary); cursor: pointer; }
+  .seg button + button { border-left: 1px solid var(--border); }
+  .seg button[aria-pressed="true"] { background: var(--grid); color: var(--text-primary); font-weight: 600; }
+  .seg button:disabled { opacity: .4; cursor: not-allowed; }
+  select { font: inherit; font-size: 13px; padding: 5px 8px; border-radius: 8px; border: 1px solid var(--axis); background: var(--page); color: var(--text-primary); max-width: 100%; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { font: inherit; font-size: 12.5px; display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px;
+    border: 1px solid var(--axis); background: transparent; color: var(--text-secondary); cursor: pointer; }
+  .chip[aria-pressed="true"] { background: var(--hover); color: var(--text-primary); border-color: var(--text-muted); font-weight: 600; }
+  .chip[aria-pressed="false"] .dot { opacity: .35; }
+  .link-btn { font: inherit; font-size: 12.5px; border: 0; background: none; color: var(--accent); cursor: pointer; padding: 4px 4px; }
+  .check { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text-secondary); font-size: 13px; }
+  .hint { color: var(--text-muted); font-size: 12.5px; margin-top: 10px; }
+  .hint:empty { display: none; }
+  .text-btn { font: inherit; font-size: 13px; padding: 5px 11px; border-radius: 8px; border: 1px solid var(--axis);
+    background: transparent; color: var(--text-primary); cursor: pointer; }
+  .text-btn:hover { background: var(--hover); }
+  .text-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+  /* tables */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 7px 10px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--grid); }
+  th { color: var(--text-muted); font-weight: 600; font-size: 12px; position: sticky; top: 0; background: var(--surface); }
+  th:first-child, td:first-child { text-align: left; }
+  td { font-variant-numeric: tabular-nums; }
+  tr:last-child td { border-bottom: 0; }
+  tr.total td { font-weight: 650; border-top: 1px solid var(--axis); }
+  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: none; }
+  .name { display: inline-flex; align-items: center; gap: 8px; }
+  .muted { color: var(--text-muted); }
+  .up { color: var(--pos); }
+  .down { color: var(--neg); }
+  .scroll-y { max-height: 520px; overflow: auto; }
+
+  /* tabs */
+  .tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 18px; border-bottom: 1px solid var(--axis); }
+  .tabs button { font: inherit; font-size: 14px; padding: 9px 16px; border: 0; background: transparent; color: var(--text-secondary);
+    cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .tabs button[aria-selected="true"] { color: var(--text-primary); font-weight: 650; border-bottom-color: var(--accent); }
+  .tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+  /* stat tiles */
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 18px; }
+  .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+  .tile .label { color: var(--text-secondary); font-size: 12.5px; display: flex; align-items: center; gap: 7px; }
+  .tile .value { font-size: 22px; font-weight: 650; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .tile .note { color: var(--text-muted); font-size: 12px; margin-top: 2px; }
+
+  details summary { cursor: pointer; font-weight: 650; font-size: 16px; }
+  details[open] summary { margin-bottom: 12px; }
+  .notes { color: var(--text-secondary); font-size: 13px; }
+  .notes li { margin-bottom: 5px; }
+  .empty { color: var(--text-muted); padding: 40px 0; text-align: center; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="page-head">
+    <div>
+      <h1>Currency composition of foreign exchange reserves</h1>
+      <p>The IMF's COFER data: the currencies the world's central banks hold their foreign exchange reserves in,
+        quarterly since 1999 and yearly since 1995.</p>
+      <div class="meta" id="meta"></div>
+    </div>
+    <aside class="update-box" aria-label="Data status">
+      <div class="update-top">
+        <div id="data-status"></div>
+        <button class="text-btn" id="update-btn" type="button">Check for updates</button>
+      </div>
+      <div class="update-msg" id="update-msg" role="status" aria-live="polite"></div>
+      <div class="theme-row">Theme
+        <div class="seg" id="theme-seg" role="group" aria-label="Theme"><button data-v="dark">Dark</button><button data-v="light">Light</button><button data-v="auto">Auto</button></div>
+      </div>
+    </aside>
+  </header>
+
+  <section class="tiles" id="tiles" aria-label="Latest quarter"></section>
+
+  <nav class="tabs" role="tablist" aria-label="Views">
+    <button role="tab" id="tab-btn-shares" data-tab="shares" aria-controls="tab-shares">Currency shares</button>
+    <button role="tab" id="tab-btn-amounts" data-tab="amounts" aria-controls="tab-amounts">Amounts</button>
+    <button role="tab" id="tab-btn-changes" data-tab="changes" aria-controls="tab-changes">Changes</button>
+    <button role="tab" id="tab-btn-data" data-tab="data" aria-controls="tab-data">Data</button>
+  </nav>
+
+  <section class="card controls" aria-label="Selection">
+    <div class="row">
+      <div class="control" style="flex:1 1 100%"><span class="lbl">Currencies</span>
+        <div class="chips" id="cur-chips"></div>
+        <button class="link-btn" type="button" id="cur-all">All</button>
+        <button class="link-btn" type="button" id="cur-nousd">All but the dollar</button>
+      </div>
+    </div>
+    <div class="row">
+      <div class="control"><span class="lbl">Frequency</span>
+        <div class="seg" id="freq-seg"><button data-v="Q">Quarterly</button><button data-v="A">Yearly</button></div>
+      </div>
+      <div class="control" id="period-control"><span class="lbl">Period</span>
+        <div class="seg" id="period-seg">
+          <button data-v="all">All</button><button data-v="2008">2008+</button><button data-v="2016">2016+</button>
+          <button data-v="10y">10Y</button><button data-v="5y">5Y</button>
+        </div>
+      </div>
+    </div>
+    <div class="hint" id="hint"></div>
+  </section>
+
+  <!-- Currency shares -->
+  <div role="tabpanel" id="tab-shares" aria-labelledby="tab-btn-shares">
+    <section class="card">
+      <div class="card-head">
+        <div><h2>Share of allocated reserves</h2><p class="sub" id="sh-sub"></p></div>
+        <div class="row">
+          <div class="seg" id="sh-view-seg" role="group" aria-label="Chart type"><button data-v="lines">Lines</button><button data-v="stack">Stacked</button><button data-v="multi">One chart each</button></div>
+          <label class="check" id="sh-log-label"><input type="checkbox" id="sh-log"> Log scale</label>
+        </div>
+      </div>
+      <div id="sh-chart" class="chart tall"></div>
+    </section>
+    <section class="card">
+      <h2>Shares and how they changed</h2>
+      <p class="sub" id="sh-table-sub"></p>
+      <div class="table-wrap"><table id="sh-table"></table></div>
+    </section>
+  </div>
+
+  <!-- Amounts -->
+  <div role="tabpanel" id="tab-amounts" aria-labelledby="tab-btn-amounts" hidden>
+    <section class="card">
+      <div class="card-head">
+        <div><h2>Reserves by currency, in US dollars</h2><p class="sub" id="am-sub"></p></div>
+        <div class="row">
+          <div class="seg" id="am-view-seg" role="group" aria-label="Chart type"><button data-v="stack">Stacked</button><button data-v="lines">Lines</button></div>
+          <label class="check"><input type="checkbox" id="am-log"> Log scale</label>
+        </div>
+      </div>
+      <div id="am-chart" class="chart tall"></div>
+    </section>
+    <section class="card">
+      <h2>Amounts and growth</h2>
+      <p class="sub" id="am-table-sub"></p>
+      <div class="table-wrap"><table id="am-table"></table></div>
+    </section>
+  </div>
+
+  <!-- Changes -->
+  <div role="tabpanel" id="tab-changes" aria-labelledby="tab-btn-changes" hidden>
+    <section class="card">
+      <div class="row">
+        <div class="control"><span class="lbl">From</span><select id="ch-from" aria-label="From"></select></div>
+        <div class="control"><span class="lbl">To</span><select id="ch-to" aria-label="To"></select></div>
+        <div class="control"><span class="lbl">Span</span>
+          <div class="seg" id="ch-span-seg"><button data-v="1">1 period</button><button data-v="1y">1Y</button><button data-v="5y">5Y</button><button data-v="10y">10Y</button></div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="control"><span class="lbl">Measure</span>
+          <div class="seg" id="ch-metric-seg"><button data-v="bn">US$ billions</button><button data-v="pct">% change</button><button data-v="pp">Share, percentage points</button></div>
+        </div>
+      </div>
+    </section>
+    <section class="grid2">
+      <section class="card">
+        <h2 id="ch-title">Change by currency</h2>
+        <p class="sub" id="ch-sub"></p>
+        <div id="ch-chart" class="chart"></div>
+      </section>
+      <section class="card">
+        <div class="card-head">
+          <div><h2 id="ch2-title">Change in each period</h2><p class="sub" id="ch2-sub"></p></div>
+          <select id="ch-cur" aria-label="Currency"></select>
+        </div>
+        <div id="ch2-chart" class="chart"></div>
+      </section>
+    </section>
+    <section class="card">
+      <h2>Behind the change</h2>
+      <p class="sub">A change in the US-dollar amount includes valuation: when the dollar strengthens, reserves held in other
+        currencies are worth fewer dollars even if no central bank sold any. Shares move for the same reason.</p>
+      <div class="table-wrap"><table id="ch-table"></table></div>
+    </section>
+  </div>
+
+  <!-- Data -->
+  <div role="tabpanel" id="tab-data" aria-labelledby="tab-btn-data" hidden>
+    <section class="card">
+      <div class="card-head">
+        <div><h2>The numbers</h2><p class="sub" id="dt-sub"></p></div>
+        <div class="row">
+          <div class="seg" id="dt-metric-seg" role="group" aria-label="Measure"><button data-v="share">Shares, %</button><button data-v="bn">US$ billions</button></div>
+          <button class="text-btn" type="button" id="dt-csv">Download CSV</button>
+        </div>
+      </div>
+      <div class="table-wrap scroll-y"><table id="dt-table"></table></div>
+      <p class="hint">"Download CSV" saves the table as shown: the currencies, frequency and period chosen above.
+        The full dataset is on the <a href="https://data.imf.org/en/datasets/IMF.STA:COFER" target="_blank" rel="noopener">IMF data portal</a>.</p>
+    </section>
+  </div>
+
+  <section class="card">
+    <details>
+      <summary>Data, definitions &amp; caveats</summary>
+      <ul class="notes">
+        <li><b>COFER</b> (<a href="https://data.imf.org/en/datasets/IMF.STA:COFER" target="_blank" rel="noopener">Currency Composition of Official Foreign Exchange Reserves</a>)
+          is the IMF's survey of the currencies central banks hold their foreign exchange reserves in. Countries report to the IMF in confidence; the
+          IMF publishes only the world totals shown here. Foreign exchange reserves exclude gold, SDRs and the reserve position in the IMF.</li>
+        <li><b>Shares</b> are percentages of <i>allocated</i> reserves: those whose currency composition is known. In the current release
+          unallocated reserves are zero from 2000 on; in 1995–1999 they were about a fifth of the total (shown grey in Amounts).
+          From 2025 Q3 the IMF also reports the part of total reserves whose composition it has imputed (estimated) itself, about 10%.</li>
+        <li><b>Amounts</b> are in US dollars at each period's market exchange rates. A change in an amount therefore mixes what central banks
+          bought or sold with valuation: when the dollar rises, reserves in other currencies are worth fewer dollars. The same holds for shares.</li>
+        <li><b>Yearly</b> figures are the end-of-year positions (the fourth quarter). Before 1999 there are only yearly figures, and the euro's
+          predecessors (Deutsche mark, French franc, Dutch guilder and the ECU) are shown combined as <i>Euro predecessors</i>.</li>
+        <li><b>Other currencies</b> is everything outside the eight currencies the IMF lists separately, for example the Korean won, the
+          Singapore dollar and the Nordic currencies. The renminbi is listed separately from 2016 Q4, the Australian and Canadian dollars from 2012 Q4;
+          before then they are part of other currencies.</li>
+        <li><b>Live data:</b> each time the page opens it asks the IMF's API for the current COFER release, so new quarters and revisions appear
+          without rebuilding it. If the IMF cannot be reached, the page shows the copy it was built with. The IMF publishes COFER once a
+          quarter, about three months after the quarter ends, and revises earlier figures when countries revise theirs.</li>
+      </ul>
+    </details>
+  </section>
+</div>
+
+<script>
+const SNAPSHOT = __SNAPSHOT__;
+// The same address update.py downloads from: world totals (G001), every series, as SDMX-CSV.
+const DATA_URL = "https://api.imf.org/external/sdmx/3.0/data/dataflow/IMF.STA/COFER/+/G001.*.*.*.*";
+const CSV_TYPE = "application/vnd.sdmx.data+csv;version=2.0.0";
+
+// Currencies in a fixed order, each with its own colour wherever it appears.
+const CURS = [
+  { k: "USD", name: "US dollar", color: "--s1" },
+  { k: "EUR", name: "Euro", color: "--s2" },
+  { k: "LEG", name: "Euro predecessors", color: "--s2", yearlyOnly: true, dash: "dot" },
+  { k: "JPY", name: "Japanese yen", color: "--s3" },
+  { k: "GBP", name: "Pound sterling", color: "--s4" },
+  { k: "CNY", name: "Chinese renminbi", color: "--s5" },
+  { k: "CAD", name: "Canadian dollar", color: "--s6" },
+  { k: "AUD", name: "Australian dollar", color: "--s7" },
+  { k: "CHF", name: "Swiss franc", color: "--s8" },
+  { k: "OTHC", name: "Other currencies", color: "--other" },
+];
+const CUR = Object.fromEntries(CURS.map(c => [c.k, c]));
+const LEGACY = ["DEM", "FRF", "NLG", "ECU"];
+const BIG4 = ["USD", "EUR", "JPY", "GBP"];
+
+// ---------- helpers ----------
+const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const fin = v => v != null && isFinite(v);
+const fmt = (v, d = 1) => fin(v) ? v.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d }) : "–";
+const signed = (v, d = 1, unit = "") => fin(v) ? (v > 0 ? "+" : v < 0 ? "−" : "") + fmt(Math.abs(v), d) + unit : "–";
+const cls = v => !fin(v) || Math.abs(v) < 1e-9 ? "" : v > 0 ? "up" : "down";
+const label = p => p.includes("-Q") ? p.replace("-Q", " Q") : p;  // "2026-Q2" -> "2026 Q2"
+// Plot each position at the end of its period (they are end-of-quarter stocks).
+const xdate = p => { const [y, q] = p.split("-Q"); return q ? `${y}-${["03-31", "06-30", "09-30", "12-31"][q - 1]}` : `${y}-12-31`; };
+const when = iso => iso ? new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "unknown";
+const dot = k => `<span class="dot" style="background:${css(CUR[k].color)}"></span>`;
+
+// ---------- the data ----------
+// SDMX-CSV rows -> per frequency: periods, and for each currency its share (%) and amount (US$ bn).
+function buildModel(text) {
+  const lines = text.trim().split(/\r?\n/);
+  const h = lines[0].split(",");
+  const col = Object.fromEntries(["COUNTRY", "INDICATOR", "FXR_CURRENCY", "TYPE_OF_TRANSFORMATION", "FREQUENCY", "TIME_PERIOD", "OBS_VALUE"].map(n => [n, h.indexOf(n)]));
+  if (Object.values(col).some(i => i < 0)) throw new Error("the IMF's data did not have the expected columns");
+  const obs = { Q: new Map(), A: new Map() };
+  for (let i = 1; i < lines.length; i++) {
+    const r = lines[i].split(",");
+    if (r[col.COUNTRY] !== "G001" || !obs[r[col.FREQUENCY]]) continue;
+    const v = parseFloat(r[col.OBS_VALUE]);
+    if (!isFinite(v)) continue;
+    obs[r[col.FREQUENCY]].set(`${r[col.INDICATOR]}|${r[col.FXR_CURRENCY].replace(/^CI_/, "")}|${r[col.TYPE_OF_TRANSFORMATION]}|${r[col.TIME_PERIOD]}`, v);
+  }
+  const model = { obs };
+  for (const f of ["Q", "A"]) {
+    const get = (ind, cur, tr, p) => obs[f].get(`${ind}|${cur}|${tr}|${p}`) ?? null;
+    const periods = [...new Set([...obs[f].keys()].filter(k => k.startsWith("AFXRA|T|NV_USD|")).map(k => k.split("|")[3]))].sort();
+    const share = {}, bn = {};
+    for (const c of CURS) {
+      const parts = c.k === "LEG" ? LEGACY : [c.k];
+      const sum = (tr, scale) => periods.map(p => {
+        const vs = parts.map(x => get("AFXRA", x, tr, p)).filter(fin);
+        return vs.length ? vs.reduce((a, b) => a + b, 0) / scale : null;
+      });
+      share[c.k] = sum("SHRO_PT", 1);
+      bn[c.k] = sum("NV_USD", 1e9);
+    }
+    model[f] = {
+      periods, x: periods.map(xdate), share, bn,
+      allocated: periods.map(p => fin(get("AFXRA", "T", "NV_USD", p)) ? get("AFXRA", "T", "NV_USD", p) / 1e9 : null),
+      unallocated: periods.map(p => fin(get("UFXRA", "T", "NV_USD", p)) ? get("UFXRA", "T", "NV_USD", p) / 1e9 : null),
+      total: periods.map(p => fin(get("TFXRA", "T", "NV_USD", p)) ? get("TFXRA", "T", "NV_USD", p) / 1e9 : null),
+      imputed: periods.map(p => get("TFXRA_IMP", "T", "SHRO_PT", p)),
+    };
+  }
+  if (!model.Q.periods.length) throw new Error("the IMF's data had no quarterly figures");
+  model.latest = model.Q.periods.at(-1);
+  return model;
+}
+// Number of observations that differ between two releases (new, removed or revised).
+function countDiff(a, b) {
+  let n = 0;
+  for (const f of ["Q", "A"]) {
+    for (const [k, v] of a.obs[f]) { const w = b.obs[f].get(k); if (w == null || Math.abs(w - v) > 1e-6 * Math.max(1, Math.abs(v))) n++; }
+    for (const k of b.obs[f].keys()) if (!a.obs[f].has(k)) n++;
+  }
+  return n;
+}
+
+let M = buildModel(SNAPSHOT.csv);
+const source = { kind: "snapshot", at: SNAPSHOT.downloaded, checking: true };
+
+// ---------- state (kept in the URL hash so a view can be bookmarked or shared) ----------
+const state = {
+  tab: "shares", cur: CURS.map(c => c.k), freq: "Q", period: "all",
+  shView: "lines", shLog: false, amView: "stack", amLog: false,
+  chFrom: "", chTo: "", chMetric: "bn", chCur: "USD", dtMetric: "share",
+};
+const LIST_KEYS = new Set(["cur"]);
+const TABS = ["shares", "amounts", "changes", "data"];
+function readHash() {
+  const p = new URLSearchParams(location.hash.slice(1));
+  for (const [k, v] of p) {
+    if (!(k in state)) continue;
+    if (LIST_KEYS.has(k)) state[k] = v ? v.split(",").filter(x => CUR[x]) : [];
+    else if (typeof state[k] === "boolean") state[k] = v === "1";
+    else state[k] = v;
+  }
+  if (!TABS.includes(state.tab)) state.tab = "shares";
+  if (!["Q", "A"].includes(state.freq)) state.freq = "Q";
+  if (!CUR[state.chCur] || CUR[state.chCur].yearlyOnly) state.chCur = "USD";
+}
+function writeHash() {
+  const p = new URLSearchParams();
+  for (const [k, v] of Object.entries(state)) p.set(k, Array.isArray(v) ? v.join(",") : typeof v === "boolean" ? (v ? "1" : "0") : v);
+  history.replaceState(null, "", "#" + p.toString());
+}
+
+const F = () => M[state.freq];
+const perYear = () => state.freq === "Q" ? 4 : 1;
+// selected currencies that exist at this frequency, in the fixed order
+const selected = () => CURS.filter(c => state.cur.includes(c.k) && (!c.yearlyOnly || state.freq === "A")).map(c => c.k);
+// indexes of the periods in the chosen window
+function windowIdx() {
+  const ps = F().periods, n = ps.length;
+  let i0 = 0;
+  if (state.period === "10y") i0 = n - 10 * perYear();
+  else if (state.period === "5y") i0 = n - 5 * perYear();
+  else if (/^\d{4}$/.test(state.period)) i0 = ps.findIndex(p => p >= state.period);
+  i0 = Math.max(0, i0);
+  return { i0, i1: n - 1 };
+}
+const slice = (arr, w) => arr.slice(w.i0, w.i1 + 1);
+const lastIdx = arr => { for (let i = arr.length - 1; i >= 0; i--) if (fin(arr[i])) return i; return -1; };
+
+// ---------- charts ----------
+const config = { displayModeBar: false, responsive: true };
+function baseLayout(extra = {}) {
+  const axis = { gridcolor: css("--grid"), linecolor: css("--axis"), zerolinecolor: css("--axis"),
+    tickfont: { color: css("--text-muted"), size: 11 }, automargin: true };
+  const { xaxis = {}, yaxis = {}, ...rest } = extra;
+  return {
+    paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "rgba(0,0,0,0)",
+    font: { family: 'system-ui, -apple-system, "Segoe UI", sans-serif', color: css("--text-secondary"), size: 12 },
+    margin: { l: 8, r: 8, t: 8, b: 8 },
+    hoverlabel: { bgcolor: css("--surface"), bordercolor: css("--axis"), font: { color: css("--text-primary") } },
+    xaxis: { ...axis, showgrid: false, ...xaxis }, yaxis: { ...axis, ...yaxis },
+    legend: { orientation: "h", y: 1.02, yanchor: "bottom", x: 0, font: { color: css("--text-secondary") }, traceorder: "normal" },
+    showlegend: true, ...rest,
+  };
+}
+// the hover header names the period ("2026 Q2", "2025")
+const hoverX = () => state.freq === "Q" ? "%Y Q%q" : "%Y";
+// Labels at the right-hand end of up to four lines, nudged apart so they never overlap.
+function directLabels(traces, log = false) {
+  if (traces.length > 4) return [];
+  const toAxis = v => log ? Math.log10(v) : v;
+  const all = traces.flatMap(t => t.y).filter(v => fin(v) && (!log || v > 0)).map(toAxis);
+  const gap = (Math.max(...all) - Math.min(...all)) * 0.06 || 1;
+  const labels = traces.map(t => { const i = lastIdx(t.y); return i < 0 ? null : { x: t.x[i], y: toAxis(t.y[i]), text: t.name }; })
+    .filter(Boolean).sort((a, b) => a.y - b.y);
+  for (let k = 1; k < labels.length; k++) labels[k].y = Math.max(labels[k].y, labels[k - 1].y + gap);
+  return labels.map(l => ({ ...l, xanchor: "left", yanchor: "middle", showarrow: false, xshift: 6,
+    font: { color: css("--text-secondary"), size: 12 } }));
+}
+function empty(el, msg) { Plotly.purge(el); el.innerHTML = `<div class="empty">${esc(msg)}</div>`; }
+function plot(el, traces, layout) { if (el.querySelector(".empty")) el.innerHTML = ""; Plotly.react(el, traces, layout, config); }
+
+function lineTrace(k, x, y, unit, d) {
+  const c = CUR[k];
+  return { type: "scatter", mode: "lines", name: c.name, x, y, connectgaps: false,
+    line: { color: css(c.color), width: 2, dash: c.dash || "solid" },
+    hovertemplate: `%{y:,.${d}f}${unit}<extra>${esc(c.name)}</extra>` };
+}
+function areaTrace(k, x, y, unit, d) {
+  const c = CUR[k];
+  return { type: "scatter", mode: "lines", name: c.name, x, y, stackgroup: "one",
+    line: { color: css("--surface"), width: 1 }, fillcolor: css(c.color),
+    hovertemplate: `%{y:,.${d}f}${unit}<extra>${esc(c.name)}</extra>` };
+}
+
+// ---------- Currency shares ----------
+function drawShares() {
+  const f = F(), w = windowIdx(), x = slice(f.x, w), ks = selected(), el = document.getElementById("sh-chart");
+  document.getElementById("sh-log-label").hidden = state.shView !== "lines";
+  document.getElementById("sh-sub").textContent =
+    `${state.freq === "Q" ? "Quarterly" : "Year-end"}, ${label(f.periods[w.i0])} to ${label(f.periods[w.i1])}, % of reserves whose currency is known`;
+  if (!ks.length) return empty(el, "Pick at least one currency above.");
+  const series = ks.map(k => ({ k, y: slice(f.share[k], w) })).filter(s => s.y.some(fin));
+  if (state.shView === "multi") return drawMultiples(el, x, series);
+  el.style.height = "";
+  if (state.shView === "stack") {
+    const all = ks.length >= 9;
+    plot(el, series.map(s => areaTrace(s.k, x, s.y, "%", 2)), baseLayout({
+      hovermode: "x unified", xaxis: { hoverformat: hoverX() },
+      yaxis: { ticksuffix: "%", range: all ? [0, 100] : undefined, rangemode: "tozero" } }));
+    return;
+  }
+  const traces = series.map(s => lineTrace(s.k, x, s.y, "%", 2));
+  plot(el, traces, baseLayout({
+    hovermode: "x unified", xaxis: { hoverformat: hoverX() },
+    yaxis: state.shLog ? { type: "log", ticksuffix: "%" } : { ticksuffix: "%", rangemode: "tozero" },
+    annotations: directLabels(traces, state.shLog), margin: { l: 8, r: traces.length <= 4 ? 130 : 8, t: 8, b: 8 } }));
+}
+// one small chart per currency, each with its own scale
+function drawMultiples(el, x, series) {
+  const cols = el.clientWidth < 640 ? 2 : 3, rows = Math.ceil(series.length / cols);
+  el.style.height = `${rows * 170 + 20}px`;
+  const traces = [], annotations = [], layout = baseLayout({ showlegend: false, hovermode: "x unified",
+    grid: { rows, columns: cols, pattern: "independent", xgap: 0.08, ygap: 0.32 }, margin: { l: 8, r: 8, t: 24, b: 8 } });
+  series.forEach((s, i) => {
+    const n = i ? i + 1 : "";
+    traces.push({ ...lineTrace(s.k, x, s.y, "%", 2), xaxis: `x${n}`, yaxis: `y${n}` });
+    layout[`xaxis${n}`] = { ...layout.xaxis, hoverformat: hoverX(), nticks: 4 };
+    layout[`yaxis${n}`] = { ...layout.yaxis, ticksuffix: "%", nticks: 4 };
+    annotations.push({ text: `<b>${esc(CUR[s.k].name)}</b>`, xref: `x${n} domain`, yref: `y${n} domain`, x: 0, y: 1.02,
+      xanchor: "left", yanchor: "bottom", showarrow: false, font: { size: 12, color: css("--text-secondary") } });
+  });
+  layout.annotations = annotations;
+  Plotly.purge(el); el.innerHTML = "";
+  Plotly.newPlot(el, traces, layout, config);
+}
+function renderSharesTable() {
+  const f = F(), w = windowIdx(), n = f.periods.length - 1, py = perYear();
+  const back = [state.freq === "Q" ? [1, "1 quarter"] : null, [py, "1 year"], [5 * py, "5 years"], [10 * py, "10 years"]].filter(Boolean);
+  const head = `<tr><th>Currency</th><th>${label(f.periods[n])}</th>${back.map(([, t]) => `<th>vs ${t} earlier</th>`).join("")}
+    <th>since ${label(f.periods[w.i0])}</th><th>Highest</th><th>Lowest</th></tr>`;
+  const rows = selected().map(k => {
+    const y = f.share[k], li = lastIdx(y);
+    if (li < 0) return "";
+    const ch = j => fin(y[li - j]) ? y[li] - y[li - j] : null;
+    let hi = -1, lo = -1;
+    for (let i = w.i0; i <= w.i1; i++) if (fin(y[i])) { if (hi < 0 || y[i] > y[hi]) hi = i; if (lo < 0 || y[i] < y[lo]) lo = i; }
+    const first = (() => { for (let i = w.i0; i <= w.i1; i++) if (fin(y[i])) return i; return -1; })();
+    const since = first >= 0 && li <= w.i1 ? y[li] - y[first] : null;
+    const cell = v => `<td class="${cls(v)}">${signed(v, 2)}</td>`;
+    const stale = li < n ? ` <span class="muted">(${label(f.periods[li])})</span>` : "";
+    return `<tr><td><span class="name">${dot(k)}${esc(CUR[k].name)}</span></td><td>${fmt(y[li], 2)}%${stale}</td>
+      ${back.map(([j]) => cell(ch(j))).join("")}${cell(since)}
+      <td>${hi >= 0 ? `${fmt(y[hi], 2)}% <span class="muted">${label(f.periods[hi])}</span>` : "–"}</td>
+      <td>${lo >= 0 ? `${fmt(y[lo], 2)}% <span class="muted">${label(f.periods[lo])}</span>` : "–"}</td></tr>`;
+  }).join("");
+  document.getElementById("sh-table").innerHTML = `<thead>${head}</thead><tbody>${rows}</tbody>`;
+  document.getElementById("sh-table-sub").textContent =
+    "Share of allocated reserves in %; changes in percentage points. Highest and lowest are within the period chosen above.";
+}
+
+// ---------- Amounts ----------
+function drawAmounts() {
+  const f = F(), w = windowIdx(), x = slice(f.x, w), ks = selected(), el = document.getElementById("am-chart");
+  const stack = state.amView === "stack";
+  document.getElementById("am-log").parentElement.hidden = stack;
+  document.getElementById("am-sub").textContent =
+    `${state.freq === "Q" ? "End of each quarter" : "End of each year"}, US$ billions at market exchange rates` +
+    (stack ? "; the grey area is reserves whose currency is not known" : "");
+  if (!ks.length) return empty(el, "Pick at least one currency above.");
+  const series = ks.map(k => ({ k, y: slice(f.bn[k], w) })).filter(s => s.y.some(fin));
+  let traces;
+  if (stack) {
+    traces = series.map(s => areaTrace(s.k, x, s.y, " bn", 0));
+    const un = slice(f.unallocated, w);
+    if (un.some(v => v > 0)) traces.push({ type: "scatter", mode: "lines", name: "Unallocated", x, y: un, stackgroup: "one",
+      line: { color: css("--surface"), width: 1 }, fillcolor: css("--unalloc"), hovertemplate: "%{y:,.0f} bn<extra>Unallocated</extra>" });
+  } else traces = series.map(s => lineTrace(s.k, x, s.y, " bn", 0));
+  plot(el, traces, baseLayout({
+    hovermode: "x unified", xaxis: { hoverformat: hoverX() },
+    yaxis: !stack && state.amLog ? { type: "log", tickprefix: "$" } : { tickprefix: "$", tickformat: ",.0f", rangemode: "tozero" },
+    annotations: stack ? [] : directLabels(traces, state.amLog), margin: { l: 8, r: !stack && traces.length <= 4 ? 130 : 8, t: 8, b: 8 } }));
+}
+function renderAmountsTable() {
+  const f = F(), n = f.periods.length - 1, py = perYear();
+  const head = `<tr><th>Currency</th><th>${label(f.periods[n])}, US$ bn</th><th>vs 1 year earlier, bn</th><th>1 year, %</th>
+    <th>5 years, % a year</th><th>10 years, % a year</th></tr>`;
+  const row = (name, y, total = false) => {
+    const li = lastIdx(y);
+    if (li < 0) return "";
+    const d1 = fin(y[li - py]) ? y[li] - y[li - py] : null;
+    const g = yrs => fin(y[li - yrs * py]) && y[li - yrs * py] > 0 ? (Math.pow(y[li] / y[li - yrs * py], 1 / yrs) - 1) * 100 : null;
+    const p1 = g(1), p5 = g(5), p10 = g(10);
+    const stale = li < n ? ` <span class="muted">(${label(f.periods[li])})</span>` : "";
+    return `<tr${total ? ' class="total"' : ""}><td>${name}</td><td>${fmt(y[li], 0)}${stale}</td><td class="${cls(d1)}">${signed(d1, 0)}</td>
+      <td class="${cls(p1)}">${signed(p1, 1, "%")}</td><td class="${cls(p5)}">${signed(p5, 1, "%")}</td><td class="${cls(p10)}">${signed(p10, 1, "%")}</td></tr>`;
+  };
+  const body = selected().map(k => row(`<span class="name">${dot(k)}${esc(CUR[k].name)}</span>`, f.bn[k])).join("") +
+    row("Total foreign exchange reserves", f.total, true);
+  document.getElementById("am-table").innerHTML = `<thead>${head}</thead><tbody>${body}</tbody>`;
+  document.getElementById("am-table-sub").textContent =
+    "Growth over 5 and 10 years is the average yearly rate (compound). Dollar amounts include exchange-rate valuation.";
+}
+
+// ---------- Changes ----------
+function syncChangeControls() {
+  const ps = F().periods, n = ps.length - 1;
+  if (!ps.includes(state.chTo)) state.chTo = ps[n];
+  if (!ps.includes(state.chFrom) || state.chFrom >= state.chTo) state.chFrom = ps[Math.max(0, ps.indexOf(state.chTo) - perYear())];
+  const opts = (sel, maxP) => ps.filter(p => !maxP || p < maxP).slice().reverse()
+    .map(p => `<option value="${p}"${p === sel ? " selected" : ""}>${label(p)}</option>`).join("");
+  document.getElementById("ch-to").innerHTML = ps.slice(1).slice().reverse().map(p => `<option value="${p}"${p === state.chTo ? " selected" : ""}>${label(p)}</option>`).join("");
+  document.getElementById("ch-from").innerHTML = opts(state.chFrom, state.chTo);
+  const gap = ps.indexOf(state.chTo) - ps.indexOf(state.chFrom), py = perYear();
+  setPressed(document.getElementById("ch-span-seg"), gap === 1 ? "1" : gap === py ? "1y" : gap === 5 * py ? "5y" : gap === 10 * py ? "10y" : "");
+  document.querySelector('#ch-span-seg [data-v="1"]').textContent = state.freq === "Q" ? "1 quarter" : "1 year";
+  document.querySelector('#ch-span-seg [data-v="1y"]').hidden = state.freq === "A";
+  document.getElementById("ch-cur").innerHTML = CURS.filter(c => !c.yearlyOnly || state.freq === "A")
+    .map(c => `<option value="${c.k}"${c.k === state.chCur ? " selected" : ""}>${esc(c.name)}</option>`).join("");
+  setPressed(document.getElementById("ch-metric-seg"), state.chMetric);
+}
+function change(f, k, i0, i1, metric) {
+  const s = metric === "pp" ? f.share[k] : f.bn[k], a = s[i0], b = s[i1];
+  if (!fin(a) || !fin(b)) return null;
+  return metric === "pct" ? (a > 0 ? (b / a - 1) * 100 : null) : b - a;
+}
+const METRIC = {
+  bn: { unit: " bn", d: 0, title: "Change in holdings, US$ billions", prefix: "$" },
+  pct: { unit: "%", d: 1, title: "Change in holdings, %" },
+  pp: { unit: " pp", d: 2, title: "Change in share, percentage points" },
+};
+function drawChanges() {
+  syncChangeControls();
+  const f = F(), i0 = f.periods.indexOf(state.chFrom), i1 = f.periods.indexOf(state.chTo), m = METRIC[state.chMetric];
+  const span = `${label(state.chFrom)} to ${label(state.chTo)}`;
+  document.getElementById("ch-title").textContent = m.title;
+  document.getElementById("ch-sub").textContent = `${span}, by currency`;
+  const el = document.getElementById("ch-chart");
+  const items = selected().map(k => ({ k, v: change(f, k, i0, i1, state.chMetric) })).filter(it => fin(it.v)).sort((a, b) => a.v - b.v);
+  if (!items.length) empty(el, selected().length ? "None of the chosen currencies has figures for both dates." : "Pick at least one currency above.");
+  else {
+    el.style.height = `${Math.max(240, items.length * 34 + 60)}px`;
+    const lo = Math.min(0, ...items.map(it => it.v)), hi = Math.max(0, ...items.map(it => it.v)), pad = (hi - lo) * 0.22 || 1;
+    plot(el, [{ type: "bar", orientation: "h", y: items.map(it => CUR[it.k].name), x: items.map(it => it.v),
+      marker: { color: items.map(it => css(CUR[it.k].color)), line: { color: css("--surface"), width: 2 } },
+      text: items.map(it => signed(it.v, m.d, m.unit)), textposition: "outside", cliponaxis: false,
+      textfont: { color: css("--text-secondary"), size: 12 },
+      hovertemplate: `%{y}: %{x:+,.${m.d}f}${m.unit}<extra></extra>` }],
+      baseLayout({ showlegend: false, bargap: 0.35, xaxis: { range: [lo < 0 ? lo - pad : 0, hi > 0 ? hi + pad : 0], showgrid: true, zeroline: true, zerolinewidth: 1.5, ticksuffix: m.unit.trim() === "bn" ? "" : m.unit.trim() },
+        yaxis: { showgrid: false, automargin: true }, margin: { l: 8, r: 60, t: 8, b: 8 } }));
+  }
+  // one currency, period by period
+  const el2 = document.getElementById("ch2-chart"), w = windowIdx(), k = state.chCur, c = CUR[k];
+  document.getElementById("ch2-title").textContent = `${c.name}: change in each ${state.freq === "Q" ? "quarter" : "year"}`;
+  document.getElementById("ch2-sub").textContent = `${m.title.replace(/^Change in /, "").replace(/^./, s => s.toUpperCase())}, ${label(f.periods[w.i0])} to ${label(f.periods[w.i1])}`;
+  const xs = [], ys = [];
+  for (let i = Math.max(1, w.i0); i <= w.i1; i++) { const v = change(f, k, i - 1, i, state.chMetric); if (fin(v)) { xs.push(f.x[i]); ys.push(v); } }
+  if (!xs.length) return empty(el2, `No figures for the ${c.name.toLowerCase()} in this period.`);
+  plot(el2, [{ type: "bar", x: xs, y: ys, marker: { color: ys.map(v => css(v >= 0 ? "--pos" : "--neg")) },
+    hovertemplate: `%{x|${hoverX()}}: %{y:+,.${m.d}f}${m.unit}<extra></extra>` }],
+    baseLayout({ showlegend: false, bargap: 0.15, xaxis: { hoverformat: hoverX() }, yaxis: { zeroline: true, zerolinewidth: 1.5, ticksuffix: m.unit.trim() === "bn" ? "" : m.unit.trim() } }));
+  renderChangesTable(f, i0, i1);
+}
+function renderChangesTable(f, i0, i1) {
+  const pa = label(f.periods[i0]), pb = label(f.periods[i1]);
+  const head = `<tr><th>Currency</th><th>${pa}, bn</th><th>${pb}, bn</th><th>Change, bn</th><th>Change, %</th>
+    <th>Share ${pa}</th><th>Share ${pb}</th><th>Change, pp</th></tr>`;
+  const body = selected().map(k => {
+    const a = f.bn[k][i0], b = f.bn[k][i1], sa = f.share[k][i0], sb = f.share[k][i1];
+    if (!fin(a) && !fin(b)) return "";
+    const d = fin(a) && fin(b) ? b - a : null, p = fin(d) && a > 0 ? (b / a - 1) * 100 : null, dp = fin(sa) && fin(sb) ? sb - sa : null;
+    return `<tr><td><span class="name">${dot(k)}${esc(CUR[k].name)}</span></td><td>${fmt(a, 0)}</td><td>${fmt(b, 0)}</td>
+      <td class="${cls(d)}">${signed(d, 0)}</td><td class="${cls(p)}">${signed(p, 1, "%")}</td>
+      <td>${fin(sa) ? fmt(sa, 2) + "%" : "–"}</td><td>${fin(sb) ? fmt(sb, 2) + "%" : "–"}</td><td class="${cls(dp)}">${signed(dp, 2)}</td></tr>`;
+  }).join("");
+  const ta = f.total[i0], tb = f.total[i1], td = fin(ta) && fin(tb) ? tb - ta : null;
+  const total = `<tr class="total"><td>Total foreign exchange reserves</td><td>${fmt(ta, 0)}</td><td>${fmt(tb, 0)}</td>
+    <td class="${cls(td)}">${signed(td, 0)}</td><td class="${cls(td)}">${fin(td) && ta > 0 ? signed((tb / ta - 1) * 100, 1, "%") : "–"}</td><td></td><td></td><td></td></tr>`;
+  document.getElementById("ch-table").innerHTML = `<thead>${head}</thead><tbody>${body}${total}</tbody>`;
+}
+
+// ---------- Data ----------
+function dataRows() {
+  const f = F(), w = windowIdx(), ks = selected(), share = state.dtMetric === "share";
+  const cols = ks.map(k => ({ name: CUR[k].name, y: share ? f.share[k] : f.bn[k], d: share ? 2 : 1 }));
+  if (!share) cols.push({ name: "Unallocated", y: f.unallocated, d: 1 }, { name: "Total FX reserves", y: f.total, d: 1 });
+  if (f.imputed.some(fin)) cols.push({ name: "Imputed by the IMF, % of total", y: f.imputed, d: 2 });
+  const rows = [];
+  for (let i = w.i1; i >= w.i0; i--) rows.push({ p: f.periods[i], vals: cols.map(c => c.y[i]) });
+  return { cols, rows };
+}
+function renderData() {
+  const { cols, rows } = dataRows();
+  document.getElementById("dt-sub").textContent = state.dtMetric === "share"
+    ? "Share of allocated reserves, %, newest first" : "US$ billions at market exchange rates, newest first";
+  document.getElementById("dt-table").innerHTML =
+    `<thead><tr><th>Period</th>${cols.map(c => `<th>${esc(c.name)}</th>`).join("")}</tr></thead>` +
+    `<tbody>${rows.map(r => `<tr><td>${label(r.p)}</td>${r.vals.map((v, j) => `<td>${fin(v) ? fmt(v, cols[j].d) : '<span class="muted">–</span>'}</td>`).join("")}</tr>`).join("")}</tbody>`;
+}
+document.getElementById("dt-csv").addEventListener("click", () => {
+  const { cols, rows } = dataRows();
+  const q = s => /[",]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  const text = [["Period", ...cols.map(c => c.name)].map(q).join(","),
+    ...rows.map(r => [r.p, ...r.vals.map(v => fin(v) ? String(+v.toFixed(6)) : "")].join(","))].join("\n");
+  const url = URL.createObjectURL(new Blob([text], { type: "text/csv" }));
+  const link = Object.assign(document.createElement("a"), { href: url, download: `cofer_${state.dtMetric === "share" ? "shares" : "usd_bn"}_${state.freq === "Q" ? "quarterly" : "yearly"}.csv` });
+  document.body.append(link); link.click(); link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
+
+// ---------- latest-quarter tiles ----------
+function renderTiles() {
+  const f = M.Q, n = f.periods.length - 1, yr = n - 4, py = label(f.periods[yr] || "");
+  const tile = (lab, value, note) => `<div class="tile"><div class="label">${lab}</div><div class="value">${value}</div><div class="note">${note}</div></div>`;
+  const shareTile = k => {
+    const v = f.share[k][n], d = f.share[k][yr];
+    return tile(`${dot(k)}${esc(CUR[k].name)}`, `${fmt(v, 1)}%`, `<span class="${cls(v - d)}">${signed(v - d, 2, " pp")}</span> vs ${py}`);
+  };
+  const beyond = i => ["CNY", "CAD", "AUD", "CHF", "OTHC"].reduce((s, k) => s + (f.share[k][i] ?? 0), 0);
+  const t = f.total[n], tPrev = f.total[yr], g = (t / tPrev - 1) * 100;
+  document.getElementById("tiles").innerHTML =
+    tile(`Total FX reserves, ${label(f.periods[n])}`, `$${fmt(t / 1000, 2)} tn`, `<span class="${cls(g)}">${signed(g, 1, "%")}</span> vs ${py}`) +
+    ["USD", "EUR", "JPY", "CNY"].map(shareTile).join("") +
+    tile("Beyond the big four", `${fmt(beyond(n), 1)}%`, `<span class="${cls(beyond(n) - beyond(yr))}">${signed(beyond(n) - beyond(yr), 2, " pp")}</span> vs ${py} · all but USD, EUR, JPY, GBP`);
+}
+
+// ---------- controls ----------
+function setPressed(container, v) { container.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === v))); }
+function bindSeg(id, key, after) {
+  document.getElementById(id).addEventListener("click", e => {
+    const b = e.target.closest("button");
+    if (!b || b.disabled) return;
+    state[key] = b.dataset.v; onChange(after);
+  });
+}
+function renderChips() {
+  document.getElementById("cur-chips").innerHTML = CURS.filter(c => !c.yearlyOnly || state.freq === "A").map(c =>
+    `<button class="chip" type="button" data-k="${c.k}" aria-pressed="${state.cur.includes(c.k)}">${dot(c.k)}${esc(c.name)}</button>`).join("");
+}
+function syncControls() {
+  renderChips();
+  setPressed(document.getElementById("freq-seg"), state.freq);
+  setPressed(document.getElementById("period-seg"), state.period);
+  setPressed(document.getElementById("sh-view-seg"), state.shView);
+  setPressed(document.getElementById("am-view-seg"), state.amView);
+  setPressed(document.getElementById("dt-metric-seg"), state.dtMetric);
+  document.getElementById("sh-log").checked = state.shLog;
+  document.getElementById("am-log").checked = state.amLog;
+  document.getElementById("period-control").hidden = false;
+  document.getElementById("hint").textContent = state.tab === "changes"
+    ? "The period chosen here sets the right-hand chart; the left one compares the two dates above it." : "";
+}
+function onChange() { syncControls(); writeHash(); renderTab(state.tab); }
+
+document.getElementById("cur-chips").addEventListener("click", e => {
+  const b = e.target.closest(".chip");
+  if (!b) return;
+  const k = b.dataset.k;
+  state.cur = state.cur.includes(k) ? state.cur.filter(x => x !== k) : [...state.cur, k];
+  onChange();
+});
+document.getElementById("cur-all").addEventListener("click", () => { state.cur = CURS.map(c => c.k); onChange(); });
+document.getElementById("cur-nousd").addEventListener("click", () => { state.cur = CURS.map(c => c.k).filter(k => k !== "USD"); onChange(); });
+bindSeg("freq-seg", "freq");
+bindSeg("period-seg", "period");
+bindSeg("sh-view-seg", "shView");
+bindSeg("am-view-seg", "amView");
+bindSeg("ch-metric-seg", "chMetric");
+bindSeg("dt-metric-seg", "dtMetric");
+document.getElementById("sh-log").addEventListener("change", e => { state.shLog = e.target.checked; onChange(); });
+document.getElementById("am-log").addEventListener("change", e => { state.amLog = e.target.checked; onChange(); });
+document.getElementById("ch-from").addEventListener("change", e => { state.chFrom = e.target.value; onChange(); });
+document.getElementById("ch-to").addEventListener("change", e => { state.chTo = e.target.value; onChange(); });
+document.getElementById("ch-cur").addEventListener("change", e => { state.chCur = e.target.value; onChange(); });
+document.getElementById("ch-span-seg").addEventListener("click", e => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  const ps = F().periods, py = perYear(), gap = { "1": 1, "1y": py, "5y": 5 * py, "10y": 10 * py }[b.dataset.v];
+  state.chTo = ps.at(-1); state.chFrom = ps[Math.max(0, ps.length - 1 - gap)];
+  onChange();
+});
+
+// ---------- data status and live updates from the IMF ----------
+const updateBtn = document.getElementById("update-btn"), updateMsg = document.getElementById("update-msg");
+function setUpdateMsg(html, error = false) { updateMsg.innerHTML = html; updateMsg.classList.toggle("error", error); }
+function renderStatus() {
+  const how = source.kind === "live"
+    ? `Live from the IMF, checked <b>${when(source.at)}</b>`
+    : `Copy downloaded <b>${when(source.at)}</b>${source.checking ? " · asking the IMF for newer data…" : ""}`;
+  document.getElementById("data-status").innerHTML =
+    `<div>IMF COFER: latest data <b>${label(M.latest)}</b></div><div>${how}</div>`;
+  document.getElementById("meta").innerHTML = `
+    <span>World totals, <b>${M.Q.periods.length}</b> quarters and <b>${M.A.periods.length}</b> years</span>
+    <span>Source: <a href="https://data.imf.org/en/datasets/IMF.STA:COFER" target="_blank" rel="noopener">IMF, COFER</a></span>`;
+}
+async function checkIMF(manual) {
+  updateBtn.disabled = true; updateBtn.setAttribute("aria-busy", "true"); updateBtn.textContent = "Checking…";
+  source.checking = true; renderStatus();
+  if (manual) setUpdateMsg("Asking the IMF for the current COFER release…");
+  try {
+    const res = await fetch(DATA_URL, { headers: { Accept: CSV_TYPE }, cache: "no-store" });
+    if (!res.ok) throw new Error(`the IMF answered ${res.status}`);
+    const fresh = buildModel(await res.text());
+    const changed = countDiff(M, fresh), newer = fresh.latest > M.latest, before = M.latest;
+    if (changed) { M = fresh; syncControls(); renderTiles(); renderTab(state.tab); }
+    Object.assign(source, { kind: "live", at: new Date().toISOString() });
+    if (newer) setUpdateMsg(`New data from the IMF: the figures now run to ${label(fresh.latest)} (were ${label(before)}).`);
+    else if (changed) setUpdateMsg(`The IMF has revised ${changed} figure${changed === 1 ? "" : "s"} since this page was built; the page now shows the current ones.`);
+    else if (manual) setUpdateMsg("Up to date: this is the IMF's current release.");
+    else setUpdateMsg("");
+  } catch (err) {
+    setUpdateMsg(`Could not reach the IMF (${esc(err.message)}). Showing the copy downloaded ${when(SNAPSHOT.downloaded)}.`, true);
+  } finally {
+    source.checking = false; renderStatus();
+    updateBtn.disabled = false; updateBtn.removeAttribute("aria-busy"); updateBtn.textContent = "Check for updates";
+  }
+}
+updateBtn.addEventListener("click", () => checkIMF(true));
+
+// ---------- tabs ----------
+function renderTab(tab) {
+  if (tab === "shares") { drawShares(); renderSharesTable(); }
+  else if (tab === "amounts") { drawAmounts(); renderAmountsTable(); }
+  else if (tab === "changes") drawChanges();
+  else renderData();
+}
+function showTab(tab, focus = false) {
+  state.tab = tab;
+  for (const t of TABS) {
+    const btn = document.getElementById(`tab-btn-${t}`);
+    btn.setAttribute("aria-selected", String(t === tab));
+    btn.tabIndex = t === tab ? 0 : -1;
+    document.getElementById(`tab-${t}`).hidden = t !== tab;
+  }
+  if (focus) document.getElementById(`tab-btn-${tab}`).focus();
+  syncControls(); writeHash();
+  renderTab(tab);  // charts are drawn when visible so Plotly sizes them correctly
+}
+document.querySelectorAll('[role="tab"]').forEach(btn => {
+  btn.addEventListener("click", () => showTab(btn.dataset.tab));
+  btn.addEventListener("keydown", e => {
+    const k = TABS.indexOf(btn.dataset.tab);
+    if (e.key === "ArrowRight") showTab(TABS[(k + 1) % TABS.length], true);
+    if (e.key === "ArrowLeft") showTab(TABS[(k + TABS.length - 1) % TABS.length], true);
+  });
+});
+
+function redraw() { renderTiles(); renderChips(); renderTab(state.tab); }
+let resizeTimer;
+window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { if (state.tab === "shares" && state.shView === "multi") drawShares(); }, 200); });
+
+readHash();
+renderStatus();
+renderTiles();
+showTab(state.tab);
+checkIMF(false);
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", redraw);
+new MutationObserver(redraw).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+const themeSeg = document.getElementById("theme-seg");
+function syncTheme() {
+  const current = document.documentElement.dataset.theme || "auto";
+  themeSeg.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === current)));
+}
+themeSeg.addEventListener("click", e => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  if (b.dataset.v === "auto") delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = b.dataset.v;
+  try { localStorage.setItem("theme", b.dataset.v); } catch (err) { /* not remembered */ }
+  syncTheme();
+});
+syncTheme();
+</script>
+</body>
+</html>
