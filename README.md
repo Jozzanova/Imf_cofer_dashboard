@@ -26,6 +26,9 @@ Tabs:
 - **Changes**: the change between any two dates, by currency, in US$, % or share points, and
   each quarter's change for one currency.
 - **Data**: the numbers as a table, with a CSV download of the selection.
+- **Countries**: each country's reserves (IMF, International Investment Position) as % of GDP
+  (IMF, World Economic Outlook) or in US$, with or without gold: a world map, a sortable ranking
+  and a chart over time for chosen countries.
 - **Explore**: a bar chart race of the currencies since 1999; how much of each currency's change in
   share came from exchange-rate moves and how much from central banks' holdings (with the IMF's
   exchange rates); estimated purchases and sales; and the effective number of reserve currencies.

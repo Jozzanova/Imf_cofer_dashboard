@@ -31,6 +31,7 @@
     --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
     --s5: #e87ba4; --s6: #008300; --s7: #4a3aa7; --s8: #e34948;
     --other: #9c9b94; --unalloc: #c3c2b7;
+    --seq-lo: #d6e5f8; --seq-mid: #4a8fe0; --seq-hi: #0c356b;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
@@ -42,6 +43,7 @@
       --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
       --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
       --other: #8a8983; --unalloc: #4a4a47;
+      --seq-lo: #1f3047; --seq-mid: #3987e5; --seq-hi: #d6e8fd;
     }
   }
   :root[data-theme="dark"] {
@@ -53,6 +55,7 @@
     --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
     --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
     --other: #8a8983; --unalloc: #4a4a47;
+    --seq-lo: #1f3047; --seq-mid: #3987e5; --seq-hi: #d6e8fd;
   }
 
   * { box-sizing: border-box; }
@@ -172,7 +175,18 @@
     padding: 10px 12px; margin: 4px 0 14px; }
   .insight:empty { display: none; }
   .grid2.inner { margin-bottom: 0; }
-  #tab-explore { margin-top: 16px; }
+  #tab-explore, #tab-countries { margin-top: 16px; }
+  .chart.map { height: 480px; }
+  .clickable tbody tr[data-k] { cursor: pointer; }
+  .clickable tbody tr[data-k]:hover td { background: var(--hover); }
+  tr.current td { font-weight: 650; }
+  th.sortable { cursor: pointer; }
+  th.sortable:hover { color: var(--text-primary); }
+  .search { font: inherit; font-size: 13px; padding: 5px 10px; border-radius: 8px; border: 1px solid var(--axis);
+    background: var(--page); color: var(--text-primary); width: min(200px, 100%); }
+  #c-chips { margin: 4px 0 6px; }
+  #c-table th:nth-child(2), #c-table td:nth-child(2) { text-align: left; }
+  @media (max-width: 520px) { .chart.map { height: 240px; } }
   h3 { font-size: 13.5px; font-weight: 600; margin: 0 0 6px; color: var(--text-secondary); }
   @media (max-width: 520px) { .race-row .rl { width: 96px; font-size: 12px; } }
 </style>
@@ -205,6 +219,7 @@
     <button role="tab" id="tab-btn-amounts" data-tab="amounts" aria-controls="tab-amounts">Amounts</button>
     <button role="tab" id="tab-btn-changes" data-tab="changes" aria-controls="tab-changes">Changes</button>
     <button role="tab" id="tab-btn-data" data-tab="data" aria-controls="tab-data">Data</button>
+    <button role="tab" id="tab-btn-countries" data-tab="countries" aria-controls="tab-countries">Countries</button>
     <button role="tab" id="tab-btn-explore" data-tab="explore" aria-controls="tab-explore">Explore ✦</button>
   </nav>
 
@@ -322,6 +337,44 @@
     </section>
   </div>
 
+  <!-- Countries -->
+  <div role="tabpanel" id="tab-countries" aria-labelledby="tab-btn-countries" hidden>
+    <section class="card">
+      <div class="row">
+        <div class="control"><span class="lbl">Measure</span>
+          <div class="seg" id="c-measure-seg"><button data-v="pct">% of GDP</button><button data-v="bn">US$ billions</button></div>
+        </div>
+        <div class="control"><span class="lbl">Gold</span>
+          <div class="seg" id="c-gold-seg"><button data-v="with">Including gold</button><button data-v="without">Excluding gold</button></div>
+        </div>
+        <div class="control"><span class="lbl">Date</span><select id="c-year" aria-label="Date"></select></div>
+      </div>
+      <div class="hint" id="c-status"></div>
+    </section>
+    <section class="card">
+      <h2 id="c-map-title">Reserves around the world</h2>
+      <p class="sub" id="c-map-sub"></p>
+      <div id="c-map" class="chart map"></div>
+    </section>
+    <section class="grid2">
+      <section class="card">
+        <div class="card-head">
+          <div><h2>Ranking</h2><p class="sub" id="c-table-sub">Click a column to sort it, a country to add it to the chart.</p></div>
+          <input type="search" id="c-search" class="search" placeholder="Find a country" aria-label="Find a country">
+        </div>
+        <div class="table-wrap scroll-y" style="max-height:560px"><table id="c-table" class="clickable"></table></div>
+      </section>
+      <section class="card">
+        <div class="card-head">
+          <div><h2 id="c-line-title">Over time</h2><p class="sub" id="c-line-sub"></p></div>
+          <select id="c-add" aria-label="Add a country"></select>
+        </div>
+        <div class="chips" id="c-chips"></div>
+        <div id="c-line" class="chart" style="height:440px"></div>
+      </section>
+    </section>
+  </div>
+
   <!-- Explore -->
   <div role="tabpanel" id="tab-explore" aria-labelledby="tab-btn-explore" hidden>
     <section class="card">
@@ -397,6 +450,14 @@
           no single exchange rate and stays at current values. Purchases and sales are estimated the same way, quarter by quarter, at the
           average of the opening and closing exchange rates. Both are estimates: changes in which countries report, and the IMF's own
           revisions and imputations, also count as "holdings".</li>
+        <li><b>Countries:</b> each country's official reserve assets from the IMF's
+          <a href="https://data.imf.org/en/datasets/IMF.STA:IIP" target="_blank" rel="noopener">International Investment Position</a> statistics
+          (foreign exchange, gold at market value, SDRs, the reserve position in the IMF and other reserve assets), quarterly where the country
+          reports quarterly and otherwise at year-end, divided by that calendar year's GDP in US dollars from the IMF's
+          <a href="https://data.imf.org/en/datasets/IMF.RES:WEO" target="_blank" rel="noopener">World Economic Outlook</a> (the latest year is
+          an IMF estimate). Reserves are a stock and GDP a yearly flow, the usual way to compare them. "Latest available" uses each country's most
+          recent figure, if it is no more than two years old. Countries that are not IMF members (such as Taiwan) or do not report are missing.
+          These are national totals, not their currency composition: the IMF publishes that only for the world as a whole.</li>
         <li><b>Live data:</b> each time the page opens it asks the IMF's API for the current COFER release, so new quarters and revisions appear
           without rebuilding it. If the IMF cannot be reached, the page shows the copy it was built with. The IMF publishes COFER once a
           quarter, about three months after the quarter ends, and revises earlier figures when countries revise theirs.</li>
@@ -503,14 +564,15 @@ const state = {
   shView: "lines", shLog: false, amView: "stack", amLog: false,
   chFrom: "", chTo: "", chMetric: "bn", chCur: "USD", dtMetric: "share",
   raceMetric: "share", raceNoUSD: false, raceSpeed: "1", fxBase: "2016-Q4", fxCur: "USD",
+  cMeasure: "pct", cGold: "with", cYear: "latest", cSort: "v", cDir: "desc", cSel: ["CHE", "HKG", "SAU", "CHN", "JPN", "USA"],
 };
-const LIST_KEYS = new Set(["cur"]);
-const TABS = ["shares", "amounts", "changes", "data", "explore"];
+const LIST_KEYS = new Set(["cur", "cSel"]);
+const TABS = ["shares", "amounts", "changes", "data", "countries", "explore"];
 function readHash() {
   const p = new URLSearchParams(location.hash.slice(1));
   for (const [k, v] of p) {
     if (!(k in state)) continue;
-    if (LIST_KEYS.has(k)) state[k] = v ? v.split(",").filter(x => CUR[x]) : [];
+    if (LIST_KEYS.has(k)) state[k] = v ? v.split(",").filter(x => k === "cur" ? CUR[x] : /^[A-Z]{3}$/.test(x)) : [];
     else if (typeof state[k] === "boolean") state[k] = v === "1";
     else state[k] = v;
   }
@@ -519,6 +581,9 @@ function readHash() {
   if (!CUR[state.chCur] || CUR[state.chCur].yearlyOnly) state.chCur = "USD";
   if (!["share", "bn"].includes(state.raceMetric)) state.raceMetric = "share";
   if (!["1", "2", "4"].includes(state.raceSpeed)) state.raceSpeed = "1";
+  if (!["pct", "bn"].includes(state.cMeasure)) state.cMeasure = "pct";
+  if (!["with", "without"].includes(state.cGold)) state.cGold = "with";
+  state.cSel = state.cSel.slice(0, 8);
 }
 function writeHash() {
   const p = new URLSearchParams();
@@ -842,7 +907,7 @@ function syncControls() {
   setPressed(document.getElementById("dt-metric-seg"), state.dtMetric);
   document.getElementById("sh-log").checked = state.shLog;
   document.getElementById("am-log").checked = state.amLog;
-  document.getElementById("controls").hidden = state.tab === "explore";
+  document.getElementById("controls").hidden = state.tab === "explore" || state.tab === "countries";
   document.getElementById("hint").textContent = state.tab === "changes"
     ? "The period chosen here sets the right-hand chart; the left one compares the two dates above it." : "";
 }
@@ -1146,12 +1211,235 @@ function renderExplore() { syncExploreControls(); renderRace(); drawFx(); drawDi
 document.getElementById("fx-base").addEventListener("change", e => { state.fxBase = e.target.value; writeHash(); drawFx(); });
 document.getElementById("fx-cur").addEventListener("change", e => { state.fxCur = e.target.value; writeHash(); drawFx(); });
 
+// ---------- Countries ----------
+// Each country's reserve assets and monetary gold (IMF, International Investment Position), quarterly
+// and yearly, and GDP in US dollars (IMF, World Economic Outlook). The same addresses as update.py.
+const IIP_URL = f => `https://api.imf.org/external/sdmx/3.0/data/dataflow/IMF.STA/IIP/+/*.A_P.R+R_F11_MV.USD.${f}`;
+const COUNTRY_URLS = {
+  iipQ: IIP_URL("Q"),
+  iipA: IIP_URL("A"),
+  weo: "https://api.imf.org/external/sdmx/3.0/data/dataflow/IMF.RES/WEO/+/*.NGDPD.A",
+};
+const MAX_COUNTRIES = 8;
+// SDMX-CSV -> {indicator: {country: {period: US$ billions}}}, countries only, from 1980 (as in update.py)
+function sdmxSeries(text) {
+  const lines = text.trim().split(/\r?\n/), h = lines[0].split(",");
+  const [c, i, t, v] = ["COUNTRY", "INDICATOR", "TIME_PERIOD", "OBS_VALUE"].map(n => h.indexOf(n));
+  if ([c, i, t, v].some(x => x < 0)) throw new Error("unexpected columns");
+  const out = {};
+  for (let n = 1; n < lines.length; n++) {
+    const r = lines[n].split(","), val = parseFloat(r[v]);
+    if (!/^[A-Z]{3}$/.test(r[c]) || r[t] < "1980" || !isFinite(val)) continue;
+    ((out[r[i]] ||= {})[r[c]] ||= {})[r[t]] = Math.round(val / 1e6) / 1e3;
+  }
+  return out;
+}
+let CD = SNAPSHOT.countries;
+const cLive = { state: "idle" };
+let CC = null;  // assembled per-country series, rebuilt when CD changes
+
+// One point per quarter that has a reserves figure; yearly figures fill in the fourth quarter of years
+// without quarterly data. GDP is the calendar year's.
+function assembleCountries() {
+  const out = {};
+  const codes = new Set([...Object.keys(CD.resQ), ...Object.keys(CD.resA)]);
+  for (const k of codes) {
+    const pts = new Map();
+    for (const [p, v] of Object.entries(CD.resQ[k] || {})) pts.set(p, { p, res: v, gold: CD.goldQ[k]?.[p] ?? null });
+    for (const [y, v] of Object.entries(CD.resA[k] || {})) {
+      const p = `${y}-Q4`;
+      if (!pts.has(p)) pts.set(p, { p, res: v, gold: CD.goldA[k]?.[y] ?? null });
+    }
+    const hasGold = !!(CD.goldQ[k] || CD.goldA[k]);
+    const list = [...pts.values()].sort((a, b) => a.p < b.p ? -1 : 1);
+    for (const pt of list) {
+      pt.gdp = CD.gdp[k]?.[pt.p.slice(0, 4)] ?? null;
+      // a country without any gold figures is taken to hold none; a missing figure otherwise stays unknown
+      pt.exGold = fin(pt.gold) ? pt.res - pt.gold : hasGold ? null : pt.res;
+    }
+    if (list.length) out[k] = { k, name: CD.names[k] || k, pts: list };
+  }
+  CC = out;
+  const all = Object.values(out).flatMap(c => c.pts.map(pt => pt.p));
+  CC_LATEST = all.length ? all.reduce((a, b) => a > b ? a : b) : "";
+}
+let CC_LATEST = "";
+const cValue = pt => {
+  if (!pt) return null;
+  const r = state.cGold === "without" ? pt.exGold : pt.res;
+  if (!fin(r)) return null;
+  if (state.cMeasure === "bn") return r;
+  return fin(pt.gdp) && pt.gdp > 0 ? r / pt.gdp * 100 : null;
+};
+// the point shown for a country: its latest (if no older than two years), or the chosen year's end
+function cPoint(c) {
+  if (state.cYear === "latest") {
+    const minP = `${+CC_LATEST.slice(0, 4) - 2}-${CC_LATEST.slice(5)}`;
+    for (let i = c.pts.length - 1; i >= 0; i--) if (fin(cValue(c.pts[i]))) return c.pts[i].p >= minP ? c.pts[i] : null;
+    return null;
+  }
+  return c.pts.find(pt => pt.p === `${state.cYear}-Q4`) || null;
+}
+const cPointAt = (c, p) => c.pts.find(pt => pt.p === p) || null;
+const quarterBack = (p, n) => { let [y, q] = p.split("-Q").map(Number); q -= n; while (q < 1) { q += 4; y--; } return `${y}-Q${q}`; };
+const cFmt = v => !fin(v) ? "–" : state.cMeasure === "bn" ? `$${fmt(v, v < 10 ? 1 : 0)} bn` : `${fmt(v, 1)}%`;
+const cUnit = () => state.cMeasure === "bn" ? "US$ billions" : "% of GDP";
+const goldWords = () => state.cGold === "without" ? "excluding gold" : "including gold";
+
+function cRows() {
+  return Object.values(CC).map(c => {
+    const pt = cPoint(c), v = cValue(pt);
+    if (!fin(v)) return null;
+    const prev = cValue(cPointAt(c, quarterBack(pt.p, 4)));
+    return { c, pt, v, d: fin(prev) ? v - prev : null };
+  }).filter(Boolean);
+}
+// colours follow the selected countries in the order they were picked
+const cColor = k => css(SLOTS[state.cSel.indexOf(k)] || "--other");
+const SLOTS = ["--s1", "--s2", "--s3", "--s4", "--s5", "--s6", "--s7", "--s8"];
+
+function syncCountryControls() {
+  setPressed(document.getElementById("c-measure-seg"), state.cMeasure);
+  setPressed(document.getElementById("c-gold-seg"), state.cGold);
+  const years = [...new Set(Object.values(CC).flatMap(c => c.pts.filter(pt => pt.p.endsWith("Q4")).map(pt => pt.p.slice(0, 4))))].sort().reverse();
+  if (state.cYear !== "latest" && !years.includes(state.cYear)) state.cYear = "latest";
+  document.getElementById("c-year").innerHTML = `<option value="latest">Latest available</option>` +
+    years.map(y => `<option value="${y}"${y === state.cYear ? " selected" : ""}>End of ${y}</option>`).join("");
+  document.getElementById("c-year").value = state.cYear;
+  const names = Object.values(CC).sort((a, b) => a.name.localeCompare(b.name));
+  document.getElementById("c-add").innerHTML = `<option value="">Add a country…</option>` +
+    names.filter(c => !state.cSel.includes(c.k)).map(c => `<option value="${c.k}">${esc(c.name)}</option>`).join("");
+  document.getElementById("c-add").disabled = state.cSel.length >= MAX_COUNTRIES;
+  const how = cLive.state === "live" ? `live from the IMF, checked ${when(cLive.at)}`
+    : cLive.state === "loading" ? `the copy downloaded ${when(SNAPSHOT.downloaded)}; asking the IMF for newer figures…`
+    : cLive.state === "failed" ? `the copy downloaded ${when(SNAPSHOT.downloaded)} (the IMF could not be reached)`
+    : `the copy downloaded ${when(SNAPSHOT.downloaded)}`;
+  document.getElementById("c-status").textContent = `${Object.keys(CC).length} countries; figures ${how}.`;
+}
+
+function drawCountryMap() {
+  const rows = cRows(), el = document.getElementById("c-map"), bn = state.cMeasure === "bn";
+  const asOf = state.cYear === "latest" ? "latest figure for each country" : `end of ${state.cYear}`;
+  document.getElementById("c-map-title").textContent = bn ? "Reserves around the world" : "Reserves as a share of GDP";
+  document.getElementById("c-map-sub").textContent = `Official reserve assets ${goldWords()}, ${cUnit()}, ${asOf}. Grey: no figures.` +
+    (bn ? " Colours on a log scale." : " Colours stop at 60%; Hong Kong, Switzerland and a few others are far above.");
+  // the IMF's code for Kosovo differs from the map's
+  const loc = k => ({ KOS: "XKX" })[k] || k;
+  const z = rows.map(r => bn ? Math.log10(Math.max(r.v, 0.01)) : Math.min(r.v, 60));
+  const ticks = bn ? [0, 1, 2, 3] : [0, 15, 30, 45, 60];
+  plot(el, [{
+    type: "choropleth", locationmode: "ISO-3", locations: rows.map(r => loc(r.c.k)), z,
+    zmin: bn ? -1 : 0, zmax: bn ? 3.6 : 60,
+    colorscale: [[0, css("--seq-lo")], [0.5, css("--seq-mid")], [1, css("--seq-hi")]],
+    marker: { line: { color: css("--surface"), width: 0.5 } },
+    customdata: rows.map(r => [r.c.name, cFmt(r.v), label(r.pt.p), r.c.k]),
+    hovertemplate: "<b>%{customdata[0]}</b><br>%{customdata[1]}<br>%{customdata[2]}<extra></extra>",
+    colorbar: { thickness: 10, len: 0.7, outlinewidth: 0, tickvals: ticks, tickfont: { color: css("--text-muted"), size: 11 },
+      ticktext: bn ? ["$1 bn", "$10 bn", "$100 bn", "$1,000 bn"] : ["0%", "15%", "30%", "45%", "60%+"] },
+  }], baseLayout({
+    showlegend: false, margin: { l: 0, r: 0, t: 0, b: 0 },
+    geo: { projection: { type: "natural earth" }, showframe: false, showcoastlines: false, showcountries: true,
+      countrycolor: css("--surface"), showland: true, landcolor: css("--grid"), showocean: false, showlakes: false,
+      bgcolor: "rgba(0,0,0,0)", lataxis: { range: [-58, 85] } },
+  }));
+  if (!el._clickBound) {
+    el._clickBound = true;
+    el.on("plotly_click", ev => { const k = ev.points?.[0]?.customdata?.[3]; if (k) toggleCountry(k, true); });
+  }
+}
+function renderCountryTable() {
+  const q = document.getElementById("c-search").value.trim().toLowerCase();
+  const key = { name: r => r.c.name, v: r => r.v, d: r => r.d ?? -Infinity, p: r => r.pt.p }[state.cSort] || (r => r.v);
+  const dir = state.cDir === "asc" ? 1 : -1;
+  const rows = cRows().sort((a, b) => { const x = key(a), y = key(b); return (x < y ? -1 : x > y ? 1 : 0) * dir; });
+  const byValue = cRows().sort((a, b) => b.v - a.v), rank = new Map(byValue.map((r, i) => [r.c.k, i + 1]));
+  const arrow = k => state.cSort === k ? (state.cDir === "asc" ? " ▲" : " ▼") : "";
+  const th = (k, t) => `<th class="sortable" data-sort="${k}">${t}${arrow(k)}</th>`;
+  document.getElementById("c-table").innerHTML =
+    `<thead><tr><th>#</th>${th("name", "Country")}${th("v", cUnit())}${th("d", state.cMeasure === "bn" ? "1 year, bn" : "1 year, pp")}${th("p", "As of")}</tr></thead>
+    <tbody>${rows.filter(r => !q || r.c.name.toLowerCase().includes(q)).map(r => {
+      const sel = state.cSel.includes(r.c.k);
+      return `<tr data-k="${r.c.k}"${sel ? ' class="current"' : ""}><td class="muted">${rank.get(r.c.k)}</td>
+        <td><span class="name">${sel ? `<span class="dot" style="background:${cColor(r.c.k)}"></span>` : '<span class="dot" style="background:transparent;border:1px solid var(--axis)"></span>'}${esc(r.c.name)}</span></td>
+        <td>${cFmt(r.v)}</td><td class="${cls(r.d)}">${signed(r.d, state.cMeasure === "bn" ? 0 : 1)}</td><td class="muted">${label(r.pt.p)}</td></tr>`;
+    }).join("")}</tbody>`;
+  document.getElementById("c-table-sub").textContent = `${rows.length} countries, ${goldWords()}. Click a column to sort it, a country to add it to the chart.`;
+}
+function drawCountryLines() {
+  const el = document.getElementById("c-line");
+  document.getElementById("c-line-title").textContent = state.cMeasure === "bn" ? "Reserves over time" : "Reserves as a share of GDP over time";
+  document.getElementById("c-line-sub").textContent = `${cUnit()}, ${goldWords()}; quarterly where the country reports quarterly, otherwise at each year's end.`;
+  document.getElementById("c-chips").innerHTML = state.cSel.filter(k => CC[k]).map(k =>
+    `<button class="chip" type="button" aria-pressed="true" data-k="${k}" title="Remove from the chart"><span class="dot" style="background:${cColor(k)}"></span>${esc(CC[k].name)} ×</button>`).join("");
+  const traces = state.cSel.filter(k => CC[k]).map(k => {
+    const pts = CC[k].pts.filter(pt => fin(cValue(pt)));
+    return { type: "scatter", mode: pts.length < 30 ? "lines+markers" : "lines", name: CC[k].name, x: pts.map(pt => xdate(pt.p)), y: pts.map(cValue),
+      connectgaps: true, line: { color: cColor(k), width: 2 }, marker: { size: 5, color: cColor(k) },
+      hovertemplate: `%{y:,.${state.cMeasure === "bn" ? 0 : 1}f}${state.cMeasure === "bn" ? " bn" : "%"}<extra>${esc(CC[k].name)}</extra>` };
+  });
+  if (!traces.length) return empty(el, "Pick a country in the ranking, on the map or in the list above.");
+  plot(el, traces, baseLayout({ hovermode: "x unified", xaxis: { hoverformat: "%Y Q%q" },
+    yaxis: state.cMeasure === "bn" ? { tickprefix: "$", tickformat: ",.0f", rangemode: "tozero" } : { ticksuffix: "%", rangemode: "tozero" },
+    annotations: directLabels(traces), margin: { l: 8, r: traces.length <= 4 ? 110 : 8, t: 8, b: 8 } }));
+}
+function renderCountries() {
+  if (!CC) assembleCountries();
+  syncCountryControls(); drawCountryMap(); renderCountryTable(); drawCountryLines();
+  if (cLive.state === "idle") loadCountriesLive();
+}
+async function loadCountriesLive() {
+  cLive.state = "loading"; syncCountryControls();
+  try {
+    const texts = await Promise.all(Object.values(COUNTRY_URLS).map(async url => {
+      const res = await fetch(url, { headers: { Accept: CSV_TYPE }, cache: "no-store" });
+      if (!res.ok) throw new Error(`the IMF answered ${res.status}`);
+      return res.text();
+    }));
+    const [q, a, w] = texts.map(sdmxSeries);
+    const fresh = { names: CD.names, resQ: q.R || {}, goldQ: q.R_F11_MV || {}, resA: a.R || {}, goldA: a.R_F11_MV || {}, gdp: w.NGDPD || {} };
+    if (!Object.keys(fresh.resQ).length || !Object.keys(fresh.gdp).length) throw new Error("the IMF's answer had no figures");
+    CD = fresh; CC = null;
+    Object.assign(cLive, { state: "live", at: new Date().toISOString() });
+  } catch (err) {
+    cLive.state = "failed";
+  }
+  if (state.tab === "countries") renderCountries(); else syncCountryControls();
+}
+function toggleCountry(k, addOnly = false) {
+  if (state.cSel.includes(k)) { if (!addOnly) state.cSel = state.cSel.filter(x => x !== k); }
+  else if (state.cSel.length < MAX_COUNTRIES) state.cSel = [...state.cSel, k];
+  writeHash(); syncCountryControls(); renderCountryTable(); drawCountryLines();
+}
+document.getElementById("c-measure-seg").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  state.cMeasure = b.dataset.v; writeHash(); renderCountries();
+});
+document.getElementById("c-gold-seg").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  state.cGold = b.dataset.v; writeHash(); renderCountries();
+});
+document.getElementById("c-year").addEventListener("change", e => { state.cYear = e.target.value; writeHash(); renderCountries(); });
+document.getElementById("c-search").addEventListener("input", renderCountryTable);
+document.getElementById("c-add").addEventListener("change", e => { if (e.target.value) toggleCountry(e.target.value, true); });
+document.getElementById("c-chips").addEventListener("click", e => { const b = e.target.closest(".chip"); if (b) toggleCountry(b.dataset.k); });
+document.getElementById("c-table").addEventListener("click", e => {
+  const th = e.target.closest("th[data-sort]");
+  if (th) {
+    const k = th.dataset.sort;
+    state.cDir = state.cSort === k ? (state.cDir === "asc" ? "desc" : "asc") : (k === "name" ? "asc" : "desc");
+    state.cSort = k; writeHash(); renderCountryTable(); return;
+  }
+  const tr = e.target.closest("tr[data-k]");
+  if (tr) toggleCountry(tr.dataset.k);
+});
+
 // ---------- tabs ----------
 function renderTab(tab) {
   if (tab === "shares") { drawShares(); renderSharesTable(); }
   else if (tab === "amounts") { drawAmounts(); renderAmountsTable(); }
   else if (tab === "changes") drawChanges();
   else if (tab === "data") renderData();
+  else if (tab === "countries") renderCountries();
   else renderExplore();
 }
 function showTab(tab, focus = false) {
