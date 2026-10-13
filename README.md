@@ -27,9 +27,9 @@ Tabs:
   each quarter's change for one currency.
 - **Data**: the numbers as a table, with a CSV download of the selection.
 - **Countries**: each country's reserves (IMF, International Investment Position) as % of GDP
-  (IMF, World Economic Outlook) or in US$, with or without gold: bars of who holds the world's
-  reserves (one bar per region, economy or exchange-rate regime, split into its largest countries;
-  or the top 30 holders ranked), a sortable ranking and a chart over time for chosen countries; a bubble chart of GDP against reserves (bubble area: share of
+  (IMF, World Economic Outlook) or in US$, with or without gold: a group builder (groups of
+  countries by region, economy and exchange-rate regime, up to four side by side as ranked bars,
+  and compared year by year since 1990; Europe with floating currencies to start), a sortable ranking and a chart over time for chosen countries; a bubble chart of GDP against reserves (bubble area: share of
   world reserves) that plays year by year since 1990, with filters for advanced/emerging,
   pegged/managed/floating and region; also gold alone, and comparisons of advanced and
   emerging economies, regions, and pegged, managed and floating currencies (measured from the
