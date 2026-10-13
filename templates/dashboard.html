@@ -959,20 +959,25 @@ function drawChanges() {
   const f = F(), i0 = f.periods.indexOf(state.chFrom), i1 = f.periods.indexOf(state.chTo), m = METRIC[state.chMetric];
   const span = `${label(state.chFrom)} to ${label(state.chTo)}`;
   document.getElementById("ch-title").textContent = m.title;
-  document.getElementById("ch-sub").textContent = `${span}, by currency`;
+  document.getElementById("ch-sub").textContent = `${span}, by currency. Click a currency to see its change in each period on the right.`;
   const el = document.getElementById("ch-chart");
   const items = selected().map(k => ({ k, v: change(f, k, i0, i1, state.chMetric) })).filter(it => fin(it.v)).sort((a, b) => a.v - b.v);
   if (!items.length) empty(el, selected().length ? "None of the chosen currencies has figures for both dates." : "Pick at least one currency above.");
   else {
     el.style.height = `${Math.max(240, items.length * 34 + 60)}px`;
     const lo = Math.min(0, ...items.map(it => it.v)), hi = Math.max(0, ...items.map(it => it.v)), pad = (hi - lo) * 0.22 || 1;
-    plot(el, [{ type: "bar", orientation: "h", y: items.map(it => CUR[it.k].name), x: items.map(it => it.v),
-      marker: { color: items.map(it => css(CUR[it.k].color)), line: { color: css("--surface"), width: 2 } },
+    // the currency shown on the right is outlined
+    plot(el, [{ type: "bar", orientation: "h", y: items.map(it => it.k === state.chCur ? `<b>${CUR[it.k].name}</b>` : CUR[it.k].name), x: items.map(it => it.v),
+      marker: { color: items.map(it => css(CUR[it.k].color)),
+        line: { color: items.map(it => css(it.k === state.chCur ? "--text-primary" : "--surface")), width: items.map(it => it.k === state.chCur ? 2.5 : 2) } },
       text: items.map(it => signed(it.v, m.d, m.unit)), textposition: "outside", cliponaxis: false,
       textfont: { color: css("--text-secondary"), size: 12 },
-      customdata: items.map(it => signed(it.v, m.d, m.unit)), hovertemplate: "%{y}: %{customdata}<extra></extra>" }],
+      customdata: items.map(it => [signed(it.v, m.d, m.unit), it.k]), hovertemplate: "%{y}: %{customdata[0]}<extra></extra>" }],
       baseLayout({ showlegend: false, bargap: 0.35, xaxis: { range: [lo < 0 ? lo - pad : 0, hi > 0 ? hi + pad : 0], showgrid: true, zeroline: true, zerolinewidth: 1.5, ticksuffix: m.unit.trim() === "bn" ? "" : m.unit.trim() },
         yaxis: { showgrid: false, automargin: true }, margin: { l: 8, r: 60, t: 8, b: 8 } }));
+    // a click on a currency shows it in the chart on the right
+    el.removeAllListeners?.("plotly_click");
+    el.on("plotly_click", ev => { const k = ev.points?.[0]?.customdata?.[1]; if (k && CUR[k] && !CUR[k].yearlyOnly) { state.chCur = k; onChange(); } });
   }
   // one currency, period by period
   const el2 = document.getElementById("ch2-chart"), w = windowIdx(), k = state.chCur, c = CUR[k];
