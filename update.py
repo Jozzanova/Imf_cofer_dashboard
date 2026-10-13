@@ -47,6 +47,9 @@ COUNTRY_URLS = {
     # monthly end-of-month exchange rates (domestic currency per US dollar) of every country for the last
     # three years, to measure how each currency behaves (pegged, managed or floating)
     "erM": "https://api.imf.org/external/sdmx/3.0/data/dataflow/IMF.STA/ER/+/*.XDC_USD.EOP_RT.M?c%5BTIME_PERIOD%5D=ge:{start}",
+    # gold at market value at each year's end (IMF, International Reserves and Foreign Currency Liquidity),
+    # where the International Investment Position has no gold figure (Norway's stops in 1993, for example)
+    "irgA": "https://api.imf.org/external/sdmx/3.0/data/dataflow/IMF.STA/IRFCL/+/*.IRFCLDT1_IRFCL56_USD.*.A",
 }
 # The full monthly history of the same exchange rates (about 14 MB), used only here, to measure each
 # country's exchange-rate regime year by year (the page then needs only the result).
@@ -62,6 +65,9 @@ DEM_PER_EUR = 1.95583
 PEG_ANCHORS = {"AUS": "AUD", "CHE": "CHF", "ZAF": "ZAR", "IND": "INR", "SGP": "SGD"}
 # The IMF's grouping of countries in the World Economic Outlook: advanced economies (including the
 # euro area) and emerging and developing economies by region.
+# the same gold quarter by quarter (about 1 MB, used only here): where a year-end is missing from the yearly
+# series, its latest quarter stands in (Norway's 2004, the year it sold its gold, for example)
+IRFCL_GOLD_Q_URL = "https://api.imf.org/external/sdmx/3.0/data/dataflow/IMF.STA/IRFCL/+/*.IRFCLDT1_IRFCL56_USD.*.Q"
 GROUPS_URL = "https://api.imf.org/external/sdmx/3.0/structure/hierarchy/IMF.RES/H_WEO_COUNTRIES/+"
 NAMES_URL = "https://api.imf.org/external/sdmx/3.0/structure/codelist/IMF/CL_COUNTRY/+"
 CSV_TYPE = "application/vnd.sdmx.data+csv;version=2.0.0"
@@ -183,6 +189,45 @@ def regime_history(text: str, first_year: int = 1980) -> dict:
     return {"from": first_year, "codes": out}
 
 
+def irfcl_gold(text: str) -> dict:
+    """SDMX-CSV of IRFCL gold -> {country: {year: US$ billions}}, preferring the monetary authorities and the
+    central government together (S1XS1311), then the monetary authorities (S1X)."""
+    lines = text.strip().splitlines()
+    h = lines[0].split(",")
+    c, sec, t, v = (h.index(n) for n in ("COUNTRY", "SECTOR", "TIME_PERIOD", "OBS_VALUE"))
+    rank = {"S1XS1311": 0, "S1X": 1, "S1311": 2}
+    best = {}
+    for line in lines[1:]:
+        r = line.split(",")
+        try:
+            val = float(r[v])
+        except ValueError:
+            continue
+        if len(r[c]) != 3 or not r[c].isalpha() or r[sec] not in rank:
+            continue
+        key = (r[c], r[t])
+        if key not in best or rank[r[sec]] < best[key][0]:
+            best[key] = (rank[r[sec]], round(val / 1e9, 3))
+    out = {}
+    for (k, y), (_, val) in best.items():
+        out.setdefault(k, {})[y] = val
+    return out
+
+
+def year_end_gold(yearly: str, quarterly: str) -> dict:
+    """IRFCL gold at each year's end: the yearly figure, or else the year's latest quarter."""
+    out = irfcl_gold(yearly)
+    latest = {}
+    for k, qs in irfcl_gold(quarterly).items():
+        for q, v in qs.items():
+            y = q[:4]
+            if q > latest.get((k, y), ("", None))[0]:
+                latest[(k, y)] = (q, v)
+    for (k, y), (_, v) in latest.items():
+        out.setdefault(k, {}).setdefault(y, v)
+    return out
+
+
 def country_groups(text: str) -> dict:
     """The WEO hierarchy -> {"econ": {country: "AE" or "EM"}, "region": {country: group}, "euro": [...]}."""
     world = json.loads(text)["data"]["hierarchies"][0]["hierarchicalCodes"][0]
@@ -215,7 +260,7 @@ def countries(raw: dict) -> dict:
     q, a, weo = series(raw["iipQ"]), series(raw["iipA"]), series(raw["weo"])
     data = {"resQ": q.get("R", {}), "goldQ": q.get("R_F11_MV", {}), "resA": a.get("R", {}),
             "goldA": a.get("R_F11_MV", {}),
-            "gdp": weo.get("NGDPD", {}), "rates": monthly_rates(raw["erM"]), "groups": country_groups(raw["groups"]),
+            "gdp": weo.get("NGDPD", {}), "rates": monthly_rates(raw["erM"]), "groups": country_groups(raw["groups"]), "goldIrfcl": year_end_gold(raw["irgA"], raw["irgQ"]),
             "regHist": regime_history(raw["erHist"])}
     used = set().union(*(data[k].keys() for k in ("resQ", "resA", "goldQ", "goldA", "gdp")))
     names = country_names(raw["names"])
@@ -239,12 +284,14 @@ def main():
         raw["names"] = (RAW.parent / "names.json").read_text(encoding="utf-8")
         raw["groups"] = (RAW.parent / "groups.json").read_text(encoding="utf-8")
         raw["erHist"] = (RAW.parent / "erHist.csv").read_text(encoding="utf-8")
+        raw["irgQ"] = (RAW.parent / "irgQ.csv").read_text(encoding="utf-8")
         status = json.loads(STATUS.read_text(encoding="utf-8")) if STATUS.exists() else {}
     else:
         text, er = download(DATA_URL), download(ER_URL)
         start = f"{datetime.now().year - 3}-M{datetime.now().month:02d}"
         raw = {k: download(url.format(start=start)) for k, url in COUNTRY_URLS.items()}
         raw["erHist"] = download(ER_HISTORY_URL)
+        raw["irgQ"] = download(IRFCL_GOLD_Q_URL)
         for k, url in (("names", NAMES_URL), ("groups", GROUPS_URL)):
             with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "cofer-dashboard"}), timeout=120) as res:
                 raw[k] = res.read().decode("utf-8")

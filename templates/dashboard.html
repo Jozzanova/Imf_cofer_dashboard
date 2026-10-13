@@ -390,6 +390,7 @@
     <section class="card">
       <div class="card-head">
         <div><h2>Compare groups</h2><p class="sub" id="g-sub"></p></div>
+        <div class="seg" id="g-scale-seg" role="group" aria-label="Scale"><button data-v="log">Log scale</button><button data-v="lin">Linear</button></div>
         <div class="seg" id="c-group-seg" role="group" aria-label="Group by"><button data-v="econ">Advanced vs emerging</button><button data-v="region">Region</button><button data-v="regime">Exchange-rate regime</button></div>
       </div>
       <div id="g-chart" class="chart" style="height:400px"></div>
@@ -537,8 +538,9 @@
           reports quarterly and otherwise at year-end, divided by that calendar year's GDP in US dollars from the IMF's
           <a href="https://data.imf.org/en/datasets/IMF.RES:WEO" target="_blank" rel="noopener">World Economic Outlook</a> (the latest year is
           an IMF estimate). Reserves are a stock and GDP a yearly flow, the usual way to compare them. "Latest available" uses each country's most
-          recent figure, if it is no more than two years old. Where a country stops reporting its gold (Norway after 1993, when it held
-          only about $0.04 bn), its last reported amount is assumed for later years. Countries that are not IMF members (such as Taiwan) or do not report are missing.
+          recent figure, if it is no more than two years old. Where the International Investment Position has no gold figure, the year-end
+          gold at market value from the IMF's <a href="https://data.imf.org/en/datasets/IMF.STA:IRFCL" target="_blank" rel="noopener">IRFCL</a>
+          statistics is used (Norway's gold, sold in 2004, is only there); failing both, a country's last reported amount is assumed. Countries that are not IMF members (such as Taiwan) or do not report are missing.
           These are national totals, not their currency composition: the IMF publishes that only for the world as a whole.
           Advanced and emerging economies and the regions are the World Economic Outlook's groups. Exchange-rate regimes are measured from
           end-of-month exchange rates over the last two years (see the note under "Compare groups"); with monthly data a few currencies
@@ -652,7 +654,7 @@ const state = {
   shView: "lines", shLog: false, amView: "stack", amLog: false,
   chFrom: "", chTo: "", chMetric: "bn", chCur: "USD", dtMetric: "share",
   raceMetric: "share", raceNoUSD: false, raceSpeed: "1", fxBase: "2016-Q4", fxCur: "USD",
-  cMeasure: "pct", cGold: "with", cYear: "latest", cSort: "v", cDir: "desc", gb: "eu_all_float", cGroup: "econ", cFilter: "all", cLines: "countries", cAgg: "combined",
+  cMeasure: "pct", cGold: "with", cYear: "latest", cSort: "v", cDir: "desc", gb: "eu_all_float", cGroup: "econ", cFilter: "all", cLines: "countries", cAgg: "combined", gScale: "log",
   bY: "bn", bColor: "econ", bEcon: ["AE", "EM"], bReg: ["peg", "managed", "float"], bRegion: "all", bSpeed: "1", cSel: ["CHE", "HKG", "SAU", "CHN", "JPN", "USA"],
 };
 const LIST_KEYS = new Set(["cur", "cSel", "bEcon", "bReg"]);
@@ -676,6 +678,7 @@ function readHash() {
   if (!["econ", "region", "regime"].includes(state.cGroup)) state.cGroup = "econ";
   if (!["countries", "econ", "region", "regime"].includes(state.cLines)) state.cLines = "countries";
   if (!["combined", "median"].includes(state.cAgg)) state.cAgg = "combined";
+  if (!["log", "lin"].includes(state.gScale)) state.gScale = "log";
   if (!["bn", "pct"].includes(state.bY)) state.bY = "bn";
   if (!["econ", "region", "regime"].includes(state.bColor)) state.bColor = "econ";
   if (!["1", "2", "4"].includes(state.bSpeed)) state.bSpeed = "1";
@@ -1402,7 +1405,22 @@ const COUNTRY_URLS = {
   iipA: IIP_URL("A"),
   weo: "https://api.imf.org/external/sdmx/3.0/data/dataflow/IMF.RES/WEO/+/*.NGDPD.A",
   erM: "https://api.imf.org/external/sdmx/3.0/data/dataflow/IMF.STA/ER/+/*.XDC_USD.EOP_RT.M?c%5BTIME_PERIOD%5D=ge:{start}",
+  irgA: "https://api.imf.org/external/sdmx/3.0/data/dataflow/IMF.STA/IRFCL/+/*.IRFCLDT1_IRFCL56_USD.*.A",
 };
+// IRFCL gold at each year's end -> {country: {year: US$ bn}}, preferring sector S1XS1311, then S1X (as in update.py)
+function sdmxGold(text) {
+  const lines = text.trim().split(/\r?\n/), h = lines[0].split(",");
+  const [c, sec, t, v] = ["COUNTRY", "SECTOR", "TIME_PERIOD", "OBS_VALUE"].map(n => h.indexOf(n));
+  const rank = { S1XS1311: 0, S1X: 1, S1311: 2 }, best = {}, out = {};
+  for (let n = 1; n < lines.length; n++) {
+    const r = lines[n].split(","), val = parseFloat(r[v]);
+    if (!/^[A-Z]{3}$/.test(r[c]) || !(r[sec] in rank) || !isFinite(val)) continue;
+    const key = `${r[c]}|${r[t]}`;
+    if (!best[key] || rank[r[sec]] < best[key][0]) best[key] = [rank[r[sec]], Math.round(val / 1e6) / 1e3];
+  }
+  for (const [key, [, val]] of Object.entries(best)) { const [k, y] = key.split("|"); (out[k] ||= {})[y] = val; }
+  return out;
+}
 const MAX_COUNTRIES = 8;
 // SDMX-CSV -> {indicator: {country: {period: US$ billions}}}, countries only, from 1980 (as in update.py)
 function sdmxSeries(text) {
@@ -1433,13 +1451,15 @@ function assembleCountries() {
       const p = `${y}-Q4`;
       if (!pts.has(p)) pts.set(p, { p, res: v, gold: CD.goldA[k]?.[y] ?? null });
     }
-    const hasGold = !!(CD.goldQ[k] || CD.goldA[k]);
+    const irg = CD.goldIrfcl?.[k], hasGold = !!(CD.goldQ[k] || CD.goldA[k] || irg);
     const list = [...pts.values()].sort((a, b) => a.p < b.p ? -1 : 1);
     let lastGold = null;
     for (const pt of list) {
       pt.gdp = CD.gdp[k]?.[pt.p.slice(0, 4)] ?? null;
-      // a country that stops reporting gold (Norway after 1993, for example) is taken to keep its last
-      // reported amount; one without any gold figures is taken to hold none; before its first figure, unknown
+      // where the IIP has no gold figure, the IRFCL's figure for that year's end (Norway's gold, sold in 2004,
+      // is only there); failing both, a country is taken to keep its last reported amount; one without any
+      // gold figures is taken to hold none; before its first figure, unknown
+      if (!fin(pt.gold) && fin(irg?.[pt.p.slice(0, 4)])) pt.gold = irg[pt.p.slice(0, 4)];
       if (fin(pt.gold)) lastGold = pt.gold;
       else if (lastGold != null) pt.gold = Math.min(lastGold, pt.res);
       pt.exGold = fin(pt.gold) ? pt.res - pt.gold : hasGold ? null : pt.res;
@@ -1683,23 +1703,26 @@ function drawGroups() {
   });
   const el = document.getElementById("g-chart");
   document.getElementById("g-sub").textContent = `${cUnit()}, ${goldWords()}, ${state.cYear === "latest" ? "latest figures" : `end of ${state.cYear}`}. ` +
-    "Each dot is a country; the box spans the middle half of each group and the line in it is the median. Log scale.";
+    `Each dot is a country; the box spans the middle half of each group and the line in it is the median. ${state.gScale === "log" ? "Log" : "Linear"} scale.`;
+  setPressed(document.getElementById("g-scale-seg"), state.gScale);
+  const log = state.gScale === "log", drawn = r => !log || r.v > 0;
   if (!rows.length) { empty(el, "No figures for this selection."); document.getElementById("g-table").innerHTML = ""; return; }
   const short = cat => cat.name.replace("Emerging and developing", "Emerging &<br>developing").replace("Latin America and the Caribbean", "Latin America &<br>Caribbean").replace("Middle East and Central Asia", "Middle East &<br>Central Asia").replace("Advanced economies", "Advanced<br>economies").replace("Sub-Saharan Africa", "Sub-Saharan<br>Africa");
   const homeRow = rows.find(r => r.c.k === HOME);
   // a log scale has no zero: countries with none (of gold, say) are counted in the table but not drawn
-  const zeros = rows.filter(r => !(r.v > 0)).length;
-  plot(el, stats.filter(st => st.rs.some(r => r.v > 0)).map(st => ({
-    type: "box", name: short(st.cat), y: st.rs.filter(r => r.v > 0).map(r => r.v), boxpoints: "all", jitter: 0.6, pointpos: 0,
+  const zeros = log ? rows.filter(r => !(r.v > 0)).length : 0;
+  plot(el, stats.filter(st => st.rs.some(drawn)).map(st => ({
+    type: "box", name: short(st.cat), y: st.rs.filter(drawn).map(r => r.v), boxpoints: "all", jitter: 0.6, pointpos: 0,
     marker: { color: css(st.cat.color), size: 6, opacity: 0.85, line: { color: css("--surface"), width: 1 } },
     line: { color: css(st.cat.color), width: 1.5 }, fillcolor: "rgba(0,0,0,0)",
-    customdata: st.rs.filter(r => r.v > 0).map(r => `${r.c.name}: ${cFmt(r.v)}`), hovertemplate: "%{customdata}<extra></extra>", hoveron: "points",
-  })).concat(homeRow && homeRow.v > 0 ? [{ type: "scatter", mode: "markers+text", x: [short(groupCat(by, homeRow.g))], y: [homeRow.v],
+    customdata: st.rs.filter(drawn).map(r => `${r.c.name}: ${cFmt(r.v)}`), hovertemplate: "%{customdata}<extra></extra>", hoveron: "points",
+  })).concat(homeRow && drawn(homeRow) ? [{ type: "scatter", mode: "markers+text", x: [short(groupCat(by, homeRow.g))], y: [homeRow.v],
     text: [`<b>${esc(homeRow.c.name)}</b>`], textposition: "middle right", textfont: { size: 12.5, color: css("--text-primary") },
     marker: { size: 13, color: css(groupCat(by, homeRow.g).color), line: { color: css("--text-primary"), width: 2.5 } },
     hovertemplate: `${esc(homeRow.c.name)}: ${cFmt(homeRow.v)}<extra></extra>` }] : []), baseLayout({ showlegend: false, hovermode: "closest",
-    yaxis: { type: "log", gridcolor: css("--grid"), tickvals: bn ? [0.1, 1, 10, 100, 1000] : [0.1, 0.3, 1, 3, 10, 30, 100, 300],
-      ticktext: bn ? ["$0.1 bn", "$1 bn", "$10 bn", "$100 bn", "$1,000 bn"] : ["0.1%", "0.3%", "1%", "3%", "10%", "30%", "100%", "300%"] },
+    yaxis: log ? { type: "log", gridcolor: css("--grid"), tickvals: bn ? [0.1, 1, 10, 100, 1000] : [0.1, 0.3, 1, 3, 10, 30, 100, 300],
+      ticktext: bn ? ["$0.1 bn", "$1 bn", "$10 bn", "$100 bn", "$1,000 bn"] : ["0.1%", "0.3%", "1%", "3%", "10%", "30%", "100%", "300%"] }
+      : { type: "linear", gridcolor: css("--grid"), rangemode: "tozero", tickprefix: bn ? "$" : "", ticksuffix: bn ? "" : "%", tickformat: ",.0f" },
     xaxis: { tickfont: { color: css("--text-secondary"), size: 11.5 } }, margin: { l: 8, r: 8, t: 8, b: 8 } }));
   if (zeros) document.getElementById("g-sub").textContent += ` ${zeros} ${zeros === 1 ? "country has" : "countries have"} none and ${zeros === 1 ? "is" : "are"} left out of the chart.`;
   const f = v => cFmt(v);
@@ -1851,8 +1874,11 @@ async function loadCountriesLive() {
       if (!res.ok) throw new Error(`the IMF answered ${res.status}`);
       return res.text();
     }));
-    const [q, a, w] = texts.slice(0, 3).map(sdmxSeries), rates = sdmxRates(texts[3]);
-    const fresh = { names: CD.names, groups: CD.groups, regHist: CD.regHist, resQ: q.R || {}, goldQ: q.R_F11_MV || {}, resA: a.R || {}, goldA: a.R_F11_MV || {},
+    const [q, a, w] = texts.slice(0, 3).map(sdmxSeries), rates = sdmxRates(texts[3]), goldIrfcl = sdmxGold(texts[4]);
+    // the live yearly gold, with the build's year-ends from quarterly figures where a year is missing
+    const mergedGold = structuredClone(CD.goldIrfcl || {});
+    for (const [k, ys] of Object.entries(goldIrfcl)) Object.assign(mergedGold[k] ||= {}, ys);
+    const fresh = { names: CD.names, groups: CD.groups, regHist: CD.regHist, goldIrfcl: mergedGold, resQ: q.R || {}, goldQ: q.R_F11_MV || {}, resA: a.R || {}, goldA: a.R_F11_MV || {},
       gdp: w.NGDPD || {}, rates: rates.G163 ? rates : CD.rates };
     if (!Object.keys(fresh.resQ).length || !Object.keys(fresh.gdp).length) throw new Error("the IMF's answer had no figures");
     CD = fresh; CC = null;
@@ -1875,6 +1901,10 @@ document.getElementById("c-measure-seg").addEventListener("click", e => {
 document.getElementById("c-gold-seg").addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b) return;
   state.cGold = b.dataset.v; writeHash(); renderCountries();
+});
+document.getElementById("g-scale-seg").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  state.gScale = b.dataset.v; writeHash(); drawGroups();
 });
 document.getElementById("c-group-seg").addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b) return;
