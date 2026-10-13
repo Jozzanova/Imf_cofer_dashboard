@@ -1728,11 +1728,15 @@ function drawBuilderTime(gs) {
     if (x.length) traces.push({ type: "scatter", mode: "lines", name: gbName(g), x, y, customdata: n, line: { color: css(GB_COLORS[i]), width: 3 },
       hovertemplate: `%{y:,.${bn ? 0 : 1}f}${bn ? " bn" : "%"} · %{customdata} countries<extra>${esc(gbName(g))}</extra>` });
   });
-  if (CC[HOME] && !bn) {
+  // Norway for comparison, as % of GDP or in US$ (next to group totals its line then sits low)
+  if (CC[HOME]) {
     const hx = [], hy = [];
-    for (let yr = 1990; yr <= lastYear; yr++) { const pt = at(CC[HOME], yr), a = cAmount(pt); if (fin(a) && pt.gdp > 0) { hx.push(`${yr}-12-31`); hy.push(a / pt.gdp * 100); } }
+    for (let yr = 1990; yr <= lastYear; yr++) {
+      const pt = at(CC[HOME], yr), a = cAmount(pt);
+      if (fin(a) && (bn || pt.gdp > 0)) { hx.push(`${yr}-12-31`); hy.push(bn ? a : a / pt.gdp * 100); }
+    }
     if (hx.length) traces.push({ type: "scatter", mode: "lines", name: "Norway", x: hx, y: hy, line: { color: css("--text-primary"), width: 3, dash: "dot" },
-      hovertemplate: "%{y:.1f}%<extra>Norway</extra>" });
+      hovertemplate: bn ? "%{y:,.0f} bn<extra>Norway</extra>" : "%{y:.1f}%<extra>Norway</extra>" });
   }
   document.getElementById("gb-time-sub").textContent = `${bn ? "Total reserves, US$ billions" : "Combined: the group's reserves ÷ its GDP"}, ${goldWords()}, at each year's end since 1990. ` +
     "Each country counts in the regime its currency had that year, so countries move in and out of the groups; the number of reporting countries also grows over time (hover for the count).";
