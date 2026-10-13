@@ -664,8 +664,8 @@ const state = {
   shView: "lines", shLog: false, amView: "stack", amLog: false, sel: "", shShow: [], amShow: [],
   chFrom: "", chTo: "", chMetric: "bn", chCur: "USD", dtMetric: "share", dtSet: "cur", dtYear: "latest",
   raceMetric: "share", raceNoUSD: false, raceSpeed: "1", fxBase: "2016-Q4", fxCur: "USD",
-  cMeasure: "pct", cGold: "with", cYear: "latest", cSort: "v", cDir: "desc", gb: "eu_AE_float~eu_AE_peg", cGroup: "econ", cFilter: "all", cLines: "countries", cAgg: "combined", gScale: "log",
-  bY: "bn", bColor: "econ", bEcon: ["AE", "EM"], bReg: ["peg", "managed", "float"], bRegion: "all", bSpeed: "1", cSel: ["CHE", "HKG", "SAU", "CHN", "JPN", "USA"],
+  cMeasure: "pct", cGold: "with", cYear: "latest", cSort: "v", cDir: "desc", gb: "eu_AE_float~eu_AE_peg", cGroup: "regime", cFilter: "all", cLines: "regime", cAgg: "combined", gScale: "log",
+  bY: "bn", bColor: "regime", bEcon: ["AE"], bReg: ["peg", "managed", "float"], bRegion: "all", bSpeed: "4", cSel: ["CHE", "HKG", "SAU", "CHN", "JPN", "USA"],
 };
 const LIST_KEYS = new Set(["cur", "cSel", "bEcon", "bReg", "shShow", "amShow"]);
 const TABS = ["shares", "changes", "countries", "explore", "data"];
@@ -685,13 +685,13 @@ function readHash() {
   if (!["1", "2", "4"].includes(state.raceSpeed)) state.raceSpeed = "1";
   if (!["pct", "bn"].includes(state.cMeasure)) state.cMeasure = "pct";
   if (!["with", "without", "only"].includes(state.cGold)) state.cGold = "with";
-  if (!["econ", "region", "regime"].includes(state.cGroup)) state.cGroup = "econ";
-  if (!["countries", "econ", "region", "regime"].includes(state.cLines)) state.cLines = "countries";
+  if (!["econ", "region", "regime"].includes(state.cGroup)) state.cGroup = "regime";
+  if (!["countries", "econ", "region", "regime"].includes(state.cLines)) state.cLines = "regime";
   if (!["combined", "median"].includes(state.cAgg)) state.cAgg = "combined";
   if (!["log", "lin"].includes(state.gScale)) state.gScale = "log";
   if (!["bn", "pct"].includes(state.bY)) state.bY = "bn";
-  if (!["econ", "region", "regime"].includes(state.bColor)) state.bColor = "econ";
-  if (!["1", "2", "4"].includes(state.bSpeed)) state.bSpeed = "1";
+  if (!["econ", "region", "regime"].includes(state.bColor)) state.bColor = "regime";
+  if (!["1", "2", "4"].includes(state.bSpeed)) state.bSpeed = "4";
 
   state.cSel = state.cSel.slice(0, 8);
 }
