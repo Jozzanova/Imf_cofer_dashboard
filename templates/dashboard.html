@@ -191,6 +191,8 @@
   .clickable tbody tr[data-k] { cursor: pointer; }
   .clickable tbody tr[data-k]:hover td { background: var(--hover); }
   tr.current td { font-weight: 650; }
+  tr.home td { font-weight: 700; background: color-mix(in srgb, var(--accent) 16%, transparent); }
+  tr.home td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
   th.sortable { cursor: pointer; }
   th.sortable:hover { color: var(--text-primary); }
   .search { font: inherit; font-size: 13px; padding: 5px 10px; border-radius: 8px; border: 1px solid var(--axis);
@@ -1465,7 +1467,10 @@ function cRows() {
   }).filter(Boolean);
 }
 // colours follow the selected countries in the order they were picked
-const cColor = k => css(SLOTS[state.cSel.indexOf(k)] || "--other");
+// Norway is highlighted everywhere on this tab (in the text colour, so it stands out in both themes)
+// and always drawn in the chart over time
+const HOME = "NOR";
+const cColor = k => k === HOME ? css("--text-primary") : css(SLOTS[state.cSel.filter(x => x !== HOME).indexOf(k)] || "--other");
 const SLOTS = ["--s1", "--s2", "--s3", "--s4", "--s5", "--s6", "--s7", "--s8"];
 
 function syncCountryControls() {
@@ -1482,7 +1487,7 @@ function syncCountryControls() {
   document.getElementById("c-year").value = state.cYear;
   const names = Object.values(CC).sort((a, b) => a.name.localeCompare(b.name));
   document.getElementById("c-add").innerHTML = `<option value="">Add a country…</option>` +
-    names.filter(c => !state.cSel.includes(c.k)).map(c => `<option value="${c.k}">${esc(c.name)}</option>`).join("");
+    names.filter(c => !state.cSel.includes(c.k) && c.k !== HOME).map(c => `<option value="${c.k}">${esc(c.name)}</option>`).join("");
   document.getElementById("c-add").disabled = state.cSel.length >= MAX_COUNTRIES;
   const how = cLive.state === "live" ? `live from the IMF, checked ${when(cLive.at)}`
     : cLive.state === "loading" ? `the copy downloaded ${when(SNAPSHOT.downloaded)}; asking the IMF for newer figures…`
@@ -1519,7 +1524,7 @@ function drawCountryMap() {
       type: "choropleth", locationmode: "ISO-3", locations: members.map(m => loc(m.c.k)),
       z: members.map(m => G.cats.findIndex(cat => cat.k === m.g)), zmin: -0.5, zmax: n - 0.5, showscale: false,
       colorscale: G.cats.flatMap((cat, i) => [[i / n, css(cat.color)], [(i + 1) / n, css(cat.color)]]),
-      marker: { line: { color: css("--map-border"), width: 0.4 } },
+      marker: { line: { color: members.map(m => m.c.k === HOME ? css("--text-primary") : css("--map-border")), width: members.map(m => m.c.k === HOME ? 2 : 0.4) } },
       customdata: members.map(m => [m.c.name, state.cGroup === "regime" ? REGIMES[m.c.k].note : groupCat(state.cGroup, m.g).name,
         fin(cValue(m.pt)) ? `${cFmt(cValue(m.pt))} (${label(m.pt.p)})` : "no recent figures", m.c.k]),
       hovertemplate: "<b>%{customdata[0]}</b><br>%{customdata[1]}<br>%{customdata[2]}<extra></extra>",
@@ -1530,7 +1535,7 @@ function drawCountryMap() {
       type: "choropleth", locationmode: "ISO-3", locations: rows.map(r => loc(r.c.k)),
       z: rows.map(r => bn ? Math.log10(Math.max(r.v, 0.01)) : Math.min(r.v, 60)), zmin: bn ? -1 : 0, zmax: bn ? 3.6 : 60,
       colorscale: [0, 0.25, 0.5, 0.75, 1].map((p, i) => [p, css(`--seq-${i + 1}`)]),
-      marker: { line: { color: css("--map-border"), width: 0.4 } },
+      marker: { line: { color: rows.map(r => r.c.k === HOME ? css("--text-primary") : css("--map-border")), width: rows.map(r => r.c.k === HOME ? 2 : 0.4) } },
       customdata: rows.map(r => [r.c.name, cFmt(r.v), label(r.pt.p), r.c.k]),
       hovertemplate: "<b>%{customdata[0]}</b><br>%{customdata[1]}<br>%{customdata[2]}<extra></extra>",
       colorbar: { orientation: "h", thickness: 8, len: 0.42, x: 0.5, xanchor: "center", y: -0.02, yanchor: "top", outlinewidth: 0,
@@ -1546,11 +1551,15 @@ function drawCountryMap() {
     traces.push({
       type: "scattergeo", locationmode: "ISO-3", locations: b.map(x => loc(x.c.k)), mode: "markers",
       marker: { size: b.map(x => 3 + 52 * Math.sqrt(x.a / max)), color: css(byGroup ? "--bubble-neutral" : "--bubble"),
-        line: { color: css(byGroup ? "--bubble-neutral-line" : "--bubble-line"), width: 1 } },
+        line: { color: b.map(x => x.c.k === HOME ? css("--text-primary") : css(byGroup ? "--bubble-neutral-line" : "--bubble-line")), width: b.map(x => x.c.k === HOME ? 2.5 : 1) } },
       customdata: b.map(x => [x.c.name, `$${fmt(x.a, x.a < 10 ? 1 : 0)} bn`, label(x.pt.p), x.c.k]),
       hovertemplate: "<b>%{customdata[0]}</b><br>%{customdata[1]}<br>%{customdata[2]}<extra></extra>",
     });
   }
+  // the label "Norway", if the map shows it
+  if ((byGroup ? groupOf(HOME) : rows.some(r => r.c.k === HOME)) && CC[HOME])
+    traces.push({ type: "scattergeo", locationmode: "ISO-3", locations: [HOME], mode: "text", text: [`<b>${esc(CC[HOME].name)}</b>`],
+      textposition: "middle left", textfont: { size: 12.5, color: css("--text-primary") }, hoverinfo: "skip" });
   const annotations = state.cYear === "latest" ? [] : [{ text: state.cYear, xref: "paper", yref: "paper", x: 0.01, y: 0.02,
     xanchor: "left", yanchor: "bottom", showarrow: false, font: { size: 54, color: css("--text-muted") }, opacity: 0.55 }];
   el.classList.toggle("globe", globe);
@@ -1633,6 +1642,7 @@ function drawGroups() {
     "Each dot is a country; the box spans the middle half of each group and the line in it is the median. Log scale.";
   if (!rows.length) { empty(el, "No figures for this selection."); document.getElementById("g-table").innerHTML = ""; return; }
   const short = cat => cat.name.replace("Emerging and developing", "Emerging &<br>developing").replace("Latin America and the Caribbean", "Latin America &<br>Caribbean").replace("Middle East and Central Asia", "Middle East &<br>Central Asia").replace("Advanced economies", "Advanced<br>economies").replace("Sub-Saharan Africa", "Sub-Saharan<br>Africa");
+  const homeRow = rows.find(r => r.c.k === HOME);
   // a log scale has no zero: countries with none (of gold, say) are counted in the table but not drawn
   const zeros = rows.filter(r => !(r.v > 0)).length;
   plot(el, stats.filter(st => st.rs.some(r => r.v > 0)).map(st => ({
@@ -1640,7 +1650,10 @@ function drawGroups() {
     marker: { color: css(st.cat.color), size: 6, opacity: 0.85, line: { color: css("--surface"), width: 1 } },
     line: { color: css(st.cat.color), width: 1.5 }, fillcolor: "rgba(0,0,0,0)",
     customdata: st.rs.filter(r => r.v > 0).map(r => `${r.c.name}: ${cFmt(r.v)}`), hovertemplate: "%{customdata}<extra></extra>", hoveron: "points",
-  })), baseLayout({ showlegend: false, hovermode: "closest",
+  })).concat(homeRow && homeRow.v > 0 ? [{ type: "scatter", mode: "markers+text", x: [short(groupCat(by, homeRow.g))], y: [homeRow.v],
+    text: [`<b>${esc(homeRow.c.name)}</b>`], textposition: "middle right", textfont: { size: 12.5, color: css("--text-primary") },
+    marker: { size: 13, color: css(groupCat(by, homeRow.g).color), line: { color: css("--text-primary"), width: 2.5 } },
+    hovertemplate: `${esc(homeRow.c.name)}: ${cFmt(homeRow.v)}<extra></extra>` }] : []), baseLayout({ showlegend: false, hovermode: "closest",
     yaxis: { type: "log", gridcolor: css("--grid"), tickvals: bn ? [0.1, 1, 10, 100, 1000] : [0.1, 0.3, 1, 3, 10, 30, 100, 300],
       ticktext: bn ? ["$0.1 bn", "$1 bn", "$10 bn", "$100 bn", "$1,000 bn"] : ["0.1%", "0.3%", "1%", "3%", "10%", "30%", "100%", "300%"] },
     xaxis: { tickfont: { color: css("--text-secondary"), size: 11.5 } }, margin: { l: 8, r: 8, t: 8, b: 8 } }));
@@ -1659,6 +1672,12 @@ function drawGroups() {
        available as data.`
     : `Groups as in the IMF's World Economic Outlook. "Combined" divides a group's total reserves by its total GDP, so large economies count for more;
        the median treats every country alike. `;
+  if (homeRow) {
+    const peers = rows.filter(r => r.g === homeRow.g).sort((a, b) => b.v - a.v), st = stats.find(x => x.cat.k === homeRow.g);
+    document.getElementById("g-note").innerHTML = `<b>${esc(homeRow.c.name)}</b>: ${cFmt(homeRow.v)} (${label(homeRow.pt.p)}), ${esc(groupCat(by, homeRow.g).name.toLowerCase())}` +
+      `${by === "regime" && REGIMES[HOME] && REGIMES[HOME].note.toLowerCase() !== groupCat(by, homeRow.g).name.toLowerCase() ? ` (${esc(REGIMES[HOME].note.toLowerCase())})` : ""}: number ${peers.indexOf(homeRow) + 1} of ${peers.length} in its group, ` +
+      `against a median of ${cFmt(st.med)}.<br>` + document.getElementById("g-note").innerHTML;
+  }
 }
 function renderCountryTable() {
   const q = document.getElementById("c-search").value.trim().toLowerCase();
@@ -1674,8 +1693,9 @@ function renderCountryTable() {
     `<thead><tr><th>#</th>${th("name", "Country")}${th("v", cUnit())}${th("d", state.cMeasure === "bn" ? "1 year, bn" : "1 year, pp")}<th>Economy · exchange rate</th>${th("p", "As of")}</tr></thead>
     <tbody>${rows.filter(r => !q || r.c.name.toLowerCase().includes(q)).map(r => {
       const sel = state.cSel.includes(r.c.k);
-      return `<tr data-k="${r.c.k}"${sel ? ' class="current"' : ""}><td class="muted">${rank.get(r.c.k)}</td>
-        <td><span class="name">${sel ? `<span class="dot" style="background:${cColor(r.c.k)}"></span>` : '<span class="dot" style="background:transparent;border:1px solid var(--axis)"></span>'}${esc(r.c.name)}</span></td>
+      const home = r.c.k === HOME;
+      return `<tr data-k="${r.c.k}"${home ? ' class="home"' : sel ? ' class="current"' : ""}><td class="muted">${rank.get(r.c.k)}</td>
+        <td><span class="name">${sel || home ? `<span class="dot" style="background:${cColor(r.c.k)}"></span>` : '<span class="dot" style="background:transparent;border:1px solid var(--axis)"></span>'}${esc(r.c.name)}</span></td>
         <td>${cFmt(r.v)}</td><td class="${cls(r.d)}">${signed(r.d, state.cMeasure === "bn" ? 0 : 1)}</td>
         <td class="muted">${({ AE: "Advanced", EM: "Emerging" })[CD.groups?.econ?.[r.c.k]] || "–"} · ${esc(REGIMES[r.c.k]?.note || "–")}</td><td class="muted">${label(r.pt.p)}</td></tr>`;
     }).join("")}</tbody>`;
@@ -1721,6 +1741,18 @@ function drawGroupLines(el) {
     return { type: "scatter", mode: "lines", name: cat.name, x, y, customdata: n, line: { color: css(cat.color), width: 2.5 },
       hovertemplate: `%{y:,.${bn ? 0 : 1}f}${bn ? " bn" : "%"} · %{customdata} countries<extra>${esc(cat.name)}</extra>` };
   }).filter(t => t.x.length);
+  // Norway's own figure at each year's end, for comparison (its group membership does not matter here)
+  if (CC[HOME]) {
+    const hx = [], hy = [];
+    for (const yr of years) {
+      const pt = at(CC[HOME], yr), a = cAmount(pt);
+      if (!fin(a)) continue;
+      const v = bn ? a : pt.gdp > 0 ? a / pt.gdp * 100 : null;
+      if (fin(v)) { hx.push(`${yr}-12-31`); hy.push(v); }
+    }
+    if (hx.length) traces.push({ type: "scatter", mode: "lines", name: CC[HOME].name, x: hx, y: hy, line: { color: css("--text-primary"), width: 3.5, dash: "dot" },
+      hovertemplate: `%{y:,.${bn ? 0 : 1}f}${bn ? " bn" : "%"}<extra>${esc(CC[HOME].name)}</extra>` });
+  }
   document.getElementById("c-line-title").textContent = `${bn ? "Reserves" : "Reserves as a share of GDP"} by ${G.label.toLowerCase()}, year by year`;
   document.getElementById("c-line-sub").textContent = `${bn ? "Total, US$ billions" : median ? "The median country's % of GDP" : "Combined: the group's total reserves ÷ its total GDP"}, ${goldWords()}, at each year's end. ` +
     (by === "regime" ? "Each country counts in the regime its currency had that year (measured from the two years of exchange rates up to then), so countries move between groups. "
@@ -1743,12 +1775,14 @@ function drawCountryLines() {
   if (groups) return drawGroupLines(el);
   document.getElementById("c-line-title").textContent = state.cMeasure === "bn" ? "Reserves over time" : "Reserves as a share of GDP over time";
   document.getElementById("c-line-sub").textContent = `${cUnit()}, ${goldWords()}; quarterly where the country reports quarterly, otherwise at each year's end.`;
-  document.getElementById("c-chips").innerHTML = state.cSel.filter(k => CC[k]).map(k =>
-    `<button class="chip" type="button" aria-pressed="true" data-k="${k}" title="Remove from the chart"><span class="dot" style="background:${cColor(k)}"></span>${esc(CC[k].name)} ×</button>`).join("");
-  const traces = state.cSel.filter(k => CC[k]).map(k => {
+  const chosen = [HOME, ...state.cSel.filter(k => k !== HOME)].filter(k => CC[k]);
+  document.getElementById("c-chips").innerHTML = chosen.map(k => k === HOME
+    ? `<span class="chip" aria-pressed="true" title="Always shown"><span class="dot" style="background:${cColor(k)}"></span>${esc(CC[k].name)} ★</span>`
+    : `<button class="chip" type="button" aria-pressed="true" data-k="${k}" title="Remove from the chart"><span class="dot" style="background:${cColor(k)}"></span>${esc(CC[k].name)} ×</button>`).join("");
+  const traces = chosen.map(k => {
     const pts = CC[k].pts.filter(pt => fin(cValue(pt)));
     return { type: "scatter", mode: pts.length < 30 ? "lines+markers" : "lines", name: CC[k].name, x: pts.map(pt => xdate(pt.p)), y: pts.map(cValue),
-      connectgaps: true, line: { color: cColor(k), width: 2 }, marker: { size: 5, color: cColor(k) },
+      connectgaps: true, line: { color: cColor(k), width: k === HOME ? 4 : 2 }, marker: { size: k === HOME ? 7 : 5, color: cColor(k) },
       hovertemplate: `%{y:,.${state.cMeasure === "bn" ? 0 : 1}f}${state.cMeasure === "bn" ? " bn" : "%"}<extra>${esc(CC[k].name)}</extra>` };
   });
   if (!traces.length) return empty(el, "Pick a country in the ranking, on the map or in the list above.");
@@ -1786,6 +1820,7 @@ async function loadCountriesLive() {
   if (state.tab === "countries") renderCountries(); else syncCountryControls();
 }
 function toggleCountry(k, addOnly = false) {
+  if (k === HOME) return;  // always shown
   if (state.cSel.includes(k)) { if (!addOnly) state.cSel = state.cSel.filter(x => x !== k); }
   else if (state.cSel.length < MAX_COUNTRIES) state.cSel = [...state.cSel, k];
   writeHash(); syncCountryControls(); renderCountryTable(); drawCountryLines(); if (!bub.playing) moveBubbles(250);
@@ -1825,7 +1860,7 @@ document.getElementById("c-filter").addEventListener("change", e => { state.cFil
 document.getElementById("c-year").addEventListener("change", e => { stopPlay(false); state.cYear = e.target.value; writeHash(); renderCountries(); });
 document.getElementById("c-search").addEventListener("input", renderCountryTable);
 document.getElementById("c-add").addEventListener("change", e => { if (e.target.value) toggleCountry(e.target.value, true); });
-document.getElementById("c-chips").addEventListener("click", e => { const b = e.target.closest(".chip"); if (b) toggleCountry(b.dataset.k); });
+document.getElementById("c-chips").addEventListener("click", e => { const b = e.target.closest(".chip[data-k]"); if (b) toggleCountry(b.dataset.k); });
 document.getElementById("c-table").addEventListener("click", e => {
   const th = e.target.closest("th[data-sort]");
   if (th) {
@@ -1866,13 +1901,13 @@ const bubKeep = r => state.bEcon.includes(r.econ) && (r.regime ? state.bReg.incl
 function bubbleTarget(y) {
   const lastYear = +CC_LATEST.slice(0, 4), pctY = state.bY === "pct";
   const { rows, world } = bubbleYear(y, lastYear), shown = rows.filter(bubKeep);
-  const named = new Set(shown.slice().sort((p, q) => q.a - p.a).slice(0, 6).map(r => r.c.k).concat(state.cSel));
+  const named = new Set(shown.slice().sort((p, q) => q.a - p.a).slice(0, 6).map(r => r.c.k).concat(state.cSel, HOME));
   const pts = new Map();
   for (const r of shown) {
     const cat = groupCat(state.bColor, r[state.bColor]);
     pts.set(r.c.k, {
       lx: Math.log10(r.gdp), ly: Math.log10(pctY ? r.pct : r.a), s: Math.max(5, 70 * Math.sqrt(r.share / MAX_SHARE)),
-      color: css(cat?.color || "--other"), text: named.has(r.c.k) ? r.c.name : "",
+      color: css(cat?.color || "--other"), text: named.has(r.c.k) ? (r.c.k === HOME ? `<b>${r.c.name}</b>` : r.c.name) : "", home: r.c.k === HOME,
       cd: [r.c.name, `$${fmt(r.gdp, 0)} bn`, `$${fmt(r.a, r.a < 10 ? 1 : 0)} bn`, `${fmt(r.pct, 1)}%`, `${fmt(r.share, 2)}%`, cat?.name || "–", r.c.k],
     });
   }
@@ -1899,8 +1934,10 @@ function syncBubbleControls() {
 const bubTrace = list => ({
   type: "scatter", mode: "markers+text", showlegend: false,
   x: list.map(p => 10 ** p.lx), y: list.map(p => 10 ** p.ly), text: list.map(p => p.text),
-  textposition: "top center", cliponaxis: false, textfont: { size: 11, color: css("--text-secondary") },
-  marker: { size: list.map(p => p.s), sizemode: "diameter", color: list.map(p => p.color), opacity: 0.78, line: { color: css("--surface"), width: 1 } },
+  textposition: "top center", cliponaxis: false,
+  textfont: { size: list.map(p => p.home ? 13 : 11), color: list.map(p => css(p.home ? "--text-primary" : "--text-secondary")) },
+  marker: { size: list.map(p => p.s), sizemode: "diameter", color: list.map(p => p.color), opacity: 0.78,
+    line: { color: list.map(p => css(p.home ? "--text-primary" : "--surface")), width: list.map(p => p.home ? 3 : 1) } },
   customdata: list.map(p => p.cd),
   hovertemplate: "<b>%{customdata[0]}</b> (%{customdata[5]})<br>GDP %{customdata[1]}<br>Reserves %{customdata[2]} = %{customdata[3]} of GDP<br>%{customdata[4]} of world reserves<extra></extra>",
 });
@@ -1974,7 +2011,7 @@ function tweenBubbles(target, ms, steady, done) {
     const t = Math.min(1, (now - t0) / ms), e = ease(t);
     const list = pairs.map(({ a, b }) => ({
       lx: a.lx + (b.lx - a.lx) * e, ly: a.ly + (b.ly - a.ly) * e, s: a.s + (b.s - a.s) * e,
-      color: e < 0.5 ? a.color : b.color, text: e < 0.5 ? a.text : b.text, cd: e < 0.5 ? a.cd : b.cd,
+      color: e < 0.5 ? a.color : b.color, text: e < 0.5 ? a.text : b.text, cd: e < 0.5 ? a.cd : b.cd, home: a.home || b.home,
     }));
     bubFrame(el, bubTrace(list));
     if (!labelled && e >= 0.5) { labelled = true; showBubbleYear(target.year, target.sub); }
@@ -1989,7 +2026,8 @@ function tweenBubbles(target, ms, steady, done) {
 // one frame: Plotly's animate path without a transition or a redraw only moves the points, which is much
 // lighter than a restyle
 function bubFrame(el, tr) {
-  Plotly.animate(el, { data: [{ x: tr.x, y: tr.y, text: tr.text, customdata: tr.customdata, marker: { size: tr.marker.size, color: tr.marker.color } }], traces: [0] },
+  Plotly.animate(el, { data: [{ x: tr.x, y: tr.y, text: tr.text, customdata: tr.customdata, textfont: tr.textfont,
+    marker: { size: tr.marker.size, color: tr.marker.color, line: tr.marker.line } }], traces: [0] },
     { transition: { duration: 0 }, frame: { duration: 0, redraw: false }, mode: "immediate" }).catch(() => {});  // a newer frame interrupted it
 }
 const moveBubbles = (ms = 450) => { syncBubbleControls(); tweenBubbles(bubbleTarget(bub.year), ms, false); };
