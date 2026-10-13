@@ -31,7 +31,9 @@
     --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
     --s5: #e87ba4; --s6: #008300; --s7: #4a3aa7; --s8: #e34948;
     --other: #9c9b94; --unalloc: #c3c2b7;
-    --seq-lo: #d6e5f8; --seq-mid: #4a8fe0; --seq-hi: #0c356b;
+    --seq-1: #e4eefa; --seq-2: #a8c8ef; --seq-3: #5a98e3; --seq-4: #2268c4; --seq-5: #0b3470;
+    --map-land: #e6e5df; --map-ocean: #eef3f8; --map-border: #ffffff; --map-grid: #dce3eb;
+    --bubble: rgba(235, 104, 52, 0.38); --bubble-line: #d4561f; --bubble-neutral: rgba(11, 11, 11, 0.16); --bubble-neutral-line: rgba(11, 11, 11, 0.6);
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
@@ -43,7 +45,9 @@
       --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
       --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
       --other: #8a8983; --unalloc: #4a4a47;
-      --seq-lo: #1f3047; --seq-mid: #3987e5; --seq-hi: #d6e8fd;
+      --seq-1: #15253a; --seq-2: #1d4f8f; --seq-3: #3987e5; --seq-4: #8fc1f8; --seq-5: #e8f3ff;
+      --map-land: #2a2a28; --map-ocean: #0e141c; --map-border: #0d0d0d; --map-grid: #1b2533;
+      --bubble: rgba(240, 120, 70, 0.4); --bubble-line: #f59569; --bubble-neutral: rgba(255, 255, 255, 0.16); --bubble-neutral-line: rgba(255, 255, 255, 0.7);
     }
   }
   :root[data-theme="dark"] {
@@ -55,7 +59,9 @@
     --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
     --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
     --other: #8a8983; --unalloc: #4a4a47;
-    --seq-lo: #1f3047; --seq-mid: #3987e5; --seq-hi: #d6e8fd;
+    --seq-1: #15253a; --seq-2: #1d4f8f; --seq-3: #3987e5; --seq-4: #8fc1f8; --seq-5: #e8f3ff;
+    --map-land: #2a2a28; --map-ocean: #0e141c; --map-border: #0d0d0d; --map-grid: #1b2533;
+    --bubble: rgba(240, 120, 70, 0.4); --bubble-line: #f59569; --bubble-neutral: rgba(255, 255, 255, 0.16); --bubble-neutral-line: rgba(255, 255, 255, 0.7);
   }
 
   * { box-sizing: border-box; }
@@ -176,7 +182,9 @@
   .insight:empty { display: none; }
   .grid2.inner { margin-bottom: 0; }
   #tab-explore, #tab-countries { margin-top: 16px; }
-  .chart.map { height: 480px; }
+  .chart.map { height: 500px; }
+  .chart.map.globe { height: 620px; }
+  .map-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin: 4px 0 8px; }
   .clickable tbody tr[data-k] { cursor: pointer; }
   .clickable tbody tr[data-k]:hover td { background: var(--hover); }
   tr.current td { font-weight: 650; }
@@ -190,7 +198,7 @@
   .map-legend:empty { display: none; }
   .map-legend span { display: inline-flex; align-items: center; gap: 6px; }
   #g-table td:first-child { white-space: normal; }
-  @media (max-width: 520px) { .chart.map { height: 240px; } }
+  @media (max-width: 520px) { .chart.map { height: 260px; } .chart.map.globe { height: 380px; } }
   h3 { font-size: 13.5px; font-weight: 600; margin: 0 0 6px; color: var(--text-secondary); }
   @media (max-width: 520px) { .race-row .rl { width: 96px; font-size: 12px; } }
 </style>
@@ -358,8 +366,15 @@
     <section class="card">
       <div class="card-head">
         <div><h2 id="c-map-title">Reserves around the world</h2><p class="sub" id="c-map-sub"></p></div>
+      </div>
+      <div class="map-tools">
         <div class="control"><span class="lbl">Colour by</span>
           <div class="seg" id="c-color-seg"><button data-v="value">Reserves</button><button data-v="group">Group</button></div></div>
+        <div class="control"><span class="lbl">View</span>
+          <div class="seg" id="c-view-seg"><button data-v="flat">Flat</button><button data-v="globe">Globe</button></div></div>
+        <label class="check"><input type="checkbox" id="c-bubbles"> Bubbles for US$ amounts</label>
+        <button class="text-btn" type="button" id="c-spin">⟳ Spin</button>
+        <button class="text-btn" type="button" id="c-play">▶ Time-lapse</button>
       </div>
       <div id="c-map" class="chart map"></div>
       <div class="map-legend" id="c-map-legend"></div>
@@ -598,7 +613,7 @@ const state = {
   shView: "lines", shLog: false, amView: "stack", amLog: false,
   chFrom: "", chTo: "", chMetric: "bn", chCur: "USD", dtMetric: "share",
   raceMetric: "share", raceNoUSD: false, raceSpeed: "1", fxBase: "2016-Q4", fxCur: "USD",
-  cMeasure: "pct", cGold: "with", cYear: "latest", cSort: "v", cDir: "desc", cColor: "value", cGroup: "econ", cFilter: "all", cLines: "countries", cAgg: "combined", cSel: ["CHE", "HKG", "SAU", "CHN", "JPN", "USA"],
+  cMeasure: "pct", cGold: "with", cYear: "latest", cSort: "v", cDir: "desc", cColor: "value", cGroup: "econ", cFilter: "all", cLines: "countries", cAgg: "combined", cMapView: "globe", cBubbles: true, cSel: ["CHE", "HKG", "SAU", "CHN", "JPN", "USA"],
 };
 const LIST_KEYS = new Set(["cur", "cSel"]);
 const TABS = ["shares", "amounts", "changes", "data", "countries", "explore"];
@@ -620,6 +635,7 @@ function readHash() {
   if (!["econ", "region", "regime"].includes(state.cGroup)) state.cGroup = "econ";
   if (!["countries", "econ", "region", "regime"].includes(state.cLines)) state.cLines = "countries";
   if (!["combined", "median"].includes(state.cAgg)) state.cAgg = "combined";
+  if (!["flat", "globe"].includes(state.cMapView)) state.cMapView = "globe";
   if (!["value", "group"].includes(state.cColor)) state.cColor = "value";
   state.cSel = state.cSel.slice(0, 8);
 }
@@ -1438,57 +1454,127 @@ function syncCountryControls() {
   document.getElementById("c-status").textContent = `${Object.keys(CC).length} countries; figures ${how}.`;
 }
 
+// the map: flat or a globe that can spin, coloured by reserves or by group, with bubbles for the
+// US-dollar amounts, and a time-lapse through the years
+const mapView = { lon: 30, spin: null, play: null };
 function drawCountryMap() {
-  const rows = cRows(), el = document.getElementById("c-map"), bn = state.cMeasure === "bn";
+  const rows = cRows(), el = document.getElementById("c-map"), bn = state.cMeasure === "bn", globe = state.cMapView === "globe";
   const asOf = state.cYear === "latest" ? "latest figure for each country" : `end of ${state.cYear}`;
-  document.getElementById("c-map-title").textContent = bn ? "Reserves around the world" : "Reserves as a share of GDP";
   const byGroup = state.cColor === "group", G = GROUPINGS[state.cGroup];
-  document.getElementById("c-map-sub").textContent = byGroup
-    ? `Coloured by ${G.label.toLowerCase()}${state.cGroup === "regime" ? ", measured over the last two years" : ", the IMF's World Economic Outlook groups"}; hover for each country's reserves (${cUnit()}, ${goldWords()}, ${asOf}). Grey: no figures.`
-    : `Official reserve assets ${goldWords()}, ${cUnit()}, ${asOf}. Grey: no figures.` +
-      (bn ? " Colours on a log scale." : " Colours stop at 60%; a few countries are far above.");
-  if (byGroup) document.getElementById("c-map-title").textContent = `Countries by ${G.label.toLowerCase()}`;
+  document.getElementById("c-map-title").textContent = byGroup ? `Countries by ${G.label.toLowerCase()}` : bn ? "Reserves around the world" : "Reserves as a share of GDP";
+  document.getElementById("c-map-sub").textContent = (byGroup
+    ? `Coloured by ${G.label.toLowerCase()}${state.cGroup === "regime" ? ", measured over the last two years" : ", the IMF's World Economic Outlook groups"}; ${cUnit()}, ${goldWords()}, ${asOf} on hover.`
+    : `Official reserve assets ${goldWords()}, ${cUnit()}, ${asOf}.` + (bn ? " Colours on a log scale." : " Colours stop at 60%; a few countries are far above.")) +
+    (state.cBubbles ? ` Bubbles: reserves in US$ (area), ${goldWords()}.` : "") + (globe ? " Drag to turn the globe." : "") + " Grey: no figures.";
+  setPressed(document.getElementById("c-view-seg"), state.cMapView);
+  document.getElementById("c-bubbles").checked = state.cBubbles;
+  document.getElementById("c-spin").hidden = !globe;
   // the IMF's code for Kosovo differs from the map's
   const loc = k => ({ KOS: "XKX" })[k] || k;
-  const z = rows.map(r => bn ? Math.log10(Math.max(r.v, 0.01)) : Math.min(r.v, 60));
-  const ticks = bn ? [0, 1, 2, 3] : [0, 15, 30, 45, 60];
   const legend = document.getElementById("c-map-legend");
   legend.innerHTML = "";
+  const traces = [];
   if (byGroup) {
     // one colour per group: categories as steps of a discrete colour scale
     const n = G.cats.length, members = Object.values(CC).map(c => ({ c, g: groupOf(c.k), pt: cPoint(c) })).filter(m => m.g);
-    const scale = G.cats.flatMap((cat, i) => [[i / n, css(cat.color)], [(i + 1) / n, css(cat.color)]]);
     legend.innerHTML = G.cats.map(cat => `<span><span class="dot" style="background:${css(cat.color)}"></span>${esc(cat.name)}</span>`).join("");
-    plot(el, [{
+    traces.push({
       type: "choropleth", locationmode: "ISO-3", locations: members.map(m => loc(m.c.k)),
-      z: members.map(m => G.cats.findIndex(cat => cat.k === m.g)), zmin: -0.5, zmax: n - 0.5, colorscale: scale, showscale: false,
-      marker: { line: { color: css("--surface"), width: 0.5 } },
+      z: members.map(m => G.cats.findIndex(cat => cat.k === m.g)), zmin: -0.5, zmax: n - 0.5, showscale: false,
+      colorscale: G.cats.flatMap((cat, i) => [[i / n, css(cat.color)], [(i + 1) / n, css(cat.color)]]),
+      marker: { line: { color: css("--map-border"), width: 0.4 } },
       customdata: members.map(m => [m.c.name, state.cGroup === "regime" ? REGIMES[m.c.k].note : groupCat(state.cGroup, m.g).name,
         fin(cValue(m.pt)) ? `${cFmt(cValue(m.pt))} (${label(m.pt.p)})` : "no recent figures", m.c.k]),
       hovertemplate: "<b>%{customdata[0]}</b><br>%{customdata[1]}<br>%{customdata[2]}<extra></extra>",
-    }], baseLayout({ showlegend: false, margin: { l: 0, r: 0, t: 0, b: 0 }, geo: mapGeo() }));
-    bindMapClick(el);
-    return;
+    });
+  } else {
+    const ticks = bn ? [0, 1, 2, 3] : [0, 15, 30, 45, 60];
+    traces.push({
+      type: "choropleth", locationmode: "ISO-3", locations: rows.map(r => loc(r.c.k)),
+      z: rows.map(r => bn ? Math.log10(Math.max(r.v, 0.01)) : Math.min(r.v, 60)), zmin: bn ? -1 : 0, zmax: bn ? 3.6 : 60,
+      colorscale: [0, 0.25, 0.5, 0.75, 1].map((p, i) => [p, css(`--seq-${i + 1}`)]),
+      marker: { line: { color: css("--map-border"), width: 0.4 } },
+      customdata: rows.map(r => [r.c.name, cFmt(r.v), label(r.pt.p), r.c.k]),
+      hovertemplate: "<b>%{customdata[0]}</b><br>%{customdata[1]}<br>%{customdata[2]}<extra></extra>",
+      colorbar: { orientation: "h", thickness: 8, len: 0.42, x: 0.5, xanchor: "center", y: -0.02, yanchor: "top", outlinewidth: 0,
+        tickvals: ticks, tickfont: { color: css("--text-muted"), size: 11 },
+        ticktext: bn ? ["$1 bn", "$10 bn", "$100 bn", "$1,000 bn"] : ["0%", "15%", "30%", "45%", "60%+"] },
+    });
   }
-  plot(el, [{
-    type: "choropleth", locationmode: "ISO-3", locations: rows.map(r => loc(r.c.k)), z,
-    zmin: bn ? -1 : 0, zmax: bn ? 3.6 : 60,
-    colorscale: [[0, css("--seq-lo")], [0.5, css("--seq-mid")], [1, css("--seq-hi")]],
-    marker: { line: { color: css("--surface"), width: 0.5 } },
-    customdata: rows.map(r => [r.c.name, cFmt(r.v), label(r.pt.p), r.c.k]),
-    hovertemplate: "<b>%{customdata[0]}</b><br>%{customdata[1]}<br>%{customdata[2]}<extra></extra>",
-    colorbar: { thickness: 10, len: 0.7, outlinewidth: 0, tickvals: ticks, tickfont: { color: css("--text-muted"), size: 11 },
-      ticktext: bn ? ["$1 bn", "$10 bn", "$100 bn", "$1,000 bn"] : ["0%", "15%", "30%", "45%", "60%+"] },
-  }], baseLayout({ showlegend: false, margin: { l: 0, r: 0, t: 0, b: 0 }, geo: mapGeo() }));
+  if (state.cBubbles) {
+    // bubbles at each country's centre, their area proportional to its reserves in US$
+    const b = Object.values(CC).map(c => { const pt = cPoint(c); return { c, pt, a: cAmount(pt) }; }).filter(x => fin(x.a) && x.a > 0)
+      .sort((p, q) => q.a - p.a);
+    const max = b.length ? b[0].a : 1;
+    traces.push({
+      type: "scattergeo", locationmode: "ISO-3", locations: b.map(x => loc(x.c.k)), mode: "markers",
+      marker: { size: b.map(x => 3 + 52 * Math.sqrt(x.a / max)), color: css(byGroup ? "--bubble-neutral" : "--bubble"),
+        line: { color: css(byGroup ? "--bubble-neutral-line" : "--bubble-line"), width: 1 } },
+      customdata: b.map(x => [x.c.name, `$${fmt(x.a, x.a < 10 ? 1 : 0)} bn`, label(x.pt.p), x.c.k]),
+      hovertemplate: "<b>%{customdata[0]}</b><br>%{customdata[1]}<br>%{customdata[2]}<extra></extra>",
+    });
+  }
+  const annotations = state.cYear === "latest" ? [] : [{ text: state.cYear, xref: "paper", yref: "paper", x: 0.01, y: 0.02,
+    xanchor: "left", yanchor: "bottom", showarrow: false, font: { size: 54, color: css("--text-muted") }, opacity: 0.55 }];
+  el.classList.toggle("globe", globe);
+  plot(el, traces, baseLayout({ showlegend: false, margin: { l: 0, r: 0, t: 0, b: byGroup ? 0 : 30 }, geo: mapGeo(globe), annotations,
+    uirevision: state.cMapView, dragmode: globe ? "pan" : false }));
   bindMapClick(el);
 }
-const mapGeo = () => ({ projection: { type: "natural earth" }, showframe: false, showcoastlines: false, showcountries: true,
-  countrycolor: css("--surface"), showland: true, landcolor: css("--grid"), showocean: false, showlakes: false,
-  bgcolor: "rgba(0,0,0,0)", lataxis: { range: [-58, 85] } });
+const mapGeo = globe => ({
+  projection: globe ? { type: "orthographic", rotation: { lon: mapView.lon, lat: 18 } } : { type: "natural earth" },
+  showframe: false, showcoastlines: true, coastlinecolor: css("--map-border"), coastlinewidth: 0.4,
+  showcountries: true, countrycolor: css("--map-border"), countrywidth: 0.4,
+  showland: true, landcolor: css("--map-land"), showocean: true, oceancolor: css("--map-ocean"), showlakes: false,
+  bgcolor: "rgba(0,0,0,0)",
+  lataxis: globe ? { showgrid: true, gridcolor: css("--map-grid"), gridwidth: 0.5, dtick: 30 } : { range: [-58, 85] },
+  lonaxis: globe ? { showgrid: true, gridcolor: css("--map-grid"), gridwidth: 0.5, dtick: 30 } : {},
+});
 function bindMapClick(el) {
   if (el._clickBound) return;
   el._clickBound = true;
   el.on("plotly_click", ev => { const k = ev.points?.[0]?.customdata?.[3]; if (k) toggleCountry(k, true); });
+  // remember where the viewer turned the globe; a drag also stops the spin
+  el.on("plotly_relayout", ev => { const lon = ev["geo.projection.rotation.lon"] ?? ev["geo.projection.rotation"]?.lon; if (lon != null && !mapView.spinning) mapView.lon = lon; });
+  ["mousedown", "touchstart", "wheel"].forEach(t => el.addEventListener(t, () => stopSpin(), { passive: true }));
+}
+function stopSpin() {
+  if (!mapView.spin) return;
+  cancelAnimationFrame(mapView.spin); mapView.spin = null;
+  document.getElementById("c-spin").textContent = "⟳ Spin";
+}
+function startSpin() {
+  const el = document.getElementById("c-map");
+  let last = performance.now();
+  document.getElementById("c-spin").textContent = "❚❚ Stop spinning";
+  const step = now => {
+    if (now - last > 40) {  // about 25 frames a second, 9 degrees a second
+      mapView.lon = (mapView.lon + 0.36 * (now - last) / 40 + 540) % 360 - 180;
+      last = now;
+      mapView.spinning = true;
+      Plotly.relayout(el, { "geo.projection.rotation.lon": mapView.lon }).then(() => { mapView.spinning = false; });
+    }
+    mapView.spin = requestAnimationFrame(step);
+  };
+  mapView.spin = requestAnimationFrame(step);
+}
+// time-lapse: the map year by year, from 1990 to the latest year, then back to the latest figures
+function stopPlay(reset) {
+  if (!mapView.play) return;
+  clearInterval(mapView.play); mapView.play = null;
+  document.getElementById("c-play").textContent = "▶ Time-lapse";
+  if (reset) { state.cYear = "latest"; writeHash(); syncCountryControls(); drawCountryMap(); drawGroups(); renderCountryTable(); }
+}
+function startPlay() {
+  const last = +CC_LATEST.slice(0, 4);
+  let y = 1990;
+  document.getElementById("c-play").textContent = "❚❚ Stop time-lapse";
+  const show = () => { state.cYear = String(y); document.getElementById("c-year").value = state.cYear; drawCountryMap(); };
+  show();
+  mapView.play = setInterval(() => {
+    if (++y > last - 1) { stopPlay(false); state.cYear = String(last - 1); writeHash(); syncCountryControls(); drawCountryMap(); drawGroups(); renderCountryTable(); return; }
+    show();
+  }, 700);
 }
 
 // ---- reserves compared across groups of countries ----
@@ -1637,6 +1723,8 @@ function drawCountryLines() {
 function renderCountries() {
   if (!CC) assembleCountries();
   syncCountryControls(); drawCountryMap(); drawGroups(); renderCountryTable(); drawCountryLines();
+  // the globe turns slowly the first time it is shown, until the viewer touches it
+  if (!mapView.started && state.cMapView === "globe") { mapView.started = true; startSpin(); }
   if (cLive.state === "idle") loadCountriesLive();
 }
 async function loadCountriesLive() {
@@ -1681,6 +1769,13 @@ document.getElementById("c-group-seg").addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b) return;
   state.cGroup = b.dataset.v; writeHash(); syncCountryControls(); drawGroups(); if (state.cColor === "group") drawCountryMap();
 });
+document.getElementById("c-view-seg").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  stopSpin(); state.cMapView = b.dataset.v; writeHash(); drawCountryMap();
+});
+document.getElementById("c-bubbles").addEventListener("change", e => { state.cBubbles = e.target.checked; writeHash(); drawCountryMap(); });
+document.getElementById("c-spin").addEventListener("click", () => mapView.spin ? stopSpin() : startSpin());
+document.getElementById("c-play").addEventListener("click", () => mapView.play ? stopPlay(true) : startPlay());
 document.getElementById("c-lines-seg").addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b) return;
   state.cLines = b.dataset.v; writeHash(); drawCountryLines();
@@ -1690,7 +1785,7 @@ document.getElementById("c-agg-seg").addEventListener("click", e => {
   state.cAgg = b.dataset.v; writeHash(); drawCountryLines();
 });
 document.getElementById("c-filter").addEventListener("change", e => { state.cFilter = e.target.value; writeHash(); renderCountryTable(); });
-document.getElementById("c-year").addEventListener("change", e => { state.cYear = e.target.value; writeHash(); renderCountries(); });
+document.getElementById("c-year").addEventListener("change", e => { stopPlay(false); state.cYear = e.target.value; writeHash(); renderCountries(); });
 document.getElementById("c-search").addEventListener("input", renderCountryTable);
 document.getElementById("c-add").addEventListener("change", e => { if (e.target.value) toggleCountry(e.target.value, true); });
 document.getElementById("c-chips").addEventListener("click", e => { const b = e.target.closest(".chip"); if (b) toggleCountry(b.dataset.k); });
@@ -1724,6 +1819,7 @@ function showTab(tab, focus = false) {
   }
   if (focus) document.getElementById(`tab-btn-${tab}`).focus();
   if (tab !== "explore") raceStop();
+  if (tab !== "countries" && typeof stopSpin === "function") { stopSpin(); stopPlay(false); }
   syncControls(); writeHash();
   renderTab(tab);  // charts are drawn when visible so Plotly sizes them correctly
 }
