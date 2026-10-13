@@ -654,7 +654,7 @@ function drawChanges() {
       marker: { color: items.map(it => css(CUR[it.k].color)), line: { color: css("--surface"), width: 2 } },
       text: items.map(it => signed(it.v, m.d, m.unit)), textposition: "outside", cliponaxis: false,
       textfont: { color: css("--text-secondary"), size: 12 },
-      hovertemplate: `%{y}: %{x:+,.${m.d}f}${m.unit}<extra></extra>` }],
+      customdata: items.map(it => signed(it.v, m.d, m.unit)), hovertemplate: "%{y}: %{customdata}<extra></extra>" }],
       baseLayout({ showlegend: false, bargap: 0.35, xaxis: { range: [lo < 0 ? lo - pad : 0, hi > 0 ? hi + pad : 0], showgrid: true, zeroline: true, zerolinewidth: 1.5, ticksuffix: m.unit.trim() === "bn" ? "" : m.unit.trim() },
         yaxis: { showgrid: false, automargin: true }, margin: { l: 8, r: 60, t: 8, b: 8 } }));
   }
@@ -666,7 +666,7 @@ function drawChanges() {
   for (let i = Math.max(1, w.i0); i <= w.i1; i++) { const v = change(f, k, i - 1, i, state.chMetric); if (fin(v)) { xs.push(f.x[i]); ys.push(v); } }
   if (!xs.length) return empty(el2, `No figures for the ${c.name.toLowerCase()} in this period.`);
   plot(el2, [{ type: "bar", x: xs, y: ys, marker: { color: ys.map(v => css(v >= 0 ? "--pos" : "--neg")) },
-    hovertemplate: `%{x|${hoverX()}}: %{y:+,.${m.d}f}${m.unit}<extra></extra>` }],
+    customdata: ys.map(v => signed(v, m.d, m.unit)), hovertemplate: `%{x|${hoverX()}}: %{customdata}<extra></extra>` }],
     baseLayout({ showlegend: false, bargap: 0.15, xaxis: { hoverformat: hoverX() }, yaxis: { zeroline: true, zerolinewidth: 1.5, ticksuffix: m.unit.trim() === "bn" ? "" : m.unit.trim() } }));
   renderChangesTable(f, i0, i1);
 }
