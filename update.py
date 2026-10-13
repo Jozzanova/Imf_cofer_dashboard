@@ -56,6 +56,10 @@ EURO_SINCE = {"AUT": 1999, "BEL": 1999, "FIN": 1999, "FRA": 1999, "DEU": 1999, "
               "NLD": 1999, "PRT": 1999, "ESP": 1999, "GRC": 2001, "SVN": 2007, "CYP": 2008, "MLT": 2008, "SVK": 2009,
               "EST": 2011, "LVA": 2014, "LTU": 2015, "HRV": 2023, "BGR": 2026}
 DEM_PER_EUR = 1.95583
+# Further anchors for pegs: countries that use these currencies (Kiribati, Tuvalu and Nauru the Australian
+# dollar, Liechtenstein the Swiss franc) or peg to them one to one (Lesotho, Eswatini and Namibia to the
+# rand, Bhutan to the rupee, Brunei to the Singapore dollar). The same list as PEG_ANCHORS in the template.
+PEG_ANCHORS = {"AUS": "AUD", "CHE": "CHF", "ZAF": "ZAR", "IND": "INR", "SGP": "SGD"}
 # The IMF's grouping of countries in the World Economic Outlook: advanced economies (including the
 # euro area) and emerging and developing economies by region.
 GROUPS_URL = "https://api.imf.org/external/sdmx/3.0/structure/hierarchy/IMF.RES/H_WEO_COUNTRIES/+"
@@ -116,10 +120,11 @@ def monthly_rates(text: str) -> dict:
     return out
 
 
-def classify(usd: list, eur: list) -> str:
+def classify(usd: list, eur: list, others: tuple = ()) -> str:
     """One window of 25 end-of-month rates (domestic currency per US dollar, and per euro) -> "P" pegged,
     "M" managed or "F" floating. The same rule as measureRegimes() in the template: pegged if within a
-    2% range against the dollar or the euro; managed if in at least half of the 6-month windows the rate
+    2% range against the dollar, the euro or one of the other anchors (others: the country's rate against
+    each, where there are enough months); managed if in at least half of the 6-month windows the rate
     stays within a 2% band around its trend against the dollar or a 50/50 dollar-euro basket."""
     def span(xs):
         v = [math.log(x) for x in xs]
@@ -137,7 +142,9 @@ def classify(usd: list, eur: list) -> str:
             ok += (max(res) - min(res)) * 100 <= 2
         return ok / n if n else 0
 
-    if span(usd) <= 2 or span(eur) <= 2:
+    # against the further anchors 3%: the IMF's rates for two currencies at par come from different sources and
+    # can differ by a percent or two (the Namibian dollar and the rand, for example)
+    if span(usd) <= 2 or span(eur) <= 2 or any(span(o) <= 3 for o in others):
         return "P"
     basket = [u / e ** 0.5 for u, e in zip(usd, [u / x for u, x in zip(usd, eur)])]
     return "M" if max(banded(usd), banded(basket)) >= 0.5 else "F"
@@ -168,7 +175,9 @@ def regime_history(text: str, first_year: int = 1980) -> dict:
             if len(ms) < 19 or ms[-1] < f"{y}-M01":
                 code += "-"
                 continue
-            code += classify([rs[m] for m in ms], [rs[m] / eur[m] for m in ms])
+            others = tuple(s for s in ([rs[m] / rates[a][m] for m in ms if m in rates[a]] for a in PEG_ANCHORS if a != c and a in rates)
+                           if len(s) >= 19)
+            code += classify([rs[m] for m in ms], [rs[m] / eur[m] for m in ms], others)
         if code.strip("-"):
             out[c] = code
     return {"from": first_year, "codes": out}

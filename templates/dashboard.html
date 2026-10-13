@@ -1321,7 +1321,12 @@ const GROUPINGS = {
     { k: "managed", name: "Managed", color: "--s2" },
     { k: "float", name: "Floating", color: "--s3" }] },
 };
-const ANCHOR = { USD: "the US dollar", EUR: "the euro", BASKET: "a dollar-euro basket" };
+const ANCHOR = { USD: "the US dollar", EUR: "the euro", BASKET: "a dollar-euro basket",
+  AUS: "the Australian dollar", CHE: "the Swiss franc", ZAF: "the South African rand", IND: "the Indian rupee", SGP: "the Singapore dollar" };
+// further anchors for pegs, by the country whose currency it is: users of the Australian dollar (Kiribati,
+// Tuvalu, Nauru) and the Swiss franc (Liechtenstein), and one-to-one pegs to the rand (Lesotho, Eswatini,
+// Namibia), the rupee (Bhutan) and the Singapore dollar (Brunei). As in update.py.
+const PEG_ANCHORS = ["AUS", "CHE", "ZAF", "IND", "SGP"];
 // SDMX-CSV of monthly exchange rates -> {country: {month: rate}} (keeps G163, the euro), as in update.py
 function sdmxRates(text) {
   const lines = text.trim().split(/\r?\n/), h = lines[0].split(",");
@@ -1362,7 +1367,10 @@ function measureRegimes() {
     const ms = months.filter(m => rs[m] > 0).slice(-25);
     if (ms.length < 19) continue;
     const usd = ms.map(m => rs[m]), vsEur = ms.map(m => rs[m] / eur[m]), basket = ms.map(m => rs[m] / Math.sqrt(eur[m]));
-    const peg = [["USD", usd], ["EUR", vsEur]].find(([, s]) => span(s) <= 2);
+    const others = PEG_ANCHORS.filter(a => a !== k && CD.rates?.[a]).map(a => [a, ms.filter(m => CD.rates[a][m] > 0).map(m => rs[m] / CD.rates[a][m])])
+      .filter(([, s]) => s.length >= 19);
+    // 3% against the further anchors: the IMF's rates for two currencies at par come from different sources
+    const peg = [["USD", usd], ["EUR", vsEur]].find(([, s]) => span(s) <= 2) || others.find(([, s]) => span(s) <= 3);
     if (peg) { out[k] = { r: "peg", a: peg[0], note: `Pegged to ${ANCHOR[peg[0]]}` }; continue; }
     const [bu, bb] = [banded(usd), banded(basket)];
     if (Math.max(bu, bb) >= 0.5) {
@@ -1688,7 +1696,8 @@ function drawGroups() {
       ${bn ? "" : `<td>${fin(st.combined) ? fmt(st.combined, 1) + "%" : "–"}</td>`}<td>${fmt(st.tot, 0)}</td><td>${fin(st.share) ? fmt(st.share, 1) + "%" : "–"}</td></tr>`).join("")}</tbody>`;
   document.getElementById("g-note").innerHTML = by === "regime"
     ? `Exchange-rate regimes are measured from the IMF's end-of-month exchange rates over the last two years, following the IMF's de facto tests:
-       <b>pegged</b> if the rate stayed within a 2% range against the US dollar or the euro; <b>managed</b> if, in most 6-month stretches, it stayed
+       <b>pegged</b> if the rate stayed within a 2% range against the US dollar or the euro (or 3% against the Australian dollar, Swiss franc,
+       South African rand, Indian rupee or Singapore dollar, which some countries use or peg to one to one); <b>managed</b> if, in most 6-month stretches, it stayed
        within a 2% band around its trend against the dollar or a dollar-euro basket (stabilised, crawling and tightly managed rates); <b>floating</b>
        otherwise. Euro-area members float with the euro. This approximates the IMF's official classification (in its AREAER report), which is not
        available as data.`
