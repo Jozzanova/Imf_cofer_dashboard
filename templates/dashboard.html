@@ -660,19 +660,19 @@ const source = { kind: "snapshot", at: SNAPSHOT.downloaded, checking: true };
 // ---------- state (kept in the URL hash so a view can be bookmarked or shared) ----------
 const state = {
   tab: "shares", cur: CURS.map(c => c.k), freq: "Q", period: "all",
-  shView: "lines", shLog: false, amView: "stack", amLog: false, sel: "",
+  shView: "lines", shLog: false, amView: "stack", amLog: false, sel: "", shShow: [], amShow: [],
   chFrom: "", chTo: "", chMetric: "bn", chCur: "USD", dtMetric: "share",
   raceMetric: "share", raceNoUSD: false, raceSpeed: "1", fxBase: "2016-Q4", fxCur: "USD",
   cMeasure: "pct", cGold: "with", cYear: "latest", cSort: "v", cDir: "desc", gb: "eu_all_float", cGroup: "econ", cFilter: "all", cLines: "countries", cAgg: "combined", gScale: "log",
   bY: "bn", bColor: "econ", bEcon: ["AE", "EM"], bReg: ["peg", "managed", "float"], bRegion: "all", bSpeed: "1", cSel: ["CHE", "HKG", "SAU", "CHN", "JPN", "USA"],
 };
-const LIST_KEYS = new Set(["cur", "cSel", "bEcon", "bReg"]);
+const LIST_KEYS = new Set(["cur", "cSel", "bEcon", "bReg", "shShow", "amShow"]);
 const TABS = ["shares", "changes", "data", "countries", "explore"];
 function readHash() {
   const p = new URLSearchParams(location.hash.slice(1));
   for (const [k, v] of p) {
     if (!(k in state)) continue;
-    if (LIST_KEYS.has(k)) state[k] = v ? v.split(",").filter(x => k === "cur" ? CUR[x] : k === "cSel" ? /^[A-Z]{3}$/.test(x) : /^\w+$/.test(x)) : [];
+    if (LIST_KEYS.has(k)) state[k] = v ? v.split(",").filter(x => k === "cur" || k === "shShow" ? CUR[x] : k === "amShow" ? CUR[x] || x === "UN" : k === "cSel" ? /^[A-Z]{3}$/.test(x) : /^\w+$/.test(x)) : [];
     else if (typeof state[k] === "boolean") state[k] = v === "1";
     else state[k] = v;
   }
@@ -752,13 +752,13 @@ function plot(el, traces, layout) { if (el.querySelector(".empty")) el.innerHTML
 
 function lineTrace(k, x, y, unit, d) {
   const c = CUR[k];
-  return { type: "scatter", mode: "lines", name: c.name, x, y, connectgaps: false,
+  return { type: "scatter", mode: "lines", name: c.name, meta: k, x, y, connectgaps: false,
     line: { color: css(c.color), width: 2, dash: c.dash || "solid" },
     hovertemplate: `%{y:,.${d}f}${unit}<extra>${esc(c.name)}</extra>` };
 }
 function areaTrace(k, x, y, unit, d) {
   const c = CUR[k];
-  return { type: "scatter", mode: "lines", name: c.name, x, y, stackgroup: "one",
+  return { type: "scatter", mode: "lines", name: c.name, meta: k, x, y, stackgroup: "one",
     line: { color: css("--surface"), width: 1 }, fillcolor: css(c.color),
     hovertemplate: `%{y:,.${d}f}${unit}<extra>${esc(c.name)}</extra>` };
 }
@@ -789,16 +789,31 @@ function setSplit(kind, show) {
   const side = document.getElementById(`${kind}-side`);
   side.hidden = !show; side.parentElement.classList.toggle("single", !show);
 }
-// In these two charts a click on a currency in the legend shows that currency alone (a second click brings
-// the others back; a double click hides it). The choice survives redraws, such as picking another date.
-const isolateLegend = () => ({ ...baseLayout().legend, itemclick: "toggleothers", itemdoubleclick: "toggle" });
-const keepView = kind => `${kind}|${state.freq}|${state.period}|${kind === "sh" ? state.shView : state.amView}|${selected().join(",")}`;
-// the same from the bars beside the chart: show one currency alone, or all again
-function isolate(kind, name) {
-  const el = document.getElementById(`${kind}-chart`);
-  if (!el.data) return;
-  const alone = el.data.every(t => (t.name === name) === (t.visible === undefined || t.visible === true));
-  Plotly.restyle(el, { visible: el.data.map(t => alone || t.name === name ? true : "legendonly") });
+// Which currencies the two charts show (state.shShow, state.amShow; empty: all). A click on a currency in
+// the legend or the bars beside the chart shows it alone (a second click: all again); Ctrl+click (Cmd+click
+// on a Mac) adds it to those shown or takes it away. Kept in the URL, so redraws keep it too.
+const legendCfg = () => ({ ...baseLayout().legend, itemclick: "toggle", itemdoubleclick: false });
+const shownIn = kind => state[`${kind}Show`];
+const visOf = (kind, k) => shownIn(kind).length && !shownIn(kind).includes(k) ? "legendonly" : true;
+function applyShown(kind, traces) { for (const t of traces) if (t.meta) t.visible = visOf(kind, t.meta); return traces; }
+function pickCurrency(kind, k, additive) {
+  const el = document.getElementById(`${kind}-chart`), all = (el.data || []).map(t => t.meta).filter(Boolean);
+  let cur = shownIn(kind).filter(x => all.includes(x));
+  if (additive) {
+    const base = cur.length ? cur : all.slice();
+    cur = base.includes(k) ? base.filter(x => x !== k) : [...base, k];
+    if (!cur.length || all.every(x => cur.includes(x))) cur = [];
+  } else cur = cur.length === 1 && cur[0] === k ? [] : [k];
+  state[`${kind}Show`] = cur; writeHash();
+  if (kind === "sh") drawShares(); else drawAmounts();
+}
+function bindLegendPick(kind, el) {
+  el.removeAllListeners?.("plotly_legendclick");
+  el.on("plotly_legendclick", ev => {
+    const k = ev.data?.[ev.curveNumber]?.meta;
+    if (k) pickCurrency(kind, k, !!(ev.event?.ctrlKey || ev.event?.metaKey));
+    return false;  // the page decides what is shown, not Plotly
+  });
 }
 // the bars beside a chart: every chosen currency on the picked date, largest first
 function drawSide(kind) {
@@ -807,21 +822,22 @@ function drawSide(kind) {
   if (!share && f.unallocated[i] > 0) items.push({ k: "UN", name: "Unallocated", color: css("--unalloc"), v: f.unallocated[i], prev: f.unallocated[i - py] });
   items.sort((a, b) => b.v - a.v);
   document.getElementById(`${kind}-side-title`).textContent = `${share ? "Shares" : "US$ billions"}, ${label(f.periods[i])}${i === w.i1 ? " (latest)" : ""}`;
-  document.getElementById(`${kind}-side-sub`).textContent = (share ? "" : `Total $${fmt(f.total[i] / 1000, 2)} tn · `) + "click the chart for another date, a bar for that currency alone";
+  document.getElementById(`${kind}-side-sub`).textContent = (share ? "" : `Total $${fmt(f.total[i] / 1000, 2)} tn · `) +
+    "click the chart for another date; a bar or a name in the legend for that currency alone, Ctrl+click to add or remove one";
   const el = document.getElementById(`${kind}-bars`);
   if (!items.length) return empty(el, "No figures for this date.");
   const ch = it => !fin(it.prev) ? "no figure a year earlier" : share ? `${signed(it.v - it.prev, 2, " pp")} in a year` : `${signed((it.v / it.prev - 1) * 100, 1, "%")} in a year`;
   plot(el, [{
     type: "bar", orientation: "h", y: items.map(it => it.name), x: items.map(it => it.v),
-    marker: { color: items.map(it => it.color), line: { color: css("--surface"), width: 1 } },
+    marker: { color: items.map(it => it.color), opacity: items.map(it => visOf(kind, it.k) === true ? 1 : 0.3), line: { color: css("--surface"), width: 1 } },
     text: items.map(it => share ? `${fmt(it.v, it.v < 10 ? 2 : 1)}%` : `$${fmt(it.v, 0)} bn`), textposition: "outside", cliponaxis: false,
     textfont: { color: css("--text-secondary"), size: 11.5 },
-    customdata: items.map(ch), hovertemplate: "<b>%{y}</b><br>%{text} · %{customdata}<extra></extra>",
+    customdata: items.map(it => [ch(it), it.k]), hovertemplate: "<b>%{y}</b><br>%{text} · %{customdata[0]}<extra></extra>",
   }], baseLayout({ showlegend: false, bargap: 0.28, hovermode: "closest",
     yaxis: { autorange: "reversed", showgrid: false, tickfont: { size: 11.5, color: css("--text-secondary") }, automargin: true },
     xaxis: { showgrid: false, showticklabels: false, zeroline: false, rangemode: "tozero" }, margin: { l: 8, r: 64, t: 4, b: 4 } }));
   el.removeAllListeners?.("plotly_click");
-  el.on("plotly_click", ev => { const name = ev.points?.[0]?.y; if (name) isolate(kind, name); });
+  el.on("plotly_click", ev => { const k = ev.points?.[0]?.customdata?.[1]; if (k) pickCurrency(kind, k, !!(ev.event?.ctrlKey || ev.event?.metaKey)); });
 }
 function drawShares() {
   const f = F(), w = windowIdx(), x = slice(f.x, w), ks = selected(), el = document.getElementById("sh-chart");
@@ -835,17 +851,18 @@ function drawShares() {
   // back from one chart each: give the chart its normal height again and let Plotly measure it afresh
   if (el._multi) { el._multi = false; el.style.height = ""; Plotly.purge(el); }
   if (state.shView === "stack") {
-    const all = ks.length >= 9;
-    plot(el, series.map(s => areaTrace(s.k, x, s.y, "%", 2)), baseLayout({
-      hovermode: "x unified", xaxis: { hoverformat: hoverX() }, shapes: [selShape()], legend: isolateLegend(), uirevision: keepView("sh"),
+    const all = ks.length >= 9 && !state.shShow.length;
+    plot(el, applyShown("sh", series.map(s => areaTrace(s.k, x, s.y, "%", 2))), baseLayout({
+      hovermode: "x unified", xaxis: { hoverformat: hoverX() }, shapes: [selShape()], legend: legendCfg(),
       yaxis: { ticksuffix: "%", range: all ? [0, 100] : undefined, rangemode: "tozero" } }));
   } else {
-    const traces = series.map(s => lineTrace(s.k, x, s.y, "%", 2));
+    const traces = applyShown("sh", series.map(s => lineTrace(s.k, x, s.y, "%", 2))), on = traces.filter(t => t.visible === true);
     plot(el, traces, baseLayout({
-      hovermode: "x unified", xaxis: { hoverformat: hoverX() }, shapes: [selShape()], legend: isolateLegend(), uirevision: keepView("sh"),
+      hovermode: "x unified", xaxis: { hoverformat: hoverX() }, shapes: [selShape()], legend: legendCfg(),
       yaxis: state.shLog ? { type: "log", ticksuffix: "%" } : { ticksuffix: "%", rangemode: "tozero" },
-      annotations: directLabels(traces, state.shLog), margin: { l: 8, r: traces.length <= 4 ? 130 : 8, t: 8, b: 8 } }));
+      annotations: directLabels(on, state.shLog), margin: { l: 8, r: on.length <= 4 ? 130 : 8, t: 8, b: 8 } }));
   }
+  bindLegendPick("sh", el);
   bindDatePick(el);
   drawSide("sh");
 }
@@ -909,13 +926,16 @@ function drawAmounts() {
   if (stack) {
     traces = series.map(s => areaTrace(s.k, x, s.y, " bn", 0));
     const un = slice(f.unallocated, w);
-    if (un.some(v => v > 0)) traces.push({ type: "scatter", mode: "lines", name: "Unallocated", x, y: un, stackgroup: "one",
+    if (un.some(v => v > 0)) traces.push({ type: "scatter", mode: "lines", name: "Unallocated", meta: "UN", x, y: un, stackgroup: "one",
       line: { color: css("--surface"), width: 1 }, fillcolor: css("--unalloc"), hovertemplate: "%{y:,.0f} bn<extra>Unallocated</extra>" });
   } else traces = series.map(s => lineTrace(s.k, x, s.y, " bn", 0));
+  applyShown("am", traces);
+  const on = traces.filter(t => t.visible === true);
   plot(el, traces, baseLayout({
-    hovermode: "x unified", xaxis: { hoverformat: hoverX() }, shapes: [selShape()], legend: isolateLegend(), uirevision: keepView("am"),
+    hovermode: "x unified", xaxis: { hoverformat: hoverX() }, shapes: [selShape()], legend: legendCfg(),
     yaxis: !stack && state.amLog ? { type: "log", tickprefix: "$" } : { tickprefix: "$", tickformat: ",.0f", rangemode: "tozero" },
-    annotations: stack ? [] : directLabels(traces, state.amLog), margin: { l: 8, r: !stack && traces.length <= 4 ? 130 : 8, t: 8, b: 8 } }));
+    annotations: stack ? [] : directLabels(on, state.amLog), margin: { l: 8, r: !stack && on.length <= 4 ? 130 : 8, t: 8, b: 8 } }));
+  bindLegendPick("am", el);
   bindDatePick(el);
   drawSide("am");
 }
