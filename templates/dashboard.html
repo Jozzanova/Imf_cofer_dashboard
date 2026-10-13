@@ -184,6 +184,9 @@
   #tab-explore, #tab-countries { margin-top: 16px; }
   .chart.map { height: 500px; }
   .chart.map.globe { height: 620px; }
+  .bub-wrap { position: relative; }
+  .bub-year { position: absolute; right: 24px; bottom: 64px; font-size: clamp(36px, 7vw, 68px); font-weight: 700; line-height: 1;
+    color: var(--text-muted); opacity: .45; pointer-events: none; font-variant-numeric: tabular-nums; }
   .map-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin: 4px 0 8px; }
   .clickable tbody tr[data-k] { cursor: pointer; }
   .clickable tbody tr[data-k]:hover td { background: var(--hover); }
@@ -411,7 +414,7 @@
           <option value="G205">Latin America and the Caribbean</option><option value="G400">Middle East and Central Asia</option>
           <option value="G603">Sub-Saharan Africa</option></select>
       </div>
-      <div id="b-chart" class="chart" style="height:600px"></div>
+      <div class="bub-wrap"><div id="b-chart" class="chart" style="height:600px"></div><div class="bub-year" id="b-yearlabel" aria-live="off"></div></div>
       <div class="race-ctrl">
         <button class="text-btn race-play" id="b-play" type="button">▶ Play</button>
         <input type="range" id="b-year" min="1990" max="2026" step="1" value="2026" aria-label="Year">
@@ -1785,7 +1788,7 @@ async function loadCountriesLive() {
 function toggleCountry(k, addOnly = false) {
   if (state.cSel.includes(k)) { if (!addOnly) state.cSel = state.cSel.filter(x => x !== k); }
   else if (state.cSel.length < MAX_COUNTRIES) state.cSel = [...state.cSel, k];
-  writeHash(); syncCountryControls(); renderCountryTable(); drawCountryLines(); drawBubbles();
+  writeHash(); syncCountryControls(); renderCountryTable(); drawCountryLines(); if (!bub.playing) moveBubbles(250);
 }
 document.getElementById("c-measure-seg").addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b) return;
@@ -1835,8 +1838,11 @@ document.getElementById("c-table").addEventListener("click", e => {
 });
 
 // ---- GDP against reserves, year by year (a bubble chart that can be played) ----
-const bub = { year: null, timer: null };
-const BUB_FROM = 1990;
+// The page moves the bubbles itself, frame by frame: each country glides in a straight line (on the log
+// scales) from one year to the next, countries that appear grow from nothing where they are, and
+// countries that drop out shrink away. Changing a filter or the year moves them the same way.
+const bub = { year: null, playing: false, raf: null, cur: null };
+const BUB_FROM = 1990, MAX_SHARE = 30;  // a bubble's area follows its share of world reserves; 30% gives the largest size
 // the year-end figure, or for the latest year the latest quarter
 function yearPt(c, y, lastYear) {
   if (y < lastYear) return c.pts.find(pt => pt.p === `${y}-Q4`) || null;
@@ -1856,6 +1862,26 @@ function bubbleYear(y, lastYear) {
 }
 const bubKeep = r => state.bEcon.includes(r.econ) && (r.regime ? state.bReg.includes(r.regime) : state.bReg.length === 3)
   && (state.bRegion === "all" || r.region === state.bRegion);
+// the bubbles of one year: country -> position (log10 of both axes), diameter, colour, label and hover text
+function bubbleTarget(y) {
+  const lastYear = +CC_LATEST.slice(0, 4), pctY = state.bY === "pct";
+  const { rows, world } = bubbleYear(y, lastYear), shown = rows.filter(bubKeep);
+  const named = new Set(shown.slice().sort((p, q) => q.a - p.a).slice(0, 6).map(r => r.c.k).concat(state.cSel));
+  const pts = new Map();
+  for (const r of shown) {
+    const cat = groupCat(state.bColor, r[state.bColor]);
+    pts.set(r.c.k, {
+      lx: Math.log10(r.gdp), ly: Math.log10(pctY ? r.pct : r.a), s: Math.max(5, 70 * Math.sqrt(r.share / MAX_SHARE)),
+      color: css(cat?.color || "--other"), text: named.has(r.c.k) ? r.c.name : "",
+      cd: [r.c.name, `$${fmt(r.gdp, 0)} bn`, `$${fmt(r.a, r.a < 10 ? 1 : 0)} bn`, `${fmt(r.pct, 1)}%`, `${fmt(r.share, 2)}%`, cat?.name || "–", r.c.k],
+    });
+  }
+  const total = shown.reduce((s, r) => s + r.a, 0);
+  const sub = `${y}${y === lastYear ? " (latest quarter)" : ", year end"}: ${shown.length} of ${rows.length} countries shown, ` +
+    `holding ${fmt(world ? total / world * 100 : 0, 1)}% of the reserves of all countries with figures, ${goldWords()}. Bubble area: share of world reserves. ` +
+    (state.bColor === "regime" || state.bReg.length < 3 ? "Exchange-rate regimes as measured in each year. " : "") + "Click a bubble to follow that country below.";
+  return { pts, sub, year: y };
+}
 function syncBubbleControls() {
   const lastYear = +CC_LATEST.slice(0, 4), s = document.getElementById("b-year");
   s.min = BUB_FROM; s.max = lastYear;
@@ -1863,17 +1889,33 @@ function syncBubbleControls() {
   s.value = bub.year;
   setPressed(document.getElementById("b-y-seg"), state.bY);
   setPressed(document.getElementById("b-color-seg"), state.bColor);
+  setPressed(document.getElementById("b-speed-seg"), state.bSpeed);
   document.querySelectorAll("#b-filters .chip").forEach(b => {
     const [key, v] = b.dataset.f.split(":");
     b.setAttribute("aria-pressed", String(state[key].includes(v)));
   });
   document.getElementById("b-region").value = state.bRegion;
 }
-function drawBubbles(animate = false) {
+const bubTrace = list => ({
+  type: "scatter", mode: "markers+text", showlegend: false,
+  x: list.map(p => 10 ** p.lx), y: list.map(p => 10 ** p.ly), text: list.map(p => p.text),
+  textposition: "top center", cliponaxis: false, textfont: { size: 11, color: css("--text-secondary") },
+  marker: { size: list.map(p => p.s), sizemode: "diameter", color: list.map(p => p.color), opacity: 0.78, line: { color: css("--surface"), width: 1 } },
+  customdata: list.map(p => p.cd),
+  hovertemplate: "<b>%{customdata[0]}</b> (%{customdata[5]})<br>GDP %{customdata[1]}<br>Reserves %{customdata[2]} = %{customdata[3]} of GDP<br>%{customdata[4]} of world reserves<extra></extra>",
+});
+const bySize = m => [...m.values()].sort((p, q) => q.s - p.s);  // the largest drawn first, so small ones stay visible
+function showBubbleYear(y, sub) {
+  document.getElementById("b-yearlabel").textContent = y;
+  if (sub) document.getElementById("b-sub").textContent = sub;
+}
+// draw everything (axes, guides, legend) for the current year, without movement
+function drawBubbles() {
   if (!CC) return;
   syncBubbleControls();
-  const el = document.getElementById("b-chart"), lastYear = +CC_LATEST.slice(0, 4), y = bub.year, pctY = state.bY === "pct";
-  const G = GROUPINGS[state.bColor];
+  cancelAnimationFrame(bub.raf);
+  if (bub.playing) { bub.playing = false; document.getElementById("b-play").textContent = "▶ Play"; }
+  const el = document.getElementById("b-chart"), lastYear = +CC_LATEST.slice(0, 4), pctY = state.bY === "pct", G = GROUPINGS[state.bColor];
   // fixed axes for every year, so the bubbles' movement shows
   if (!bub.range || bub.rangeKey !== `${state.cGold}|${state.bY}|${CC_LATEST}`) {
     let xs = [], ys = [];
@@ -1881,93 +1923,115 @@ function drawBubbles(animate = false) {
     const lr = v => [Math.log10(Math.min(...v)) - 0.15, Math.log10(Math.max(...v)) + 0.25];
     bub.range = { x: lr(xs), y: lr(ys) }; bub.rangeKey = `${state.cGold}|${state.bY}|${CC_LATEST}`;
   }
-  const { rows, world } = bubbleYear(y, lastYear);
-  const shown = rows.filter(bubKeep);
-  // names on the largest holders and on the countries chosen for the chart over time
-  const named = new Set([...shown].sort((p, q) => q.a - p.a).slice(0, 6).map(r => r.c.k).concat(state.cSel));
-  const maxShare = 30;  // a bubble's area follows its share of world reserves; 30% gives the largest size
-  // one series for all bubbles (largest drawn first), so each country glides from year to year and simply
-  // changes colour when it changes group; the legend comes from empty series, one per group
-  const rs = shown.slice().sort((p, q) => q.a - p.a), catOf = r => groupCat(state.bColor, r[state.bColor]);
-  const traces = [{
-    type: "scatter", mode: "markers+text", ids: rs.map(r => r.c.k), showlegend: false,
-    x: rs.map(r => r.gdp), y: rs.map(r => pctY ? r.pct : r.a),
-    text: rs.map(r => named.has(r.c.k) ? r.c.name : ""), textposition: "top center", cliponaxis: false,
-    textfont: { size: 11, color: css("--text-secondary") },
-    marker: { size: rs.map(r => Math.max(5, 70 * Math.sqrt(r.share / maxShare))), sizemode: "diameter",
-      color: rs.map(r => css(catOf(r)?.color || "--other")), opacity: 0.78, line: { color: css("--surface"), width: 1 } },
-    customdata: rs.map(r => [r.c.name, `$${fmt(r.gdp, 0)} bn`, `$${fmt(r.a, r.a < 10 ? 1 : 0)} bn`, `${fmt(r.pct, 1)}%`, `${fmt(r.share, 2)}%`,
-      catOf(r)?.name || "–", r.c.k]),
-    hovertemplate: "<b>%{customdata[0]}</b> (%{customdata[5]})<br>GDP %{customdata[1]}<br>Reserves %{customdata[2]} = %{customdata[3]} of GDP<br>%{customdata[4]} of world reserves<extra></extra>",
-  }, ...G.cats.map(cat => ({ type: "scatter", mode: "markers", name: cat.name, x: [null], y: [null], hoverinfo: "skip",
-    marker: { size: 10, color: css(cat.color) } }))];
+  const target = bubbleTarget(bub.year);
+  bub.cur = target.pts;
   // with reserves in US$: dotted guides where reserves are 1%, 10% and 100% of GDP
   const shapes = [], annotations = [];
   if (!pctY) for (const k of [0.01, 0.1, 1]) {
     const x0 = 10 ** bub.range.x[0], x1 = 10 ** bub.range.x[1];
     shapes.push({ type: "line", x0, x1, y0: x0 * k, y1: x1 * k, line: { color: css("--axis"), width: 1, dash: "dot" }, layer: "below" });
-    // the label near where the line enters the chart, at the lower left where there are few bubbles, along the line
+    // labelled near where the line enters the chart, at the lower left where there are few bubbles, along the line
     const xl = Math.max(x0, 10 ** bub.range.y[0] / k) * 4;
     const w = el.clientWidth - 90, h = el.clientHeight - 110;
     const angle = Math.atan((h / (bub.range.y[1] - bub.range.y[0])) / (w / (bub.range.x[1] - bub.range.x[0]))) * 180 / Math.PI;
     annotations.push({ x: Math.log10(xl), y: Math.log10(xl * k), text: `reserves = ${k * 100}% of GDP`, showarrow: false, xanchor: "left", yanchor: "bottom",
       font: { size: 10.5, color: css("--text-muted") }, textangle: -angle });
   }
-  annotations.push({ text: String(y), xref: "paper", yref: "paper", x: 0.99, y: 0.03, xanchor: "right", yanchor: "bottom", showarrow: false,
-    font: { size: 64, color: css("--text-muted") }, opacity: 0.45 });
-  const total = shown.reduce((s, r) => s + r.a, 0);
-  document.getElementById("b-sub").textContent = `${y}${y === lastYear ? " (latest quarter)" : ", year end"}: ${shown.length} of ${rows.length} countries shown, ` +
-    `holding ${fmt(total / world * 100, 1)}% of the reserves of all countries with figures, ${goldWords()}. Bubble area: share of world reserves. ` +
-    (state.bColor === "regime" || state.bReg.length < 3 ? "Exchange-rate regimes as measured in each year. " : "") + "Click a bubble to follow that country below.";
-  const tick = (v, pre, suf) => `${pre}${v >= 1000 ? fmt(v / 1000, 0) + (pre ? " tn" : "k") : fmt(v, v < 1 ? 1 : 0) + (pre ? " bn" : "")}${suf}`;
+  const tick = v => `$${v >= 1000 ? fmt(v / 1000, 0) + " tn" : fmt(v, v < 1 ? 1 : 0) + " bn"}`;
   const vals = [0.1, 1, 10, 100, 1000, 10000, 100000];
-  plot(el, traces, baseLayout({
+  plot(el, [bubTrace(bySize(target.pts)), ...G.cats.map(cat => ({ type: "scatter", mode: "markers", name: cat.name, x: [null], y: [null],
+    hoverinfo: "skip", marker: { size: 10, color: css(cat.color) } }))], baseLayout({
     hovermode: "closest", showlegend: true, shapes, annotations,
     legend: { orientation: "h", y: 1.02, yanchor: "bottom", x: 0, font: { color: css("--text-secondary") }, itemclick: false, itemdoubleclick: false },
     xaxis: { type: "log", range: bub.range.x, title: { text: "GDP, US$ (log scale)", font: { size: 12, color: css("--text-muted") } },
-      showgrid: true, gridcolor: css("--grid"), tickvals: vals, ticktext: vals.map(v => tick(v, "$", "")) },
+      showgrid: true, gridcolor: css("--grid"), tickvals: vals, ticktext: vals.map(tick) },
     yaxis: { type: "log", range: bub.range.y, title: { text: pctY ? "Reserves, % of GDP (log scale)" : "Reserves, US$ (log scale)", font: { size: 12, color: css("--text-muted") } },
       tickvals: pctY ? [0.1, 0.3, 1, 3, 10, 30, 100, 300] : vals,
-      ticktext: pctY ? ["0.1%", "0.3%", "1%", "3%", "10%", "30%", "100%", "300%"] : vals.map(v => tick(v, "$", "")) },
+      ticktext: pctY ? ["0.1%", "0.3%", "1%", "3%", "10%", "30%", "100%", "300%"] : vals.map(tick) },
     margin: { l: 8, r: 8, t: 8, b: 8 }, uirevision: "bubbles",
-    transition: animate ? { duration: Math.round(650 / +state.bSpeed), easing: "cubic-in-out" } : { duration: 0 },
   }));
+  showBubbleYear(bub.year, target.sub);
   if (!el._bubBound) {
     el._bubBound = true;
     el.on("plotly_click", ev => { const k = ev.points?.[0]?.customdata?.[6]; if (k) toggleCountry(k, true); });
   }
 }
+// move the bubbles from where they are to the target over ms milliseconds; eased for a single change,
+// steady while playing so the years run into each other without stopping
+function tweenBubbles(target, ms, steady, done) {
+  cancelAnimationFrame(bub.raf);
+  const el = document.getElementById("b-chart");
+  if (!bub.cur || !el.data) { drawBubbles(); return done?.(); }
+  const from = bub.cur;
+  const pairs = [...new Set([...from.keys(), ...target.pts.keys()])].map(k => {
+    const a = from.get(k), b = target.pts.get(k);
+    return { a: a || { ...b, s: 0, text: "" }, b: b || { ...a, s: 0, text: "" } };
+  }).sort((p, q) => Math.max(q.a.s, q.b.s) - Math.max(p.a.s, p.b.s));
+  const ease = t => steady ? t : t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
+  const t0 = performance.now();
+  let labelled = false;
+  const step = now => {
+    const t = Math.min(1, (now - t0) / ms), e = ease(t);
+    const list = pairs.map(({ a, b }) => ({
+      lx: a.lx + (b.lx - a.lx) * e, ly: a.ly + (b.ly - a.ly) * e, s: a.s + (b.s - a.s) * e,
+      color: e < 0.5 ? a.color : b.color, text: e < 0.5 ? a.text : b.text, cd: e < 0.5 ? a.cd : b.cd,
+    }));
+    bubFrame(el, bubTrace(list));
+    if (!labelled && e >= 0.5) { labelled = true; showBubbleYear(target.year, target.sub); }
+    if (t < 1) { bub.raf = requestAnimationFrame(step); return; }
+    // finished: keep only the target's bubbles
+    bub.cur = target.pts;
+    bubFrame(el, bubTrace(bySize(target.pts)));
+    done?.();
+  };
+  bub.raf = requestAnimationFrame(step);
+}
+// one frame: Plotly's animate path without a transition or a redraw only moves the points, which is much
+// lighter than a restyle
+function bubFrame(el, tr) {
+  Plotly.animate(el, { data: [{ x: tr.x, y: tr.y, text: tr.text, customdata: tr.customdata, marker: { size: tr.marker.size, color: tr.marker.color } }], traces: [0] },
+    { transition: { duration: 0 }, frame: { duration: 0, redraw: false }, mode: "immediate" }).catch(() => {});  // a newer frame interrupted it
+}
+const moveBubbles = (ms = 450) => { syncBubbleControls(); tweenBubbles(bubbleTarget(bub.year), ms, false); };
 function bubStop() {
-  clearInterval(bub.timer); bub.timer = null;
+  bub.playing = false; cancelAnimationFrame(bub.raf);
   document.getElementById("b-play").textContent = "▶ Play";
+  if (bub.cur) moveBubbles(200);  // settle on the year shown
 }
 function bubStart() {
   const lastYear = +CC_LATEST.slice(0, 4);
-  if (bub.year >= lastYear) bub.year = BUB_FROM;
+  if (bub.year >= lastYear) { bub.year = BUB_FROM; drawBubbles(); }
+  bub.playing = true;
   document.getElementById("b-play").textContent = "❚❚ Pause";
-  drawBubbles(false);
-  bub.timer = setInterval(() => {
-    if (bub.year >= lastYear) return bubStop();
-    bub.year++; drawBubbles(true);
-  }, Math.round(800 / +state.bSpeed));
+  const next = () => {
+    if (!bub.playing) return;
+    if (bub.year >= lastYear) { bub.playing = false; document.getElementById("b-play").textContent = "▶ Play"; return; }
+    const y = bub.year + 1;
+    tweenBubbles(bubbleTarget(y), 1100 / +state.bSpeed, true, () => { bub.year = y; document.getElementById("b-year").value = y; next(); });
+  };
+  next();
 }
-document.getElementById("b-play").addEventListener("click", () => bub.timer ? bubStop() : bubStart());
-document.getElementById("b-year").addEventListener("input", e => { bubStop(); bub.year = +e.target.value; drawBubbles(true); });
+document.getElementById("b-play").addEventListener("click", () => bub.playing ? bubStop() : bubStart());
+document.getElementById("b-year").addEventListener("input", e => {
+  bub.playing = false; document.getElementById("b-play").textContent = "▶ Play";
+  bub.year = +e.target.value; tweenBubbles(bubbleTarget(bub.year), 300, false);
+});
 for (const [id, key] of [["b-y-seg", "bY"], ["b-color-seg", "bColor"], ["b-speed-seg", "bSpeed"]]) {
   document.getElementById(id).addEventListener("click", e => {
     const b = e.target.closest("button"); if (!b) return;
     state[key] = b.dataset.v; setPressed(e.currentTarget, state[key]); writeHash();
-    if (key === "bSpeed") { if (bub.timer) { bubStop(); bubStart(); } return; }
-    drawBubbles(false);
+    if (key === "bSpeed") return;  // takes effect from the next year
+    if (key === "bColor" && !bub.playing) { drawBubbles(); return; }
+    if (key === "bY") { bub.playing = false; document.getElementById("b-play").textContent = "▶ Play"; drawBubbles(); }
   });
 }
 document.getElementById("b-filters").addEventListener("click", e => {
   const b = e.target.closest(".chip"); if (!b) return;
   const [key, v] = b.dataset.f.split(":");
   state[key] = state[key].includes(v) ? state[key].filter(x => x !== v) : [...state[key], v];
-  writeHash(); drawBubbles(true);
+  writeHash(); if (!bub.playing) moveBubbles(); else syncBubbleControls();
 });
-document.getElementById("b-region").addEventListener("change", e => { state.bRegion = e.target.value; writeHash(); drawBubbles(true); });
+document.getElementById("b-region").addEventListener("change", e => { state.bRegion = e.target.value; writeHash(); if (!bub.playing) moveBubbles(); });
 
 // ---------- tabs ----------
 function renderTab(tab) {
