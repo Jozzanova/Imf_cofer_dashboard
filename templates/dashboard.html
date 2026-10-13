@@ -197,7 +197,6 @@
   .map-legend:empty { display: none; }
   .map-legend span { display: inline-flex; align-items: center; gap: 6px; }
   #g-table td:first-child { white-space: normal; }
-  @media (max-width: 520px) { #t-chart { height: 460px !important; } }
   h3 { font-size: 13.5px; font-weight: 600; margin: 0 0 6px; color: var(--text-secondary); }
   @media (max-width: 520px) { .race-row .rl { width: 96px; font-size: 12px; } }
 </style>
@@ -363,12 +362,12 @@
         <div><h2>Who holds the world's reserves</h2><p class="sub" id="t-sub"></p></div>
       </div>
       <div class="map-tools">
-        <div class="control"><span class="lbl">Boxed by</span>
+        <div class="control"><span class="lbl">Show</span>
+          <div class="seg" id="t-view-seg"><button data-v="group">By group</button><button data-v="top">Top countries</button></div></div>
+        <div class="control"><span class="lbl">Group by</span>
           <div class="seg" id="t-group-seg"><button data-v="region">Region</button><button data-v="econ">Economy</button><button data-v="regime">Exchange rate</button></div></div>
-        <div class="control"><span class="lbl">Colour</span>
-          <div class="seg" id="t-color-seg"><button data-v="pct">% of GDP</button><button data-v="group">Group</button></div></div>
       </div>
-      <div id="t-chart" class="chart" style="height:620px"></div>
+      <div id="t-chart" class="chart"></div>
       <div class="map-legend" id="t-legend"></div>
     </section>
     <section class="card">
@@ -635,7 +634,7 @@ const state = {
   shView: "lines", shLog: false, amView: "stack", amLog: false,
   chFrom: "", chTo: "", chMetric: "bn", chCur: "USD", dtMetric: "share",
   raceMetric: "share", raceNoUSD: false, raceSpeed: "1", fxBase: "2016-Q4", fxCur: "USD",
-  cMeasure: "pct", cGold: "with", cYear: "latest", cSort: "v", cDir: "desc", tGroup: "region", tColor: "pct", cGroup: "econ", cFilter: "all", cLines: "countries", cAgg: "combined",
+  cMeasure: "pct", cGold: "with", cYear: "latest", cSort: "v", cDir: "desc", tGroup: "region", tView: "group", cGroup: "econ", cFilter: "all", cLines: "countries", cAgg: "combined",
   bY: "bn", bColor: "econ", bEcon: ["AE", "EM"], bReg: ["peg", "managed", "float"], bRegion: "all", bSpeed: "1", cSel: ["CHE", "HKG", "SAU", "CHN", "JPN", "USA"],
 };
 const LIST_KEYS = new Set(["cur", "cSel", "bEcon", "bReg"]);
@@ -663,7 +662,7 @@ function readHash() {
   if (!["econ", "region", "regime"].includes(state.bColor)) state.bColor = "econ";
   if (!["1", "2", "4"].includes(state.bSpeed)) state.bSpeed = "1";
   if (!["region", "econ", "regime"].includes(state.tGroup)) state.tGroup = "region";
-  if (!["pct", "group"].includes(state.tColor)) state.tColor = "pct";
+  if (!["group", "top"].includes(state.tView)) state.tView = "group";
   state.cSel = state.cSel.slice(0, 8);
 }
 function writeHash() {
@@ -1484,65 +1483,86 @@ function syncCountryControls() {
   document.getElementById("c-status").textContent = `${Object.keys(CC).length} countries; figures ${how}.`;
 }
 
-// ---- who holds the world's reserves: a treemap, one rectangle per country sized by its reserves in US$,
-// boxed by group and coloured by reserves as % of GDP or by group ----
-function drawTreemap() {
-  const el = document.getElementById("t-chart"), by = state.tGroup, G = GROUPINGS[by], byColor = state.tColor === "group";
+// ---- who holds the world's reserves: bars, either one per group split into its countries (US$), or the
+// largest holders ranked by the tab's measure; coloured by group ----
+const TOP_N = 30, SEGMENTS = 12;  // countries named in each group's bar; the rest are summed as "others"
+function drawGroupBars() {
+  const el = document.getElementById("t-chart"), by = state.tGroup, G = GROUPINGS[by], top = state.tView === "top";
+  setPressed(document.getElementById("t-view-seg"), state.tView);
   setPressed(document.getElementById("t-group-seg"), state.tGroup);
-  setPressed(document.getElementById("t-color-seg"), state.tColor);
   const asOf = state.cYear === "latest" ? "latest figures" : `end of ${state.cYear}`;
-  // every country with reserves in this selection, its amount (US$ bn) and, where known, its GDP
   const rows = Object.values(CC).map(c => {
     const pt = cPoint(c), a = cAmount(pt);
-    return fin(a) && a > 0 ? { c, pt, a, gdp: pt.gdp > 0 ? pt.gdp : null, g: groupOf(c.k, by) || "none" } : null;
+    return fin(a) && a > 0 ? { c, pt, a, v: cValue(pt), g: groupOf(c.k, by) || "none" } : null;
   }).filter(Boolean);
   if (!rows.length) return empty(el, "No figures for this selection.");
   const world = rows.reduce((s, r) => s + r.a, 0);
-  const pctOf = rs => { const w = rs.filter(r => r.gdp); return w.length ? w.reduce((s, r) => s + r.a, 0) / w.reduce((s, r) => s + r.gdp, 0) * 100 : null; };
   const cats = [...G.cats, { k: "none", name: "Not classified", color: "--other" }].filter(cat => rows.some(r => r.g === cat.k));
-  const ids = ["world"], labels = ["All countries"], parents = [""], values = [world], colors = [], cd = [], lw = [], lc = [];
+  const colorOf = k => css(cats.find(c => c.k === k)?.color || "--other");
   const fmtBn = v => v >= 1000 ? `$${fmt(v / 1000, 2)} tn` : `$${fmt(v, v < 10 ? 1 : 0)} bn`;
-  const node = (pct, share, color, home = false) => {
-    colors.push(byColor ? css(color) : fin(pct) ? Math.min(pct, 60) : null);
-    cd.push([fin(pct) ? `${fmt(pct, 1)}% of GDP` : "GDP not known", `${fmt(share, share < 1 ? 2 : 1)}% of the total`]);
-    lw.push(home ? 3.5 : 1); lc.push(css(home ? "--text-primary" : "--surface"));
-  };
-  node(pctOf(rows), 100, "--grid");
-  for (const cat of cats) {
-    const rs = rows.filter(r => r.g === cat.k), sum = rs.reduce((s, r) => s + r.a, 0);
-    ids.push(`g:${cat.k}`); labels.push(cat.name); parents.push("world"); values.push(sum);
-    node(pctOf(rs), sum / world * 100, cat.color);
-    for (const r of rs.sort((p, q) => q.a - p.a)) {
-      ids.push(r.c.k); labels.push(r.c.k === HOME ? `★ ${r.c.name}` : r.c.name); parents.push(`g:${cat.k}`); values.push(r.a);
-      node(r.gdp ? r.a / r.gdp * 100 : null, r.a / world * 100, cat.color, r.c.k === HOME);
+  const homeLine = k => css(k === HOME ? "--text-primary" : "--surface"), homeW = k => k === HOME ? 3 : 1.5;
+  document.getElementById("t-legend").innerHTML = cats.map(cat => `<span><span class="dot" style="background:${css(cat.color)}"></span>${esc(cat.name)}</span>`).join("");
+  if (top) {
+    // the largest holders by the tab's measure, and Norway at the bottom if it is not among them
+    const ranked = rows.filter(r => fin(r.v)).sort((p, q) => q.v - p.v), list = ranked.slice(0, TOP_N);
+    const home = ranked.find(r => r.c.k === HOME);
+    if (home && !list.includes(home)) list.push(home);
+    const rank = new Map(ranked.map((r, i) => [r.c.k, i + 1]));
+    const name = r => `${r.c.k === HOME ? "<b>★ " : ""}${rank.get(r.c.k)}. ${esc(r.c.name)}${r.c.k === HOME ? "</b>" : ""}`;
+    document.getElementById("t-sub").textContent = `The ${TOP_N} largest holders by ${state.cMeasure === "bn" ? "reserves in US$" : "reserves as % of GDP"} (${goldWords()}, ${asOf}), ` +
+      `coloured by ${G.label.toLowerCase()}${by === "regime" ? " (measured over the last two years)" : ""}${home && rank.get(HOME) > TOP_N ? `; Norway, number ${rank.get(HOME)}, at the bottom` : ""}. Click a bar to follow that country below.`;
+    el.style.height = `${list.length * 24 + 70}px`;
+    plot(el, [{
+      type: "bar", orientation: "h", y: list.map(name), x: list.map(r => r.v),
+      marker: { color: list.map(r => colorOf(r.g)), line: { color: list.map(r => homeLine(r.c.k)), width: list.map(r => r.c.k === HOME ? 3 : 0) } },
+      text: list.map(r => cFmt(r.v)), textposition: "outside", cliponaxis: false, textfont: { color: css("--text-secondary"), size: 12 },
+      customdata: list.map(r => [r.c.name, cats.find(c => c.k === r.g)?.name || "–", fmtBn(r.a), r.c.k]),
+      hovertemplate: "<b>%{customdata[0]}</b> (%{customdata[1]})<br>%{text} · %{customdata[2]}<extra></extra>",
+    }], baseLayout({ showlegend: false, bargap: 0.25, hovermode: "closest",
+      yaxis: { autorange: "reversed", showgrid: false, tickfont: { size: 12, color: css("--text-secondary") }, automargin: true },
+      xaxis: { showgrid: true, ticksuffix: state.cMeasure === "bn" ? "" : "%", tickprefix: state.cMeasure === "bn" ? "$" : "", tickformat: ",.0f", rangemode: "tozero" },
+      margin: { l: 8, r: 70, t: 8, b: 8 } }));
+  } else {
+    // one bar per group, split into its largest countries (and the rest as "others"), total at the end
+    const groups = cats.map(cat => {
+      const rs = rows.filter(r => r.g === cat.k).sort((p, q) => q.a - p.a);
+      return { cat, rs, tot: rs.reduce((s, r) => s + r.a, 0) };
+    }).sort((p, q) => q.tot - p.tot);
+    const names = groups.map(g => `<b>${esc(g.cat.name)}</b>`);
+    const traces = [];
+    for (let i = 0; i <= SEGMENTS; i++) {
+      // segment i of every bar: the i-th largest country, or after SEGMENTS of them the others together
+      const seg = groups.map(g => {
+        // Norway always gets a segment of its own
+        const named = g.rs.slice(0, SEGMENTS), home = g.rs.find(r => r.c.k === HOME);
+        if (home && !named.includes(home)) named[SEGMENTS - 1] = home;
+        if (i < SEGMENTS) { const r = named[i]; return r ? { a: r.a, k: r.c.k, name: r.c.name } : null; }
+        const rest = g.rs.filter(r => !named.includes(r));
+        return rest.length ? { a: rest.reduce((s, r) => s + r.a, 0), k: "", name: `${rest.length} others` } : null;
+      });
+      traces.push({
+        type: "bar", orientation: "h", y: names, x: seg.map(s => s ? s.a : null),
+        marker: { color: groups.map((g, j) => seg[j]?.k === "" ? css("--axis") : css(g.cat.color)),
+          line: { color: seg.map(s => homeLine(s?.k)), width: seg.map(s => s?.k === HOME ? 3 : 1.5) } },
+        text: seg.map(s => s ? (s.k === HOME ? `★ ${s.name}` : s.name) : ""), textposition: "inside", insidetextanchor: "middle", textangle: 0,
+        insidetextfont: { size: 12, color: seg.map((s, j) => s?.k === "" ? css("--text-primary") : "#ffffff") },
+        customdata: seg.map((s, j) => s ? [s.name, fmtBn(s.a), `${fmt(s.a / groups[j].tot * 100, 1)}% of the group`, `${fmt(s.a / world * 100, 1)}% of the total`, s.k] : null),
+        hovertemplate: "<b>%{customdata[0]}</b><br>%{customdata[1]} · %{customdata[2]} · %{customdata[3]}<extra></extra>",
+      });
     }
+    document.getElementById("t-sub").textContent = `Reserves in US$ (${goldWords()}, ${asOf}) by ${G.label.toLowerCase()}${by === "regime" ? " (measured over the last two years)" : ""}: ` +
+      `each bar split into its ${SEGMENTS} largest holders and the rest. ${rows.length} countries, ${fmtBn(world)} in all. Click a segment to follow that country below.`;
+    el.style.height = `${groups.length * 64 + 70}px`;
+    plot(el, traces, baseLayout({ barmode: "stack", bargap: 0.3, showlegend: false, hovermode: "closest", uniformtext: { minsize: 10, mode: "hide" },
+      yaxis: { autorange: "reversed", showgrid: false, tickfont: { size: 13.5, color: css("--text-primary") }, automargin: true },
+      xaxis: { showgrid: true, tickprefix: "$", tickformat: ",.0f", title: { text: "US$ billions", font: { size: 12, color: css("--text-muted") } } },
+      annotations: groups.map((g, j) => ({ y: names[j], x: g.tot, text: `<b>${fmtBn(g.tot)}</b> · ${fmt(g.tot / world * 100, 1)}%`, showarrow: false,
+        xanchor: "left", xshift: 8, font: { size: 13, color: css("--text-primary") } })),
+      margin: { l: 8, r: 130, t: 8, b: 8 } }));
   }
-  if (byColor) colors[0] = css("--grid");
-  document.getElementById("t-sub").textContent = `Each rectangle is a country, its area its reserves in US$ (${goldWords()}, ${asOf}), boxed by ${G.label.toLowerCase()}` +
-    `${by === "regime" ? " (measured over the last two years)" : ""}; ` + (byColor ? "coloured by group. " : "colour: reserves as % of GDP (stopping at 60%). ") +
-    `${rows.length} countries, ${fmtBn(world)} in all. Click a group to zoom in (and the bar above it to zoom out), a country to follow it below.`;
-  plot(el, [{
-    type: "treemap", ids, labels, parents, values, branchvalues: "total", sort: true,
-    customdata: cd.map((x, i) => [fmtBn(values[i]), ...x, ids[i]]),
-    // group headers large and bold, with the group's total on the same line; countries as before
-    // the tiniest countries have no text (it would be unreadable); hover still shows them
-    texttemplate: ids.map((id, i) => id.startsWith("g:") ? "<b>%{label}</b>   %{customdata[0]} · %{customdata[2]}" : id === "world" ? "<b>%{label}</b>"
-      : values[i] / world >= 0.0015 ? "<b>%{label}</b><br>%{customdata[0]}<br>%{customdata[1]}" : ""),
-    hovertemplate: "<b>%{label}</b><br>%{customdata[0]} · %{customdata[2]}<br>%{customdata[1]}<extra></extra>",
-    marker: byColor ? { colors, line: { width: lw, color: lc }, pad: { t: 30, l: 3, r: 3, b: 3 } } : {
-      pad: { t: 30, l: 3, r: 3, b: 3 }, colors: colors.map(v => v ?? 0), colorscale: [0, 0.25, 0.5, 0.75, 1].map((p, i) => [p, css(`--seq-${i + 1}`)]), cmin: 0, cmax: 60, showscale: true,
-      line: { width: lw, color: lc },
-      colorbar: { orientation: "h", thickness: 8, len: 0.42, x: 0.5, xanchor: "center", y: -0.04, yanchor: "top", outlinewidth: 0,
-        tickvals: [0, 15, 30, 45, 60], ticktext: ["0%", "15%", "30%", "45%", "60%+ of GDP"], tickfont: { color: css("--text-muted"), size: 11 } } },
-    textfont: { family: 'system-ui, -apple-system, "Segoe UI", sans-serif', size: ids.map(id => id.startsWith("g:") ? 17 : 13) },
-    pathbar: { visible: true, textfont: { size: 13 } }, tiling: { packing: "squarify", pad: 3 }, root: { color: "rgba(0,0,0,0)" },
-  }], baseLayout({ margin: { l: 0, r: 0, t: 28, b: byColor ? 0 : 36 }, showlegend: false,
-    uirevision: `${by}|${state.cGold}|${state.cYear}` }));
-  document.getElementById("t-legend").innerHTML = byColor ? cats.map(cat => `<span><span class="dot" style="background:${css(cat.color)}"></span>${esc(cat.name)}</span>`).join("") : "";
   if (!el._tBound) {
     el._tBound = true;
-    // a country adds it to the chart over time; a group zooms in as usual
-    el.on("plotly_treemapclick", ev => { const k = ev.points?.[0]?.id; if (k && /^[A-Z]{3}$/.test(k)) { toggleCountry(k, true); return false; } });
+    el.on("plotly_click", ev => { const cd = ev.points?.[0]?.customdata, k = cd?.[cd.length - 1]; if (k && /^[A-Z]{3}$/.test(k)) toggleCountry(k, true); });
   }
 }
 
@@ -1708,7 +1728,7 @@ function drawCountryLines() {
       connectgaps: true, line: { color: cColor(k), width: k === HOME ? 4 : 2 }, marker: { size: k === HOME ? 7 : 5, color: cColor(k) },
       hovertemplate: `%{y:,.${state.cMeasure === "bn" ? 0 : 1}f}${state.cMeasure === "bn" ? " bn" : "%"}<extra>${esc(CC[k].name)}</extra>` };
   });
-  if (!traces.length) return empty(el, "Pick a country in the ranking, in the treemap or in the list above.");
+  if (!traces.length) return empty(el, "Pick a country in the ranking, in the bars or in the list above.");
   const xs = traces.flatMap(t => t.x).sort();
   plot(el, traces, baseLayout({ hovermode: "x unified", xaxis: { hoverformat: "%Y Q%q", range: [xs[0], xs.at(-1)] },
     yaxis: state.cMeasure === "bn" ? { tickprefix: "$", tickformat: ",.0f", rangemode: "tozero" } : { ticksuffix: "%", rangemode: "tozero" },
@@ -1716,7 +1736,7 @@ function drawCountryLines() {
 }
 function renderCountries() {
   if (!CC) assembleCountries();
-  syncCountryControls(); drawTreemap(); drawGroups(); drawBubbles(); renderCountryTable(); drawCountryLines();
+  syncCountryControls(); drawGroupBars(); drawGroups(); drawBubbles(); renderCountryTable(); drawCountryLines();
   if (cLive.state === "idle") loadCountriesLive();
 }
 async function loadCountriesLive() {
@@ -1754,10 +1774,10 @@ document.getElementById("c-gold-seg").addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b) return;
   state.cGold = b.dataset.v; writeHash(); renderCountries();
 });
-for (const [id, key] of [["t-group-seg", "tGroup"], ["t-color-seg", "tColor"]])
+for (const [id, key] of [["t-group-seg", "tGroup"], ["t-view-seg", "tView"]])
   document.getElementById(id).addEventListener("click", e => {
     const b = e.target.closest("button"); if (!b) return;
-    state[key] = b.dataset.v; writeHash(); drawTreemap();
+    state[key] = b.dataset.v; writeHash(); drawGroupBars();
   });
 document.getElementById("c-group-seg").addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b) return;
