@@ -797,6 +797,13 @@ const legendCfg = () => ({ ...baseLayout().legend, itemclick: "toggle", itemdoub
 const shownIn = kind => state[`${kind}Show`];
 const visOf = (kind, k) => shownIn(kind).length && !shownIn(kind).includes(k) ? "legendonly" : true;
 function applyShown(kind, traces) { for (const t of traces) if (t.meta) t.visible = visOf(kind, t.meta); return traces; }
+// Plotly can lose a stacked layer's fill when it is switched back on in place, so a change in which
+// currencies are shown redraws the chart from scratch
+function freshIfShownChanged(kind, el) {
+  const key = `${kind === "sh" ? state.shView : state.amView}|${shownIn(kind).join(",")}`;
+  if (el._shownKey !== undefined && el._shownKey !== key && el.data) Plotly.purge(el);
+  el._shownKey = key;
+}
 function pickCurrency(kind, k, additive) {
   const el = document.getElementById(`${kind}-chart`), all = (el.data || []).map(t => t.meta).filter(Boolean);
   let cur = shownIn(kind).filter(x => all.includes(x));
@@ -853,6 +860,7 @@ function drawShares() {
   if (el._multi) { el._multi = false; el.style.height = ""; Plotly.purge(el); }
   if (state.shView === "stack") {
     const all = ks.length >= 9 && !state.shShow.length;
+    freshIfShownChanged("sh", el);
     plot(el, applyShown("sh", series.map(s => areaTrace(s.k, x, s.y, "%", 2))), baseLayout({
       hovermode: "x unified", xaxis: { hoverformat: hoverX() }, shapes: [selShape()], legend: legendCfg(),
       yaxis: { ticksuffix: "%", range: all ? [0, 100] : undefined, rangemode: "tozero" } }));
@@ -931,6 +939,7 @@ function drawAmounts() {
       line: { color: css("--surface"), width: 1 }, fillcolor: css("--unalloc"), hovertemplate: "%{y:,.0f} bn<extra>Unallocated</extra>" });
   } else traces = series.map(s => lineTrace(s.k, x, s.y, " bn", 0));
   applyShown("am", traces);
+  if (stack) freshIfShownChanged("am", el);
   const on = traces.filter(t => t.visible === true);
   plot(el, traces, baseLayout({
     hovermode: "x unified", xaxis: { hoverformat: hoverX() }, shapes: [selShape()], legend: legendCfg(),
