@@ -16,6 +16,7 @@ appears without running this script again.
 """
 
 import json
+import math
 import sys
 import urllib.request
 import webbrowser
@@ -47,6 +48,14 @@ COUNTRY_URLS = {
     # three years, to measure how each currency behaves (pegged, managed or floating)
     "erM": "https://api.imf.org/external/sdmx/3.0/data/dataflow/IMF.STA/ER/+/*.XDC_USD.EOP_RT.M?c%5BTIME_PERIOD%5D=ge:{start}",
 }
+# The full monthly history of the same exchange rates (about 14 MB), used only here, to measure each
+# country's exchange-rate regime year by year (the page then needs only the result).
+ER_HISTORY_URL = "https://api.imf.org/external/sdmx/3.0/data/dataflow/IMF.STA/ER/+/*.XDC_USD.EOP_RT.M"
+# The year each euro-area member adopted the euro; from then on it floats with the euro.
+EURO_SINCE = {"AUT": 1999, "BEL": 1999, "FIN": 1999, "FRA": 1999, "DEU": 1999, "IRL": 1999, "ITA": 1999, "LUX": 1999,
+              "NLD": 1999, "PRT": 1999, "ESP": 1999, "GRC": 2001, "SVN": 2007, "CYP": 2008, "MLT": 2008, "SVK": 2009,
+              "EST": 2011, "LVA": 2014, "LTU": 2015, "HRV": 2023, "BGR": 2026}
+DEM_PER_EUR = 1.95583
 # The IMF's grouping of countries in the World Economic Outlook: advanced economies (including the
 # euro area) and emerging and developing economies by region.
 GROUPS_URL = "https://api.imf.org/external/sdmx/3.0/structure/hierarchy/IMF.RES/H_WEO_COUNTRIES/+"
@@ -106,6 +115,64 @@ def monthly_rates(text: str) -> dict:
     return out
 
 
+def classify(usd: list, eur: list) -> str:
+    """One window of 25 end-of-month rates (domestic currency per US dollar, and per euro) -> "P" pegged,
+    "M" managed or "F" floating. The same rule as measureRegimes() in the template: pegged if within a
+    2% range against the dollar or the euro; managed if in at least half of the 6-month windows the rate
+    stays within a 2% band around its trend against the dollar or a 50/50 dollar-euro basket."""
+    def span(xs):
+        v = [math.log(x) for x in xs]
+        return (math.exp(max(v) - min(v)) - 1) * 100
+
+    def banded(xs):
+        v = [math.log(x) for x in xs]
+        ok = n = 0
+        for i in range(len(v) - 6):
+            w = v[i:i + 7]
+            my = sum(w) / 7
+            b = sum((x - 3) * (y - my) for x, y in enumerate(w)) / 28
+            res = [y - (my + b * (x - 3)) for x, y in enumerate(w)]
+            n += 1
+            ok += (max(res) - min(res)) * 100 <= 2
+        return ok / n if n else 0
+
+    if span(usd) <= 2 or span(eur) <= 2:
+        return "P"
+    basket = [u / e ** 0.5 for u, e in zip(usd, [u / x for u, x in zip(usd, eur)])]
+    return "M" if max(banded(usd), banded(basket)) >= 0.5 else "F"
+
+
+def regime_history(text: str, first_year: int = 1980) -> dict:
+    """Each country's measured regime at the end of every year since first_year, from the 25 months up to
+    then: {country: "PPMMF-F..."} ("-" where there are too few rates)."""
+    rates = monthly_rates(text)
+    eur = dict(rates.get("G163", {}))  # euros per dollar; before 1999 the Deutsche mark at the euro's rate
+    for m, v in rates.get("DEU", {}).items():
+        if m < "1999-M01":
+            eur[m] = v / DEM_PER_EUR
+    months = sorted(eur)
+    last = int(months[-1][:4])
+    out = {}
+    for c, rs in rates.items():
+        if not (len(c) == 3 and c.isalpha()):
+            continue
+        have = [m for m in months if m in rs]
+        code = ""
+        for y in range(first_year, last + 1):
+            # the dollar, the euro, and the Deutsche mark (the euro's stand-in before 1999) are the anchors
+            if c in ("USA", "DEU") or EURO_SINCE.get(c, 9999) <= y:
+                code += "F"
+                continue
+            ms = [m for m in have if m <= f"{y}-M12"][-25:]
+            if len(ms) < 19 or ms[-1] < f"{y}-M01":
+                code += "-"
+                continue
+            code += classify([rs[m] for m in ms], [rs[m] / eur[m] for m in ms])
+        if code.strip("-"):
+            out[c] = code
+    return {"from": first_year, "codes": out}
+
+
 def country_groups(text: str) -> dict:
     """The WEO hierarchy -> {"econ": {country: "AE" or "EM"}, "region": {country: group}, "euro": [...]}."""
     world = json.loads(text)["data"]["hierarchies"][0]["hierarchicalCodes"][0]
@@ -138,7 +205,8 @@ def countries(raw: dict) -> dict:
     q, a, weo = series(raw["iipQ"]), series(raw["iipA"]), series(raw["weo"])
     data = {"resQ": q.get("R", {}), "goldQ": q.get("R_F11_MV", {}), "resA": a.get("R", {}),
             "goldA": a.get("R_F11_MV", {}),
-            "gdp": weo.get("NGDPD", {}), "rates": monthly_rates(raw["erM"]), "groups": country_groups(raw["groups"])}
+            "gdp": weo.get("NGDPD", {}), "rates": monthly_rates(raw["erM"]), "groups": country_groups(raw["groups"]),
+            "regHist": regime_history(raw["erHist"])}
     used = set().union(*(data[k].keys() for k in ("resQ", "resA", "goldQ", "goldA", "gdp")))
     names = country_names(raw["names"])
     data["names"] = {k: names.get(k, k) for k in sorted(used)}
@@ -160,11 +228,13 @@ def main():
         raw = {k: (RAW.parent / f"{k}.csv").read_text(encoding="utf-8") for k in COUNTRY_URLS}
         raw["names"] = (RAW.parent / "names.json").read_text(encoding="utf-8")
         raw["groups"] = (RAW.parent / "groups.json").read_text(encoding="utf-8")
+        raw["erHist"] = (RAW.parent / "erHist.csv").read_text(encoding="utf-8")
         status = json.loads(STATUS.read_text(encoding="utf-8")) if STATUS.exists() else {}
     else:
         text, er = download(DATA_URL), download(ER_URL)
         start = f"{datetime.now().year - 3}-M{datetime.now().month:02d}"
         raw = {k: download(url.format(start=start)) for k, url in COUNTRY_URLS.items()}
+        raw["erHist"] = download(ER_HISTORY_URL)
         for k, url in (("names", NAMES_URL), ("groups", GROUPS_URL)):
             with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "cofer-dashboard"}), timeout=120) as res:
                 raw[k] = res.read().decode("utf-8")

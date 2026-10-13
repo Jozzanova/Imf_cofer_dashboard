@@ -391,6 +391,12 @@
           <div><h2 id="c-line-title">Over time</h2><p class="sub" id="c-line-sub"></p></div>
           <select id="c-add" aria-label="Add a country"></select>
         </div>
+        <div class="row" style="margin-bottom:8px">
+          <div class="control"><span class="lbl">Show</span>
+            <div class="seg" id="c-lines-seg" role="group" aria-label="Show"><button data-v="countries">Chosen countries</button><button data-v="econ">Advanced vs emerging</button><button data-v="region">Regions</button><button data-v="regime">Exchange-rate regimes</button></div></div>
+          <div class="control" id="c-agg-control"><span class="lbl">Per group</span>
+            <div class="seg" id="c-agg-seg" role="group" aria-label="Per group"><button data-v="combined">Combined</button><button data-v="median">Median country</button></div></div>
+        </div>
         <div class="chips" id="c-chips"></div>
         <div id="c-line" class="chart" style="height:440px"></div>
       </section>
@@ -482,7 +488,10 @@
           These are national totals, not their currency composition: the IMF publishes that only for the world as a whole.
           Advanced and emerging economies and the regions are the World Economic Outlook's groups. Exchange-rate regimes are measured from
           end-of-month exchange rates over the last two years (see the note under "Compare groups"); with monthly data a few currencies
-          can land in a neighbouring category to the IMF's official one.</li>
+          can land in a neighbouring category to the IMF's official one. For the groups over time, each year uses the two years of exchange
+          rates up to its end (from the IMF's full monthly history; before 1999 the Deutsche mark, at the euro's conversion rate, stands in for
+          the euro), and euro-area members count as floating from the year they adopted the euro. Advanced and emerging economies and regions
+          use today's IMF groups for every year.</li>
         <li><b>Live data:</b> each time the page opens it asks the IMF's API for the current COFER release, so new quarters and revisions appear
           without rebuilding it. If the IMF cannot be reached, the page shows the copy it was built with. The IMF publishes COFER once a
           quarter, about three months after the quarter ends, and revises earlier figures when countries revise theirs.</li>
@@ -589,7 +598,7 @@ const state = {
   shView: "lines", shLog: false, amView: "stack", amLog: false,
   chFrom: "", chTo: "", chMetric: "bn", chCur: "USD", dtMetric: "share",
   raceMetric: "share", raceNoUSD: false, raceSpeed: "1", fxBase: "2016-Q4", fxCur: "USD",
-  cMeasure: "pct", cGold: "with", cYear: "latest", cSort: "v", cDir: "desc", cColor: "value", cGroup: "econ", cFilter: "all", cSel: ["CHE", "HKG", "SAU", "CHN", "JPN", "USA"],
+  cMeasure: "pct", cGold: "with", cYear: "latest", cSort: "v", cDir: "desc", cColor: "value", cGroup: "econ", cFilter: "all", cLines: "countries", cAgg: "combined", cSel: ["CHE", "HKG", "SAU", "CHN", "JPN", "USA"],
 };
 const LIST_KEYS = new Set(["cur", "cSel"]);
 const TABS = ["shares", "amounts", "changes", "data", "countries", "explore"];
@@ -609,6 +618,8 @@ function readHash() {
   if (!["pct", "bn"].includes(state.cMeasure)) state.cMeasure = "pct";
   if (!["with", "without", "only"].includes(state.cGold)) state.cGold = "with";
   if (!["econ", "region", "regime"].includes(state.cGroup)) state.cGroup = "econ";
+  if (!["countries", "econ", "region", "regime"].includes(state.cLines)) state.cLines = "countries";
+  if (!["combined", "median"].includes(state.cAgg)) state.cAgg = "combined";
   if (!["value", "group"].includes(state.cColor)) state.cColor = "value";
   state.cSel = state.cSel.slice(0, 8);
 }
@@ -1548,8 +1559,65 @@ function renderCountryTable() {
   document.getElementById("c-table-sub").textContent = `${rows.length} countries, ${goldWords()}. Click a column to sort it, a country to add it to the chart.`;
   // the rank is within the countries shown
 }
+// a country's regime at the end of a year, from the history measured in update.py (the latest year
+// falls back to the live measurement)
+function regimeIn(k, y) {
+  const h = CD.regHist, code = h?.codes?.[k]?.[y - h.from];
+  return ({ P: "peg", M: "managed", F: "float" })[code] ?? (y >= new Date().getFullYear() - 1 ? REGIMES[k]?.r ?? null : null);
+}
+// reserves of groups of countries, year by year: combined (total reserves over total GDP, or the total in
+// US$) or the median country; regimes as measured in each year, so countries move between groups
+function drawGroupLines(el) {
+  const by = state.cLines, G = GROUPINGS[by], bn = state.cMeasure === "bn", median = !bn && state.cAgg === "median";
+  const lastYear = +CC_LATEST.slice(0, 4), years = [];
+  for (let y = 1980; y <= lastYear; y++) years.push(y);
+  const at = (c, y) => {
+    if (y < lastYear) return c.pts.find(pt => pt.p === `${y}-Q4`) || null;
+    let best = null; for (const pt of c.pts) if (pt.p.startsWith(`${y}-`)) best = pt;  // this year: the latest quarter
+    return best;
+  };
+  const countries = Object.values(CC);
+  const traces = G.cats.map(cat => {
+    const x = [], y = [], n = [];
+    for (const yr of years) {
+      const vals = [];
+      let amt = 0, gdp = 0, cnt = 0;
+      for (const c of countries) {
+        if ((by === "regime" ? regimeIn(c.k, yr) : groupOf(c.k, by)) !== cat.k) continue;
+        const pt = at(c, yr), a = cAmount(pt);
+        if (!fin(a)) continue;
+        if (bn) { amt += a; cnt++; continue; }
+        if (!(fin(pt.gdp) && pt.gdp > 0)) continue;
+        amt += a; gdp += pt.gdp; cnt++; vals.push(a / pt.gdp * 100);
+      }
+      if (cnt < 3) continue;
+      vals.sort((p, q) => p - q);
+      const m = vals.length % 2 ? vals[(vals.length - 1) / 2] : (vals[vals.length / 2 - 1] + vals[vals.length / 2]) / 2;
+      x.push(`${yr}-12-31`); y.push(bn ? amt : median ? m : amt / gdp * 100); n.push(cnt);
+    }
+    return { type: "scatter", mode: "lines", name: cat.name, x, y, customdata: n, line: { color: css(cat.color), width: 2.5 },
+      hovertemplate: `%{y:,.${bn ? 0 : 1}f}${bn ? " bn" : "%"} · %{customdata} countries<extra>${esc(cat.name)}</extra>` };
+  }).filter(t => t.x.length);
+  document.getElementById("c-line-title").textContent = `${bn ? "Reserves" : "Reserves as a share of GDP"} by ${G.label.toLowerCase()}, year by year`;
+  document.getElementById("c-line-sub").textContent = `${bn ? "Total, US$ billions" : median ? "The median country's % of GDP" : "Combined: the group's total reserves ÷ its total GDP"}, ${goldWords()}, at each year's end. ` +
+    (by === "regime" ? "Each country counts in the regime its currency had that year (measured from the two years of exchange rates up to then), so countries move between groups. "
+      : "Today's IMF groups for every year. ") +
+    "The number of reporting countries grows over time, which makes totals jump; hover for the count.";
+  if (!traces.length) return empty(el, "No figures for this selection.");
+  const xs = traces.flatMap(t => t.x).sort();
+  plot(el, traces, baseLayout({ hovermode: "x unified", xaxis: { hoverformat: "%Y", range: [xs[0], xs.at(-1)] },
+    yaxis: bn ? { tickprefix: "$", tickformat: ",.0f", rangemode: "tozero" } : { ticksuffix: "%", rangemode: "tozero" },
+    annotations: directLabels(traces), margin: { l: 8, r: traces.length <= 4 ? 190 : 8, t: 8, b: 8 } }));
+}
 function drawCountryLines() {
   const el = document.getElementById("c-line");
+  const groups = state.cLines !== "countries";
+  setPressed(document.getElementById("c-lines-seg"), state.cLines);
+  setPressed(document.getElementById("c-agg-seg"), state.cAgg);
+  document.getElementById("c-agg-control").hidden = !groups || state.cMeasure === "bn";
+  document.getElementById("c-add").hidden = groups;
+  document.getElementById("c-chips").hidden = groups;
+  if (groups) return drawGroupLines(el);
   document.getElementById("c-line-title").textContent = state.cMeasure === "bn" ? "Reserves over time" : "Reserves as a share of GDP over time";
   document.getElementById("c-line-sub").textContent = `${cUnit()}, ${goldWords()}; quarterly where the country reports quarterly, otherwise at each year's end.`;
   document.getElementById("c-chips").innerHTML = state.cSel.filter(k => CC[k]).map(k =>
@@ -1561,7 +1629,8 @@ function drawCountryLines() {
       hovertemplate: `%{y:,.${state.cMeasure === "bn" ? 0 : 1}f}${state.cMeasure === "bn" ? " bn" : "%"}<extra>${esc(CC[k].name)}</extra>` };
   });
   if (!traces.length) return empty(el, "Pick a country in the ranking, on the map or in the list above.");
-  plot(el, traces, baseLayout({ hovermode: "x unified", xaxis: { hoverformat: "%Y Q%q" },
+  const xs = traces.flatMap(t => t.x).sort();
+  plot(el, traces, baseLayout({ hovermode: "x unified", xaxis: { hoverformat: "%Y Q%q", range: [xs[0], xs.at(-1)] },
     yaxis: state.cMeasure === "bn" ? { tickprefix: "$", tickformat: ",.0f", rangemode: "tozero" } : { ticksuffix: "%", rangemode: "tozero" },
     annotations: directLabels(traces), margin: { l: 8, r: traces.length <= 4 ? 110 : 8, t: 8, b: 8 } }));
 }
@@ -1581,7 +1650,7 @@ async function loadCountriesLive() {
       return res.text();
     }));
     const [q, a, w] = texts.slice(0, 3).map(sdmxSeries), rates = sdmxRates(texts[3]);
-    const fresh = { names: CD.names, groups: CD.groups, resQ: q.R || {}, goldQ: q.R_F11_MV || {}, resA: a.R || {}, goldA: a.R_F11_MV || {},
+    const fresh = { names: CD.names, groups: CD.groups, regHist: CD.regHist, resQ: q.R || {}, goldQ: q.R_F11_MV || {}, resA: a.R || {}, goldA: a.R_F11_MV || {},
       gdp: w.NGDPD || {}, rates: rates.G163 ? rates : CD.rates };
     if (!Object.keys(fresh.resQ).length || !Object.keys(fresh.gdp).length) throw new Error("the IMF's answer had no figures");
     CD = fresh; CC = null;
@@ -1611,6 +1680,14 @@ document.getElementById("c-color-seg").addEventListener("click", e => {
 document.getElementById("c-group-seg").addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b) return;
   state.cGroup = b.dataset.v; writeHash(); syncCountryControls(); drawGroups(); if (state.cColor === "group") drawCountryMap();
+});
+document.getElementById("c-lines-seg").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  state.cLines = b.dataset.v; writeHash(); drawCountryLines();
+});
+document.getElementById("c-agg-seg").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  state.cAgg = b.dataset.v; writeHash(); drawCountryLines();
 });
 document.getElementById("c-filter").addEventListener("change", e => { state.cFilter = e.target.value; writeHash(); renderCountryTable(); });
 document.getElementById("c-year").addEventListener("change", e => { state.cYear = e.target.value; writeHash(); renderCountries(); });
