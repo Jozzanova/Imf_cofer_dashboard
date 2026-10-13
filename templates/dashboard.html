@@ -184,6 +184,7 @@
   .gb-head { display: flex; align-items: center; gap: 8px; font-size: 15px; }
   .gb-head b { flex: 1; font-weight: 650; }
   .gb-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 10px 0 8px; }
+  .gb-scroll { max-height: calc(15 * 21px + 12px); overflow-y: auto; overscroll-behavior: contain; border-bottom: 1px solid var(--grid); }
   .gb-stats { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12.5px; color: var(--text-secondary); margin-bottom: 4px; }
   .gb-stats b { color: var(--text-primary); font-weight: 650; }
   .gb-add { font: inherit; font-size: 15px; font-weight: 600; min-height: 180px; border: 2px dashed var(--axis); border-radius: 10px;
@@ -1508,7 +1509,7 @@ const geoAt = {};
 for (const [g, list] of Object.entries(ADVANCED_GEO)) for (const k of list.split(" ")) geoAt[k] = g;
 const geoOf = k => CD.groups?.econ?.[k] === "AE" ? geoAt[k] ?? null : EM_GEO[CD.groups?.region?.[k]] ?? null;
 const REG_NAMES = { peg: "pegged", managed: "managed", float: "floating" };
-const GB_COLORS = ["--s1", "--s2", "--s3", "--s4"], GB_MAX = 4, GB_BARS = 40;
+const GB_COLORS = ["--s1", "--s2", "--s3", "--s4"], GB_MAX = 4, GB_ROW = 21;  // px per bar; the window shows 15 (CSS .gb-scroll)
 // the groups, kept in the URL as region_economy_regimes, e.g. "eu_all_float~eu_all_peg.managed"
 function gbGroups() {
   const out = String(state.gb || "").split("~").map(t => {
@@ -1542,7 +1543,7 @@ function drawBuilder() {
         <div class="chips gb-reg">${Object.entries(REG_NAMES).map(([v, t]) => `<button class="chip" type="button" data-v="${v}" aria-pressed="${g.reg.includes(v)}">${t[0].toUpperCase() + t.slice(1)}</button>`).join("")}</div>
       </div>
       <div class="gb-stats"></div>
-      <div class="gb-chart"></div>
+      <div class="gb-scroll"><div class="gb-chart"></div></div>
     </section>`).join("") +
     (gs.length < GB_MAX ? `<button class="gb-add" type="button" id="gb-add">+ Add a group</button>` : "");
   const stats = [];
@@ -1559,10 +1560,10 @@ function drawBuilder() {
         (combined != null ? `<span>combined <b>${fmt(combined, 1)}%</b> of GDP</span>` : "")
       : "<span>No countries match.</span>";
     if (!n) { empty(el, "No country with figures matches this group."); el.style.height = "120px"; return; }
-    const list = rows.slice(0, GB_BARS), home = rows.find(r => r.c.k === HOME);
-    if (home && !list.includes(home)) list.push(home);
-    const more = rows.length - GB_BARS;
-    el.style.height = `${list.length * 21 + 48}px`;
+    // every country of the group; the window around the chart scrolls after 15
+    const list = rows;
+    el.style.height = `${list.length * GB_ROW + 12}px`;
+    el.parentElement.scrollTop = 0;
     plot(el, [{
       type: "bar", orientation: "h", y: list.map(r => r.c.k === HOME ? `<b>★ ${esc(r.c.name)}</b>` : esc(r.c.name)), x: list.map(r => r.v),
       marker: { color: list.map(r => r.c.k === HOME ? css("--text-primary") : css(GB_COLORS[i])), opacity: 0.9 },
@@ -1571,11 +1572,9 @@ function drawBuilder() {
       hovertemplate: "<b>%{customdata[0]}</b><br>%{text} · %{customdata[2]}<br>%{customdata[1]}<extra></extra>",
     }], baseLayout({ showlegend: false, bargap: 0.22, hovermode: "closest",
       yaxis: { autorange: "reversed", showgrid: false, tickfont: { size: 11.5, color: css("--text-secondary") }, automargin: true },
-      xaxis: { showgrid: true, rangemode: "tozero", ticksuffix: bn ? "" : "%", tickprefix: bn ? "$" : "", tickformat: ",.0f",
-        type: bn ? "log" : "linear" },
-      margin: { l: 8, r: 60, t: 4, b: 8 },
-      annotations: more > 0 ? [{ text: `and ${more} more`, xref: "paper", yref: "paper", x: 1, y: 0, xanchor: "right", yanchor: "bottom",
-        showarrow: false, font: { size: 11, color: css("--text-muted") } }] : [] }));
+      // no scale: every bar has its value written on it, and a scale would scroll out of view
+      xaxis: { showgrid: false, showticklabels: false, zeroline: false, rangemode: "tozero", type: bn ? "log" : "linear" },
+      margin: { l: 8, r: 60, t: 4, b: 4 } }));
     if (!el._bound) { el._bound = true; el.on("plotly_click", ev => { const k = ev.points?.[0]?.customdata?.[3]; if (k) toggleCountry(k, true); }); }
   });
   drawBuilderTime(gs);
