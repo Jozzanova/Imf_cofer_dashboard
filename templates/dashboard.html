@@ -169,6 +169,8 @@
   .race { position: relative; margin-top: 10px; transition: height .3s; --race-ms: 520ms; }
   .race-row { position: absolute; left: 0; right: 0; top: 0; height: 28px; display: flex; align-items: center; gap: 10px;
     transition: transform var(--race-ms) ease, opacity .4s; }
+  .race-row { cursor: pointer; }
+  .race-row.sel .rl { color: var(--text-primary); font-weight: 700; }
   .race-row .rl { width: 140px; flex: none; text-align: right; color: var(--text-secondary); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .race-row .rt { flex: 1; position: relative; height: 100%; min-width: 0; }
   .race-row .rb { height: 100%; border-radius: 0 4px 4px 0; transition: width var(--race-ms) ease; min-width: 2px; }
@@ -665,17 +667,17 @@ const state = {
   tab: "shares", cur: CURS.map(c => c.k), freq: "Q", period: "all",
   shView: "lines", shLog: false, amView: "stack", amLog: false, sel: "", shShow: [], amShow: [],
   chFrom: "", chTo: "", chMetric: "bn", chCur: "USD", dtMetric: "share", dtSet: "cur", dtYear: "latest",
-  raceMetric: "share", raceNoUSD: false, raceSpeed: "1", fxBase: "2016-Q4", fxCur: "USD",
+  raceMetric: "share", raceNoUSD: false, raceSpeed: "1", fxBase: "2016-Q4", fxCur: "USD", flShow: [], fxShow: [],
   cMeasure: "pct", cGold: "with", cYear: "latest", cSort: "v", cDir: "desc", gb: "eu_AE_float~eu_AE_peg", cGroup: "regime", cFilter: "all", cLines: "regime", cAgg: "combined", gScale: "log",
   bY: "bn", bColor: "regime", bEcon: ["AE"], bReg: ["peg", "managed", "float"], bRegion: "all", bSpeed: "4", bLabels: "10", cSel: ["CHE", "HKG", "SAU", "CHN", "JPN", "USA"],
 };
-const LIST_KEYS = new Set(["cur", "cSel", "bEcon", "bReg", "shShow", "amShow"]);
+const LIST_KEYS = new Set(["cur", "cSel", "bEcon", "bReg", "shShow", "amShow", "flShow", "fxShow"]);
 const TABS = ["shares", "changes", "countries", "explore", "data"];
 function readHash() {
   const p = new URLSearchParams(location.hash.slice(1));
   for (const [k, v] of p) {
     if (!(k in state)) continue;
-    if (LIST_KEYS.has(k)) state[k] = v ? v.split(",").filter(x => k === "cur" || k === "shShow" ? CUR[x] : k === "amShow" ? CUR[x] || x === "UN" : k === "cSel" ? /^[A-Z]{3}$/.test(x) : /^\w+$/.test(x)) : [];
+    if (LIST_KEYS.has(k)) state[k] = v ? v.split(",").filter(x => ["cur", "shShow", "flShow", "fxShow"].includes(k) ? CUR[x] : k === "amShow" ? CUR[x] || x === "UN" : k === "cSel" ? /^[A-Z]{3}$/.test(x) : /^\w+$/.test(x)) : [];
     else if (typeof state[k] === "boolean") state[k] = v === "1";
     else state[k] = v;
   }
@@ -807,8 +809,9 @@ function freshIfShownChanged(kind, el) {
   if (el._shownKey !== undefined && el._shownKey !== key && el.data) Plotly.purge(el);
   el._shownKey = key;
 }
+const PICK_CHART = { sh: "sh-chart", am: "am-chart", fl: "flow-chart" };
 function pickCurrency(kind, k, additive) {
-  const el = document.getElementById(`${kind}-chart`), all = (el.data || []).map(t => t.meta).filter(Boolean);
+  const el = document.getElementById(PICK_CHART[kind]), all = (el.data || []).map(t => t.meta).filter(Boolean);
   let cur = shownIn(kind).filter(x => all.includes(x));
   if (additive) {
     const base = cur.length ? cur : all.slice();
@@ -816,7 +819,7 @@ function pickCurrency(kind, k, additive) {
     if (!cur.length || all.every(x => cur.includes(x))) cur = [];
   } else cur = cur.length === 1 && cur[0] === k ? [] : [k];
   state[`${kind}Show`] = cur; writeHash();
-  if (kind === "sh") drawShares(); else drawAmounts();
+  if (kind === "sh") drawShares(); else if (kind === "am") drawAmounts(); else drawFx();
 }
 function bindLegendPick(kind, el) {
   el.removeAllListeners?.("plotly_legendclick");
@@ -1320,6 +1323,7 @@ function renderRace() {
   el.style.height = `${Math.max(live.length, 1) * 34 + 6}px`;
   el.querySelectorAll(".race-row").forEach(row => {
     const k = row.dataset.k, r = rank.get(k);
+    row.classList.toggle("sel", k === state.fxCur);
     if (r == null) { row.style.opacity = 0; row.style.transform = `translateY(${FX_CURS.length * 34}px)`; return; }
     const v = live[r].v, pct = v / max * 86;
     row.style.opacity = 1;
@@ -1333,7 +1337,7 @@ function renderRace() {
   document.getElementById("race-slider").value = i;
   const ev = EVENTS.filter(([q]) => q <= p && M.Q.periods.indexOf(q) >= i - 5 && M.Q.periods.indexOf(q) >= 0).at(-1);
   document.getElementById("race-event").textContent = ev ? ev[1] : "";
-  document.getElementById("race-sub").textContent = `${bn ? "US$ billions" : "Share of allocated reserves"}, every quarter from ${label(M.Q.periods[0])} to ${label(M.latest)}. Press play, or drag the slider.`;
+  document.getElementById("race-sub").textContent = `${bn ? "US$ billions" : "Share of allocated reserves"}, every quarter from ${label(M.Q.periods[0])} to ${label(M.latest)}. Press play, or drag the slider; click a currency to look at it below (Ctrl+click to add more).`;
 }
 function raceStop() {
   clearInterval(race.timer); race.timer = null;
@@ -1349,6 +1353,7 @@ function raceStart() {
   }, Math.round(600 / +state.raceSpeed));
 }
 document.getElementById("race-play").addEventListener("click", () => race.timer ? raceStop() : raceStart());
+document.getElementById("race").addEventListener("click", e => { const row = e.target.closest(".race-row"); if (row) pickFx(row.dataset.k, e.ctrlKey || e.metaKey); });
 document.getElementById("race-slider").addEventListener("input", e => { raceStop(); race.i = +e.target.value; renderRace(); });
 document.getElementById("race-nousd").addEventListener("change", e => { state.raceNoUSD = e.target.checked; writeHash(); renderRace(); });
 document.getElementById("race-metric-seg").addEventListener("click", e => {
@@ -1402,6 +1407,22 @@ function syncExploreControls() {
   setPressed(document.getElementById("race-speed-seg"), state.raceSpeed);
   document.getElementById("race-nousd").checked = state.raceNoUSD;
 }
+// A click on a currency in the race or in the split chooses it: the line chart shows it and the split
+// shows it alone (a second click: all again); Ctrl+click (Cmd+click) adds it to the split or takes it away.
+function pickFx(k, additive) {
+  if (RATED.includes(k)) state.fxCur = k;
+  const all = document.getElementById("fx-split")._keys || [];
+  if (all.includes(k)) {
+    let cur = state.fxShow.filter(x => all.includes(x));
+    if (additive) {
+      const base = cur.length ? cur : all.slice();
+      cur = base.includes(k) ? base.filter(x => x !== k) : [...base, k];
+      if (!cur.length || all.every(x => cur.includes(x))) cur = [];
+    } else cur = cur.length === 1 && cur[0] === k ? [] : [k];
+    state.fxShow = cur;
+  }
+  writeHash(); syncExploreControls(); drawFx(); renderRace();
+}
 function drawFx() {
   const f = M.Q, b = state.fxBase, ib = f.periods.indexOf(b), k = state.fxCur, c = CUR[k];
   const els = ["fx-line", "fx-split", "flow-chart"].map(id => document.getElementById(id));
@@ -1421,22 +1442,29 @@ function drawFx() {
   plot(els[0], tr, baseLayout({ hovermode: "x unified", xaxis: { hoverformat: "%Y Q%q", range: [x[0], x.at(-1)] }, yaxis: { ticksuffix: "%" },
     annotations: directLabels(tr), margin: { l: 8, r: 150, t: 8, b: 8 }, showlegend: false }));
   // the split: every currency's change in share since the start date, in two parts
-  document.getElementById("fx-split-title").textContent = `Change in share, ${label(b)} to ${label(e)}, in percentage points`;
+  document.getElementById("fx-split-title").textContent = `Change in share, ${label(b)} to ${label(e)}, in percentage points` +
+    (state.fxShow.length ? " (click a currency again for all)" : "");
   const rows = FX_CURS.filter(j => j !== "OTHC" && fin(f.share[j][ib]) && fin(f.share[j][ie]) && fin(C[j][ie])).map(j => {
     const total = f.share[j][ie] - f.share[j][ib], fx = f.share[j][ie] - C[j][ie];
     return { j, total, fx, hold: total - fx };
   }).sort((p, q) => p.total - q.total);
-  const names = rows.map(r => CUR[r.j].name);
+  // only the currencies chosen (all if none); the one in the line chart in bold
+  els[1]._keys = rows.map(r => r.j);
+  const shownRows = state.fxShow.some(j => els[1]._keys.includes(j)) ? rows.filter(r => state.fxShow.includes(r.j)) : rows;
+  const names = shownRows.map(r => r.j === k ? `<b>${CUR[r.j].name}</b>` : CUR[r.j].name);
+  const cd = f => shownRows.map(r => [signed(f(r), 2, " pp"), r.j]);
   plot(els[1], [
-    { type: "bar", orientation: "h", name: "Holdings", y: names, x: rows.map(r => r.hold), marker: { color: css("--s1"), line: { color: css("--surface"), width: 1 } },
-      customdata: rows.map(r => signed(r.hold, 2, " pp")), hovertemplate: "%{y}, holdings: %{customdata}<extra></extra>" },
-    { type: "bar", orientation: "h", name: "Exchange rates", y: names, x: rows.map(r => r.fx), marker: { color: css("--s4"), line: { color: css("--surface"), width: 1 } },
-      customdata: rows.map(r => signed(r.fx, 2, " pp")), hovertemplate: "%{y}, exchange rates: %{customdata}<extra></extra>" },
-    { type: "scatter", mode: "markers", name: "Total change", y: names, x: rows.map(r => r.total),
+    { type: "bar", orientation: "h", name: "Holdings", y: names, x: shownRows.map(r => r.hold), marker: { color: css("--s1"), line: { color: css("--surface"), width: 1 } },
+      customdata: cd(r => r.hold), hovertemplate: "%{y}, holdings: %{customdata[0]}<extra></extra>" },
+    { type: "bar", orientation: "h", name: "Exchange rates", y: names, x: shownRows.map(r => r.fx), marker: { color: css("--s4"), line: { color: css("--surface"), width: 1 } },
+      customdata: cd(r => r.fx), hovertemplate: "%{y}, exchange rates: %{customdata[0]}<extra></extra>" },
+    { type: "scatter", mode: "markers", name: "Total change", y: names, x: shownRows.map(r => r.total),
       marker: { symbol: "diamond", size: 10, color: css("--text-primary"), line: { color: css("--surface"), width: 2 } },
-      customdata: rows.map(r => signed(r.total, 2, " pp")), hovertemplate: "%{y}, total: %{customdata}<extra></extra>" },
+      customdata: cd(r => r.total), hovertemplate: "%{y}, total: %{customdata[0]}<extra></extra>" },
   ], baseLayout({ barmode: "relative", bargap: 0.35, hovermode: "closest", xaxis: { showgrid: true, zeroline: true, zerolinewidth: 1.5, ticksuffix: " pp" },
     yaxis: { showgrid: false }, margin: { l: 8, r: 8, t: 8, b: 8 } }));
+  els[1].removeAllListeners?.("plotly_click");
+  els[1].on("plotly_click", ev => { const j = ev.points?.[0]?.customdata?.[1]; if (j) pickFx(j, !!(ev.event?.ctrlKey || ev.event?.metaKey)); });
   // the sentence above the charts
   const row = rows.find(r => r.j === k), ins = document.getElementById("fx-insight");
   if (!row) ins.textContent = `COFER lists the ${inText(k)} only from ${label(f.periods[f.share[k].findIndex(fin)])}: pick a later start date.`;
@@ -1448,7 +1476,7 @@ function drawFx() {
   }
   // cumulative purchases and sales since the start date
   document.getElementById("flow-sub").textContent = `Cumulative purchases (+) and sales (−) since ${label(b)}, US$ billions, with exchange-rate moves
-    taken out. Other currencies are left out: they have no single exchange rate.`;
+    taken out. Other currencies are left out: they have no single exchange rate. Click a currency in the legend for it alone, Ctrl+click to add or remove one.`;
   const ft = RATED.map(j => {
     const fl = flows(j);
     // zero at the start date, or when COFER starts listing the currency if that is later
@@ -1461,7 +1489,10 @@ function drawFx() {
     }
     return y.some(fin) ? { ...lineTrace(j, x, y, " bn", 0) } : null;
   }).filter(Boolean);
-  plot(els[2], ft, baseLayout({ hovermode: "x unified", xaxis: { hoverformat: "%Y Q%q" }, yaxis: { tickprefix: "$", tickformat: ",.0f", zeroline: true, zerolinewidth: 1.5 } }));
+  applyShown("fl", ft);
+  plot(els[2], ft, baseLayout({ hovermode: "x unified", xaxis: { hoverformat: "%Y Q%q" }, legend: legendCfg(),
+    yaxis: { tickprefix: "$", tickformat: ",.0f", zeroline: true, zerolinewidth: 1.5 } }));
+  bindLegendPick("fl", els[2]);
 }
 function drawDiversity() {
   const f = M.Q, el = document.getElementById("div-chart");
