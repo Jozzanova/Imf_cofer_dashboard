@@ -152,6 +152,29 @@
   .notes li { margin-bottom: 5px; }
   .empty { color: var(--text-muted); padding: 40px 0; text-align: center; }
   a { color: var(--accent); }
+
+  /* explore */
+  .race { position: relative; margin-top: 10px; transition: height .3s; --race-ms: 520ms; }
+  .race-row { position: absolute; left: 0; right: 0; top: 0; height: 28px; display: flex; align-items: center; gap: 10px;
+    transition: transform var(--race-ms) ease, opacity .4s; }
+  .race-row .rl { width: 140px; flex: none; text-align: right; color: var(--text-secondary); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .race-row .rt { flex: 1; position: relative; height: 100%; min-width: 0; }
+  .race-row .rb { height: 100%; border-radius: 0 4px 4px 0; transition: width var(--race-ms) ease; min-width: 2px; }
+  .race-row .rv { position: absolute; top: 50%; transform: translateY(-50%); padding-left: 8px; white-space: nowrap;
+    font-size: 13px; font-weight: 600; color: var(--text-primary); font-variant-numeric: tabular-nums; transition: left var(--race-ms) ease; }
+  .race-period { position: absolute; right: 4px; bottom: 0; font-size: clamp(32px, 7vw, 64px); font-weight: 750; line-height: 1;
+    color: var(--text-muted); opacity: .4; pointer-events: none; font-variant-numeric: tabular-nums; }
+  .race-ctrl { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 16px; }
+  .race-ctrl input[type="range"] { flex: 1 1 220px; accent-color: var(--accent); cursor: pointer; }
+  .race-play { min-width: 92px; font-weight: 600; }
+  .race-event { min-height: 21px; margin-top: 10px; color: var(--text-secondary); font-size: 13px; }
+  .insight { font-size: 14px; color: var(--text-primary); background: var(--page); border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 12px; margin: 4px 0 14px; }
+  .insight:empty { display: none; }
+  .grid2.inner { margin-bottom: 0; }
+  #tab-explore { margin-top: 16px; }
+  h3 { font-size: 13.5px; font-weight: 600; margin: 0 0 6px; color: var(--text-secondary); }
+  @media (max-width: 520px) { .race-row .rl { width: 96px; font-size: 12px; } }
 </style>
 </head>
 <body>
@@ -182,9 +205,10 @@
     <button role="tab" id="tab-btn-amounts" data-tab="amounts" aria-controls="tab-amounts">Amounts</button>
     <button role="tab" id="tab-btn-changes" data-tab="changes" aria-controls="tab-changes">Changes</button>
     <button role="tab" id="tab-btn-data" data-tab="data" aria-controls="tab-data">Data</button>
+    <button role="tab" id="tab-btn-explore" data-tab="explore" aria-controls="tab-explore">Explore ✦</button>
   </nav>
 
-  <section class="card controls" aria-label="Selection">
+  <section class="card controls" id="controls" aria-label="Selection">
     <div class="row">
       <div class="control" style="flex:1 1 100%"><span class="lbl">Currencies</span>
         <div class="chips" id="cur-chips"></div>
@@ -298,6 +322,57 @@
     </section>
   </div>
 
+  <!-- Explore -->
+  <div role="tabpanel" id="tab-explore" aria-labelledby="tab-btn-explore" hidden>
+    <section class="card">
+      <div class="card-head">
+        <div><h2>The race for reserves</h2>
+          <p class="sub" id="race-sub">Every quarter since 1999. Press play, or drag the slider.</p></div>
+        <div class="row">
+          <div class="seg" id="race-metric-seg" role="group" aria-label="Measure"><button data-v="share">Shares</button><button data-v="bn">US$ billions</button></div>
+          <label class="check"><input type="checkbox" id="race-nousd"> Without the dollar</label>
+        </div>
+      </div>
+      <div class="race" id="race" aria-label="Currencies ranked by their share of reserves"></div>
+      <div class="race-ctrl">
+        <button class="text-btn race-play" id="race-play" type="button">▶ Play</button>
+        <input type="range" id="race-slider" min="0" max="0" step="1" value="0" aria-label="Quarter">
+        <div class="seg" id="race-speed-seg" role="group" aria-label="Speed"><button data-v="1">1×</button><button data-v="2">2×</button><button data-v="4">4×</button></div>
+      </div>
+      <div class="race-event" id="race-event" aria-live="polite"></div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <div><h2>Currency moves or central banks' choices?</h2>
+          <p class="sub">A currency's share of reserves changes for two reasons: central banks buy or sell it, or its exchange rate
+            against the dollar moves. Holding every exchange rate at its level on the start date separates the two.</p></div>
+        <div class="row">
+          <div class="control"><span class="lbl">Since</span><select id="fx-base" aria-label="Start date"></select></div>
+          <div class="control"><span class="lbl">Currency</span><select id="fx-cur" aria-label="Currency"></select></div>
+        </div>
+      </div>
+      <p class="insight" id="fx-insight"></p>
+      <div class="grid2 inner">
+        <div><h3 id="fx-line-title"></h3><div id="fx-line" class="chart"></div></div>
+        <div><h3 id="fx-split-title"></h3><div id="fx-split" class="chart"></div></div>
+      </div>
+    </section>
+
+    <section class="grid2">
+      <section class="card">
+        <h2>What central banks bought and sold</h2>
+        <p class="sub" id="flow-sub"></p>
+        <div id="flow-chart" class="chart"></div>
+      </section>
+      <section class="card">
+        <h2>How many reserve currencies?</h2>
+        <p class="sub" id="div-sub"></p>
+        <div id="div-chart" class="chart"></div>
+      </section>
+    </section>
+  </div>
+
   <section class="card">
     <details>
       <summary>Data, definitions &amp; caveats</summary>
@@ -315,6 +390,13 @@
         <li><b>Other currencies</b> is everything outside the eight currencies the IMF lists separately, for example the Korean won, the
           Singapore dollar and the Nordic currencies. The renminbi is listed separately from 2016 Q4, the Australian and Canadian dollars from 2012 Q4;
           before then they are part of other currencies.</li>
+        <li><b>Explore:</b> the race ranks the currencies every quarter. <i>Currency moves or central banks' choices</i> values each
+          currency's holdings at the exchange rates of the start date (end-of-quarter rates from the IMF's
+          <a href="https://data.imf.org/en/datasets/IMF.STA:ER" target="_blank" rel="noopener">Exchange Rates</a> dataset): the difference
+          between the actual share and that share is the effect of exchange rates; the rest is the change in holdings. "Other currencies" has
+          no single exchange rate and stays at current values. Purchases and sales are estimated the same way, quarter by quarter, at the
+          average of the opening and closing exchange rates. Both are estimates: changes in which countries report, and the IMF's own
+          revisions and imputations, also count as "holdings".</li>
         <li><b>Live data:</b> each time the page opens it asks the IMF's API for the current COFER release, so new quarters and revisions appear
           without rebuilding it. If the IMF cannot be reached, the page shows the copy it was built with. The IMF publishes COFER once a
           quarter, about three months after the quarter ends, and revises earlier figures when countries revise theirs.</li>
@@ -357,6 +439,8 @@ const label = p => p.includes("-Q") ? p.replace("-Q", " Q") : p;  // "2026-Q2" -
 // Plot each position at the end of its period (they are end-of-quarter stocks).
 const xdate = p => { const [y, q] = p.split("-Q"); return q ? `${y}-${["03-31", "06-30", "09-30", "12-31"][q - 1]}` : `${y}-12-31`; };
 const when = iso => iso ? new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "unknown";
+// a currency's name inside a sentence: "the euro", "the Japanese yen"
+const inText = k => CUR[k].name.replace(/^(Euro|Pound|Other)/, w => w.toLowerCase());
 const dot = k => `<span class="dot" style="background:${css(CUR[k].color)}"></span>`;
 
 // ---------- the data ----------
@@ -418,9 +502,10 @@ const state = {
   tab: "shares", cur: CURS.map(c => c.k), freq: "Q", period: "all",
   shView: "lines", shLog: false, amView: "stack", amLog: false,
   chFrom: "", chTo: "", chMetric: "bn", chCur: "USD", dtMetric: "share",
+  raceMetric: "share", raceNoUSD: false, raceSpeed: "1", fxBase: "2016-Q4", fxCur: "USD",
 };
 const LIST_KEYS = new Set(["cur"]);
-const TABS = ["shares", "amounts", "changes", "data"];
+const TABS = ["shares", "amounts", "changes", "data", "explore"];
 function readHash() {
   const p = new URLSearchParams(location.hash.slice(1));
   for (const [k, v] of p) {
@@ -432,6 +517,8 @@ function readHash() {
   if (!TABS.includes(state.tab)) state.tab = "shares";
   if (!["Q", "A"].includes(state.freq)) state.freq = "Q";
   if (!CUR[state.chCur] || CUR[state.chCur].yearlyOnly) state.chCur = "USD";
+  if (!["share", "bn"].includes(state.raceMetric)) state.raceMetric = "share";
+  if (!["1", "2", "4"].includes(state.raceSpeed)) state.raceSpeed = "1";
 }
 function writeHash() {
   const p = new URLSearchParams();
@@ -664,7 +751,7 @@ function drawChanges() {
   document.getElementById("ch2-sub").textContent = `${m.title.replace(/^Change in /, "").replace(/^./, s => s.toUpperCase())}, ${label(f.periods[w.i0])} to ${label(f.periods[w.i1])}`;
   const xs = [], ys = [];
   for (let i = Math.max(1, w.i0); i <= w.i1; i++) { const v = change(f, k, i - 1, i, state.chMetric); if (fin(v)) { xs.push(f.x[i]); ys.push(v); } }
-  if (!xs.length) return empty(el2, `No figures for the ${c.name.toLowerCase()} in this period.`);
+  if (!xs.length) return empty(el2, `No figures for the ${inText(k)} in this period.`);
   plot(el2, [{ type: "bar", x: xs, y: ys, marker: { color: ys.map(v => css(v >= 0 ? "--pos" : "--neg")) },
     customdata: ys.map(v => signed(v, m.d, m.unit)), hovertemplate: `%{x|${hoverX()}}: %{customdata}<extra></extra>` }],
     baseLayout({ showlegend: false, bargap: 0.15, xaxis: { hoverformat: hoverX() }, yaxis: { zeroline: true, zerolinewidth: 1.5, ticksuffix: m.unit.trim() === "bn" ? "" : m.unit.trim() } }));
@@ -755,7 +842,7 @@ function syncControls() {
   setPressed(document.getElementById("dt-metric-seg"), state.dtMetric);
   document.getElementById("sh-log").checked = state.shLog;
   document.getElementById("am-log").checked = state.amLog;
-  document.getElementById("period-control").hidden = false;
+  document.getElementById("controls").hidden = state.tab === "explore";
   document.getElementById("hint").textContent = state.tab === "changes"
     ? "The period chosen here sets the right-hand chart; the left one compares the two dates above it." : "";
 }
@@ -807,11 +894,15 @@ async function checkIMF(manual) {
   source.checking = true; renderStatus();
   if (manual) setUpdateMsg("Asking the IMF for the current COFER release…");
   try {
+    const erText = fetch(ER_URL, { headers: { Accept: CSV_TYPE }, cache: "no-store" }).then(r => r.ok ? r.text() : "").catch(() => "");
     const res = await fetch(DATA_URL, { headers: { Accept: CSV_TYPE }, cache: "no-store" });
     if (!res.ok) throw new Error(`the IMF answered ${res.status}`);
     const fresh = buildModel(await res.text());
     const changed = countDiff(M, fresh), newer = fresh.latest > M.latest, before = M.latest;
-    if (changed) { M = fresh; syncControls(); renderTiles(); renderTab(state.tab); }
+    const freshRates = buildRates(await erText), newRates = Object.keys(freshRates).length > 0 && JSON.stringify(freshRates) !== JSON.stringify(RATES);
+    if (newRates) RATES = freshRates;
+    if (changed) { M = fresh; race.i = -1; document.getElementById("race").innerHTML = ""; }
+    if (changed || newRates) { syncControls(); renderTiles(); if (!race.timer) renderTab(state.tab); }
     Object.assign(source, { kind: "live", at: new Date().toISOString() });
     if (newer) setUpdateMsg(`New data from the IMF: the figures now run to ${label(fresh.latest)} (were ${label(before)}).`);
     else if (changed) setUpdateMsg(`The IMF has revised ${changed} figure${changed === 1 ? "" : "s"} since this page was built; the page now shows the current ones.`);
@@ -826,12 +917,242 @@ async function checkIMF(manual) {
 }
 updateBtn.addEventListener("click", () => checkIMF(true));
 
+// ---------- Explore ----------
+// End-of-quarter exchange rates (domestic currency per US dollar) from the IMF's Exchange Rates dataset.
+const ER_URL = "https://api.imf.org/external/sdmx/3.0/data/dataflow/IMF.STA/ER/+/G163+JPN+GBR+CHN+CAN+AUS+CHE.XDC_USD.EOP_RT.Q";
+const ER_COUNTRY = { EUR: "G163", JPY: "JPN", GBP: "GBR", CNY: "CHN", CAD: "CAN", AUD: "AUS", CHF: "CHE" };
+const FX_CURS = ["USD", "EUR", "JPY", "GBP", "CNY", "CAD", "AUD", "CHF", "OTHC"];
+const RATED = FX_CURS.filter(k => k !== "OTHC");  // the currencies with an exchange rate (the dollar's is 1)
+function buildRates(text) {
+  const rates = {};
+  if (!text) return rates;
+  const lines = text.trim().split(/\r?\n/), h = lines[0].split(",");
+  const ci = h.indexOf("COUNTRY"), fi = h.indexOf("FREQUENCY"), ti = h.indexOf("TIME_PERIOD"), vi = h.indexOf("OBS_VALUE");
+  if ([ci, fi, ti, vi].some(i => i < 0)) return rates;
+  const cur = Object.fromEntries(Object.entries(ER_COUNTRY).map(([k, c]) => [c, k]));
+  for (let i = 1; i < lines.length; i++) {
+    const r = lines[i].split(","), k = cur[r[ci]], v = parseFloat(r[vi]);
+    if (k && r[fi] === "Q" && v > 0) (rates[k] ||= {})[r[ti]] = v;
+  }
+  return rates;
+}
+let RATES = buildRates(SNAPSHOT.er);
+const rate = (k, p) => k === "USD" ? 1 : RATES[k]?.[p] ?? null;
+const hasRates = p => RATED.every(k => fin(rate(k, p)));
+
+// Key moments, shown under the race while it passes them.
+const EVENTS = [
+  ["1999-Q1", "January 1999: the euro is launched."],
+  ["2008-Q3", "September 2008: Lehman Brothers collapses and the global financial crisis peaks."],
+  ["2010-Q2", "May 2010: Greece's first rescue starts the euro-area debt crisis."],
+  ["2012-Q4", "From the end of 2012 COFER lists the Canadian and Australian dollars separately."],
+  ["2014-Q3", "Mid-2014 to 2015: the dollar rises sharply against most currencies."],
+  ["2016-Q4", "October 2016: the renminbi joins the IMF's SDR basket; COFER lists it from the end of 2016."],
+  ["2020-Q1", "Early 2020: the COVID-19 pandemic."],
+  ["2022-Q1", "February 2022: Russia invades Ukraine, and Western countries freeze much of Russia's central-bank reserves."],
+  ["2022-Q3", "September 2022: the dollar reaches its highest level in two decades."],
+];
+
+// --- the race: currencies ranked each quarter, bars sliding into place ---
+const race = { i: -1, timer: null };
+function raceItems(i) {
+  const f = M.Q, metric = state.raceMetric === "bn" ? f.bn : f.share;
+  return FX_CURS.filter(k => !(state.raceNoUSD && k === "USD")).map(k => ({ k, v: metric[k][i] }));
+}
+function raceMax() {
+  let m = 0;
+  for (let i = 0; i < M.Q.periods.length; i++) for (const it of raceItems(i)) if (fin(it.v)) m = Math.max(m, it.v);
+  return m || 1;
+}
+function buildRace() {
+  const el = document.getElementById("race");
+  el.innerHTML = FX_CURS.map(k => `<div class="race-row" data-k="${k}"><div class="rl">${esc(CUR[k].name)}</div>
+    <div class="rt"><div class="rb" style="background:${css(CUR[k].color)}"></div><div class="rv"></div></div></div>`).join("") +
+    `<div class="race-period" id="race-period"></div>`;
+  const s = document.getElementById("race-slider");
+  s.max = M.Q.periods.length - 1;
+  if (race.i < 0 || race.i > s.max) race.i = +s.max;
+}
+function renderRace() {
+  const el = document.getElementById("race");
+  if (!el.querySelector(".race-row")) buildRace();
+  const i = race.i, p = M.Q.periods[i], max = raceMax(), bn = state.raceMetric === "bn";
+  const live = raceItems(i).filter(it => fin(it.v)).sort((a, b) => b.v - a.v);
+  const rank = new Map(live.map((it, r) => [it.k, r]));
+  el.style.setProperty("--race-ms", `${Math.round(520 / +state.raceSpeed)}ms`);
+  el.style.height = `${Math.max(live.length, 1) * 34 + 6}px`;
+  el.querySelectorAll(".race-row").forEach(row => {
+    const k = row.dataset.k, r = rank.get(k);
+    if (r == null) { row.style.opacity = 0; row.style.transform = `translateY(${FX_CURS.length * 34}px)`; return; }
+    const v = live[r].v, pct = v / max * 86;
+    row.style.opacity = 1;
+    row.style.transform = `translateY(${r * 34}px)`;
+    row.querySelector(".rb").style.width = `${pct}%`;
+    const val = row.querySelector(".rv");
+    val.style.left = `${pct}%`;
+    val.textContent = bn ? `$${fmt(v, 0)} bn` : `${fmt(v, 2)}%`;
+  });
+  document.getElementById("race-period").textContent = label(p);
+  document.getElementById("race-slider").value = i;
+  const ev = EVENTS.filter(([q]) => q <= p && M.Q.periods.indexOf(q) >= i - 5 && M.Q.periods.indexOf(q) >= 0).at(-1);
+  document.getElementById("race-event").textContent = ev ? ev[1] : "";
+  document.getElementById("race-sub").textContent = `${bn ? "US$ billions" : "Share of allocated reserves"}, every quarter from ${label(M.Q.periods[0])} to ${label(M.latest)}. Press play, or drag the slider.`;
+}
+function raceStop() {
+  clearInterval(race.timer); race.timer = null;
+  document.getElementById("race-play").textContent = "▶ Play";
+}
+function raceStart() {
+  if (race.i >= M.Q.periods.length - 1) race.i = 0;
+  renderRace();
+  document.getElementById("race-play").textContent = "❚❚ Pause";
+  race.timer = setInterval(() => {
+    if (race.i >= M.Q.periods.length - 1) return raceStop();
+    race.i++; renderRace();
+  }, Math.round(600 / +state.raceSpeed));
+}
+document.getElementById("race-play").addEventListener("click", () => race.timer ? raceStop() : raceStart());
+document.getElementById("race-slider").addEventListener("input", e => { raceStop(); race.i = +e.target.value; renderRace(); });
+document.getElementById("race-nousd").addEventListener("change", e => { state.raceNoUSD = e.target.checked; writeHash(); renderRace(); });
+document.getElementById("race-metric-seg").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  state.raceMetric = b.dataset.v; setPressed(e.currentTarget, state.raceMetric); writeHash(); renderRace();
+});
+document.getElementById("race-speed-seg").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  state.raceSpeed = b.dataset.v; setPressed(e.currentTarget, state.raceSpeed); writeHash();
+  if (race.timer) { raceStop(); raceStart(); } else renderRace();
+});
+
+// --- shares at constant exchange rates ---
+// A currency's holdings in its own units are its US-dollar amount times the exchange rate (units per dollar).
+// Valued at the start date's rate instead of today's, the amount changes only when central banks buy or sell.
+function constantShares(base) {
+  const f = M.Q, out = Object.fromEntries(FX_CURS.map(k => [k, []]));
+  f.periods.forEach((p, i) => {
+    const vals = {};
+    for (const k of FX_CURS) {
+      const v = f.bn[k][i];
+      if (!fin(v)) continue;
+      // "Other currencies" has no single exchange rate; it stays at current values.
+      vals[k] = k === "OTHC" ? v : fin(rate(k, p)) && fin(rate(k, base)) ? v * rate(k, p) / rate(k, base) : NaN;
+    }
+    const ok = Object.values(vals).every(isFinite), tot = Object.values(vals).reduce((a, b) => a + b, 0);
+    for (const k of FX_CURS) out[k][i] = ok && k in vals && tot > 0 ? vals[k] / tot * 100 : null;
+  });
+  return out;
+}
+// Purchases (+) and sales (−) each quarter: the change in holdings in the currency's own units, at the
+// quarter's average of the opening and closing exchange rates.
+function flows(k) {
+  const f = M.Q;
+  return f.periods.map((p, i) => {
+    if (i === 0) return null;
+    const a = f.bn[k][i - 1], b = f.bn[k][i], q = f.periods[i - 1];
+    if (!fin(a) || !fin(b) || !fin(rate(k, p)) || !fin(rate(k, q))) return null;
+    return (b * rate(k, p) - a * rate(k, q)) / ((rate(k, p) + rate(k, q)) / 2);
+  });
+}
+function syncExploreControls() {
+  const ps = M.Q.periods.filter((p, i) => i < M.Q.periods.length - 1 && hasRates(p));
+  if (!ps.includes(state.fxBase)) state.fxBase = ps.includes("2016-Q4") ? "2016-Q4" : ps[0] || "";
+  document.getElementById("fx-base").innerHTML = ps.slice().reverse()
+    .map(p => `<option value="${p}"${p === state.fxBase ? " selected" : ""}>${label(p)}</option>`).join("");
+  if (!FX_CURS.includes(state.fxCur) || state.fxCur === "OTHC") state.fxCur = "USD";
+  document.getElementById("fx-cur").innerHTML = RATED
+    .map(k => `<option value="${k}"${k === state.fxCur ? " selected" : ""}>${esc(CUR[k].name)}</option>`).join("");
+  setPressed(document.getElementById("race-metric-seg"), state.raceMetric);
+  setPressed(document.getElementById("race-speed-seg"), state.raceSpeed);
+  document.getElementById("race-nousd").checked = state.raceNoUSD;
+}
+function drawFx() {
+  const f = M.Q, b = state.fxBase, ib = f.periods.indexOf(b), k = state.fxCur, c = CUR[k];
+  const els = ["fx-line", "fx-split", "flow-chart"].map(id => document.getElementById(id));
+  if (ib < 0) {
+    document.getElementById("fx-insight").textContent = "The exchange rates could not be loaded from the IMF, so this part is not available right now.";
+    els.forEach(el => empty(el, "No exchange rates."));
+    return;
+  }
+  const C = constantShares(b), x = f.x.slice(ib), act = f.share[k].slice(ib), con = C[k].slice(ib);
+  const ie = lastIdx(C[k]), e = f.periods[ie];  // the last quarter with both COFER data and exchange rates
+  // the line chart: actual share and the share at the start date's exchange rates
+  document.getElementById("fx-line-title").textContent = `${c.name}: actual share and at ${label(b)} exchange rates`;
+  const tr = [
+    { ...lineTrace(k, x, act, "%", 2), name: "Actual" },
+    { ...lineTrace(k, x, con, "%", 2), name: `At ${label(b)} exchange rates`, line: { color: css(c.color), width: 2, dash: "dot" } },
+  ];
+  plot(els[0], tr, baseLayout({ hovermode: "x unified", xaxis: { hoverformat: "%Y Q%q", range: [x[0], x.at(-1)] }, yaxis: { ticksuffix: "%" },
+    annotations: directLabels(tr), margin: { l: 8, r: 150, t: 8, b: 8 }, showlegend: false }));
+  // the split: every currency's change in share since the start date, in two parts
+  document.getElementById("fx-split-title").textContent = `Change in share, ${label(b)} to ${label(e)}, in percentage points`;
+  const rows = FX_CURS.filter(j => j !== "OTHC" && fin(f.share[j][ib]) && fin(f.share[j][ie]) && fin(C[j][ie])).map(j => {
+    const total = f.share[j][ie] - f.share[j][ib], fx = f.share[j][ie] - C[j][ie];
+    return { j, total, fx, hold: total - fx };
+  }).sort((p, q) => p.total - q.total);
+  const names = rows.map(r => CUR[r.j].name);
+  plot(els[1], [
+    { type: "bar", orientation: "h", name: "Holdings", y: names, x: rows.map(r => r.hold), marker: { color: css("--s1"), line: { color: css("--surface"), width: 1 } },
+      customdata: rows.map(r => signed(r.hold, 2, " pp")), hovertemplate: "%{y}, holdings: %{customdata}<extra></extra>" },
+    { type: "bar", orientation: "h", name: "Exchange rates", y: names, x: rows.map(r => r.fx), marker: { color: css("--s4"), line: { color: css("--surface"), width: 1 } },
+      customdata: rows.map(r => signed(r.fx, 2, " pp")), hovertemplate: "%{y}, exchange rates: %{customdata}<extra></extra>" },
+    { type: "scatter", mode: "markers", name: "Total change", y: names, x: rows.map(r => r.total),
+      marker: { symbol: "diamond", size: 10, color: css("--text-primary"), line: { color: css("--surface"), width: 2 } },
+      customdata: rows.map(r => signed(r.total, 2, " pp")), hovertemplate: "%{y}, total: %{customdata}<extra></extra>" },
+  ], baseLayout({ barmode: "relative", bargap: 0.35, hovermode: "closest", xaxis: { showgrid: true, zeroline: true, zerolinewidth: 1.5, ticksuffix: " pp" },
+    yaxis: { showgrid: false }, margin: { l: 8, r: 8, t: 8, b: 8 } }));
+  // the sentence above the charts
+  const row = rows.find(r => r.j === k), ins = document.getElementById("fx-insight");
+  if (!row) ins.textContent = `COFER lists the ${inText(k)} only from ${label(f.periods[f.share[k].findIndex(fin)])}: pick a later start date.`;
+  else {
+    const a = f.share[k][ib], z = f.share[k][ie];
+    ins.innerHTML = `From ${label(b)} to ${label(e)} the ${esc(inText(k))}'s share ${z >= a ? "rose" : "fell"} from
+      <b>${fmt(a, 2)}%</b> to <b>${fmt(z, 2)}%</b> (${signed(row.total, 2, " pp")}). Of that, <b>${signed(row.fx, 2, " pp")}</b> came from exchange-rate
+      moves and <b>${signed(row.hold, 2, " pp")}</b> from what central banks hold. At ${label(b)} exchange rates the share would be ${fmt(C[k][ie], 2)}%.`;
+  }
+  // cumulative purchases and sales since the start date
+  document.getElementById("flow-sub").textContent = `Cumulative purchases (+) and sales (−) since ${label(b)}, US$ billions, with exchange-rate moves
+    taken out. Other currencies are left out: they have no single exchange rate.`;
+  const ft = RATED.map(j => {
+    const fl = flows(j);
+    // zero at the start date, or when COFER starts listing the currency if that is later
+    const y = [];
+    let s = null;
+    for (let i = ib; i < f.periods.length; i++) {
+      if (s == null) { if (fin(f.bn[j][i])) s = 0; y.push(s); }
+      else if (fin(fl[i])) { s += fl[i]; y.push(s); }
+      else y.push(null);
+    }
+    return y.some(fin) ? { ...lineTrace(j, x, y, " bn", 0) } : null;
+  }).filter(Boolean);
+  plot(els[2], ft, baseLayout({ hovermode: "x unified", xaxis: { hoverformat: "%Y Q%q" }, yaxis: { tickprefix: "$", tickformat: ",.0f", zeroline: true, zerolinewidth: 1.5 } }));
+}
+function drawDiversity() {
+  const f = M.Q, el = document.getElementById("div-chart");
+  const y = f.periods.map((p, i) => {
+    const s = FX_CURS.map(k => f.share[k][i]).filter(fin);
+    const h = s.reduce((a, v) => a + (v / 100) ** 2, 0);
+    return h > 0 ? 1 / h : null;
+  });
+  const i0 = y.findIndex(fin), i1 = lastIdx(y);
+  let lo = i0; for (let i = i0; i <= i1; i++) if (fin(y[i]) && y[i] < y[lo]) lo = i;
+  document.getElementById("div-sub").innerHTML = `The effective number of currencies, 1 ÷ the sum of the squared shares: what the
+    reserves would amount to if they were spread evenly. It went from <b>${fmt(y[i0], 2)}</b> in ${label(f.periods[i0])} to a low of
+    ${fmt(y[lo], 2)} in ${label(f.periods[lo])} and <b>${fmt(y[i1], 2)}</b> in ${label(f.periods[i1])}. "Other currencies" counts as one, so the true number is a little higher.`;
+  plot(el, [{ type: "scatter", mode: "lines", x: f.x, y, name: "Effective number", line: { color: css("--s7"), width: 2 },
+    hovertemplate: "%{y:.2f} currencies<extra></extra>" }],
+    baseLayout({ showlegend: false, hovermode: "x unified", xaxis: { hoverformat: "%Y Q%q" }, yaxis: { tickformat: ".1f" } }));
+}
+function renderExplore() { syncExploreControls(); renderRace(); drawFx(); drawDiversity(); }
+document.getElementById("fx-base").addEventListener("change", e => { state.fxBase = e.target.value; writeHash(); drawFx(); });
+document.getElementById("fx-cur").addEventListener("change", e => { state.fxCur = e.target.value; writeHash(); drawFx(); });
+
 // ---------- tabs ----------
 function renderTab(tab) {
   if (tab === "shares") { drawShares(); renderSharesTable(); }
   else if (tab === "amounts") { drawAmounts(); renderAmountsTable(); }
   else if (tab === "changes") drawChanges();
-  else renderData();
+  else if (tab === "data") renderData();
+  else renderExplore();
 }
 function showTab(tab, focus = false) {
   state.tab = tab;
@@ -842,6 +1163,7 @@ function showTab(tab, focus = false) {
     document.getElementById(`tab-${t}`).hidden = t !== tab;
   }
   if (focus) document.getElementById(`tab-btn-${tab}`).focus();
+  if (tab !== "explore") raceStop();
   syncControls(); writeHash();
   renderTab(tab);  // charts are drawn when visible so Plotly sizes them correctly
 }
@@ -854,7 +1176,7 @@ document.querySelectorAll('[role="tab"]').forEach(btn => {
   });
 });
 
-function redraw() { renderTiles(); renderChips(); renderTab(state.tab); }
+function redraw() { renderTiles(); renderChips(); document.getElementById("race").innerHTML = ""; renderTab(state.tab); }
 let resizeTimer;
 window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { if (state.tab === "shares" && state.shView === "multi") drawShares(); }, 200); });
 

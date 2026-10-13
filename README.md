@@ -26,6 +26,9 @@ Tabs:
 - **Changes**: the change between any two dates, by currency, in US$, % or share points, and
   each quarter's change for one currency.
 - **Data**: the numbers as a table, with a CSV download of the selection.
+- **Explore**: a bar chart race of the currencies since 1999; how much of each currency's change in
+  share came from exchange-rate moves and how much from central banks' holdings (with the IMF's
+  exchange rates); estimated purchases and sales; and the effective number of reserve currencies.
 
 Files:
 - `update.py`: downloads the data and writes the page
