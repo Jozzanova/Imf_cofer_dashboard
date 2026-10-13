@@ -755,7 +755,8 @@ function drawShares() {
   if (!ks.length) return empty(el, "Pick at least one currency above.");
   const series = ks.map(k => ({ k, y: slice(f.share[k], w) })).filter(s => s.y.some(fin));
   if (state.shView === "multi") return drawMultiples(el, x, series);
-  el.style.height = "";
+  // back from one chart each: give the chart its normal height again and let Plotly measure it afresh
+  if (el._multi) { el._multi = false; el.style.height = ""; Plotly.purge(el); }
   if (state.shView === "stack") {
     const all = ks.length >= 9;
     plot(el, series.map(s => areaTrace(s.k, x, s.y, "%", 2)), baseLayout({
@@ -784,7 +785,7 @@ function drawMultiples(el, x, series) {
       xanchor: "left", yanchor: "bottom", showarrow: false, font: { size: 12, color: css("--text-secondary") } });
   });
   layout.annotations = annotations;
-  Plotly.purge(el); el.innerHTML = "";
+  Plotly.purge(el); el.innerHTML = ""; el._multi = true;
   Plotly.newPlot(el, traces, layout, config);
 }
 function renderSharesTable() {
