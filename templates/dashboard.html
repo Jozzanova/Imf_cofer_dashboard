@@ -149,7 +149,9 @@
   .tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
   /* stat tiles */
-  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 18px; }
+  .tiles-head { margin-top: 18px; font-size: 13px; color: var(--text-muted); }
+  .tiles-head b { color: var(--text-primary); font-weight: 650; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 8px; }
   .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
   .tile .label { color: var(--text-secondary); font-size: 12.5px; display: flex; align-items: center; gap: 7px; }
   .tile .value { font-size: 22px; font-weight: 650; margin-top: 2px; font-variant-numeric: tabular-nums; }
@@ -229,6 +231,7 @@
     </aside>
   </header>
 
+  <div class="tiles-head" id="tiles-head"></div>
   <section class="tiles" id="tiles" aria-label="Latest quarter"></section>
 
   <nav class="tabs" role="tablist" aria-label="Views">
@@ -968,14 +971,15 @@ function renderTiles() {
   const tile = (lab, value, note) => `<div class="tile"><div class="label">${lab}</div><div class="value">${value}</div><div class="note">${note}</div></div>`;
   const shareTile = k => {
     const v = f.share[k][n], d = f.share[k][yr];
-    return tile(`${dot(k)}${esc(CUR[k].name)}`, `${fmt(v, 1)}%`, `<span class="${cls(v - d)}">${signed(v - d, 2, " pp")}</span> vs ${py}`);
+    return tile(`${dot(k)}${esc(CUR[k].name)}`, `${fmt(v, 1)}%`, `<span class="${cls(v - d)}">${signed(v - d, 2, " pp")}</span> in a year`);
   };
   const beyond = i => ["CNY", "CAD", "AUD", "CHF", "OTHC"].reduce((s, k) => s + (f.share[k][i] ?? 0), 0);
   const t = f.total[n], tPrev = f.total[yr], g = (t / tPrev - 1) * 100;
+  document.getElementById("tiles-head").innerHTML = `Latest quarter: <b>${label(f.periods[n])}</b> · change over the past year, since ${py}`;
   document.getElementById("tiles").innerHTML =
-    tile(`Total FX reserves, ${label(f.periods[n])}`, `$${fmt(t / 1000, 2)} tn`, `<span class="${cls(g)}">${signed(g, 1, "%")}</span> vs ${py}`) +
+    tile("Total FX reserves", `$${fmt(t / 1000, 2)} tn`, `<span class="${cls(g)}">${signed(g, 1, "%")}</span> in a year`) +
     ["USD", "EUR", "JPY", "CNY"].map(shareTile).join("") +
-    tile("Beyond the big four", `${fmt(beyond(n), 1)}%`, `<span class="${cls(beyond(n) - beyond(yr))}">${signed(beyond(n) - beyond(yr), 2, " pp")}</span> vs ${py} · all but USD, EUR, JPY, GBP`);
+    tile("Beyond the big four", `${fmt(beyond(n), 1)}%`, `<span class="${cls(beyond(n) - beyond(yr))}">${signed(beyond(n) - beyond(yr), 2, " pp")}</span> in a year · all but USD, EUR, JPY, GBP`);
 }
 
 // ---------- controls ----------
