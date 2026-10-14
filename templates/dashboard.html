@@ -2238,6 +2238,14 @@ async function loadCountriesLive() {
   }
   if (state.tab === "countries") renderCountries(); else if (state.tab === "data") renderData(); else if (state.tab === "country") renderSingle(); else syncCountryControls();
 }
+// a bubble clicked: that country into the chart over time below (the oldest choice making room if it is full),
+// the chart switched to the chosen countries, and scrolled into view
+function followCountry(k) {
+  if (k !== HOME && !state.cSel.includes(k)) state.cSel = [...state.cSel.slice(state.cSel.length >= MAX_COUNTRIES ? 1 : 0), k];
+  state.cLines = "countries";
+  writeHash(); syncCountryControls(); renderCountryTable(); drawCountryLines(); if (!bub.playing) moveBubbles(250);
+  document.getElementById("c-line").scrollIntoView({ behavior: "smooth", block: "center" });
+}
 function toggleCountry(k, addOnly = false) {
   if (k === HOME) return;  // always shown
   if (state.cSel.includes(k)) { if (!addOnly) state.cSel = state.cSel.filter(x => x !== k); }
@@ -2414,7 +2422,7 @@ function drawBubbles() {
   showBubbleYear(bub.year, target.sub);
   if (!el._bubBound) {
     el._bubBound = true;
-    el.on("plotly_click", ev => { const k = ev.points?.[0]?.customdata?.[6]; if (k) toggleCountry(k, true); });
+    el.on("plotly_click", ev => { const k = ev.points?.[0]?.customdata?.[6]; if (k) followCountry(k); });
   }
 }
 // move the bubbles from where they are to the target over ms milliseconds; eased for a single change,
