@@ -35,6 +35,13 @@ Tabs:
   pegged/managed/floating and region; also gold alone, and comparisons of advanced and
   emerging economies, regions, and pegged, managed and floating currencies (measured from the
   IMF's monthly exchange rates), also year by year since 1980.
+- **Gold**: central banks' gold in tonnes (IMF, IRFCL: fine troy ounces, quarterly, for the
+  countries that report them, and the ECB) and the gold price (IMF, Primary Commodity Prices): key
+  figures, the price since 2000, net purchases year by year (or the change in value split into
+  purchases and price), the biggest buyers and sellers over 1, 5 or 10 years or since 2000, holdings
+  over time for chosen countries, gold as a share of reserves, and a table. Changes count only the
+  countries with figures at both ends, since countries began reporting in different years; ounces
+  reported a thousand times too many or too few are corrected from the gold's value.
 - **Data**: the numbers as a table, with a CSV download: the world by currency (shares or
   US$, with world GDP and FX reserves as % of it), or every country (reserves with and without
   gold, gold, GDP and % of GDP, with its economy, region and exchange-rate regime; a selector with a

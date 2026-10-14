@@ -71,6 +71,12 @@ PEG_ANCHORS = {"AUS": "AUD", "CHE": "CHF", "ZAF": "ZAR", "IND": "INR", "SGP": "S
 # the same gold quarter by quarter (about 1 MB, used only here): where a year-end is missing from the yearly
 # series, its latest quarter stands in (Norway's 2004, the year it sold its gold, for example)
 IRFCL_GOLD_Q_URL = "https://api.imf.org/external/sdmx/3.0/data/dataflow/IMF.STA/IRFCL/+/*.IRFCLDT1_IRFCL56_USD.*.Q"
+# For the Gold tab: the monetary authorities' gold in fine troy ounces, quarter by quarter (IMF, IRFCL), and the
+# gold price in US$ per troy ounce, month by month (IMF, Primary Commodity Prices). The same as GOLD_URLS in the template.
+GOLD_URLS = {
+    "goldVol": "https://api.imf.org/external/sdmx/3.0/data/dataflow/IMF.STA/IRFCL/+/*.IRFCLDT1_IRFCL56V_FTO.*.Q",
+    "goldPrice": "https://api.imf.org/external/sdmx/3.0/data/dataflow/IMF.RES/PCPS/+/G001.PGOLD.USD.M",
+}
 GROUPS_URL = "https://api.imf.org/external/sdmx/3.0/structure/hierarchy/IMF.RES/H_WEO_COUNTRIES/+"
 NAMES_URL = "https://api.imf.org/external/sdmx/3.0/structure/codelist/IMF/CL_COUNTRY/+"
 CSV_TYPE = "application/vnd.sdmx.data+csv;version=2.0.0"
@@ -81,6 +87,7 @@ SHORT_NAMES = {
     "COD": "DR Congo", "COG": "Congo", "NLD": "Netherlands", "GMB": "Gambia", "FSM": "Micronesia",
     "NRU": "Nauru", "TWN": "Taiwan", "LAO": "Laos", "SYR": "Syria", "RUS": "Russia", "IRN": "Iran", "VNM": "Vietnam",
     "BRN": "Brunei", "MDA": "Moldova", "TZA": "Tanzania", "VEN": "Venezuela", "BOL": "Bolivia",
+    "EZB": "European Central Bank",  # in the IMF's gold figures, not in its list of countries
 }
 
 
@@ -193,9 +200,9 @@ def regime_history(text: str, first_year: int = 1980) -> dict:
     return {"from": first_year, "codes": out}
 
 
-def irfcl_gold(text: str) -> dict:
-    """SDMX-CSV of IRFCL gold -> {country: {year: US$ billions}}, preferring the monetary authorities and the
-    central government together (S1XS1311), then the monetary authorities (S1X)."""
+def irfcl_gold(text: str, div: float = 1e9, digits: int = 3) -> dict:
+    """SDMX-CSV of IRFCL gold -> {country: {period: US$ billions}} (or another unit: the value / div), preferring
+    the monetary authorities and the central government together (S1XS1311), then the monetary authorities (S1X)."""
     lines = text.strip().splitlines()
     h = lines[0].split(",")
     c, sec, t, v = (h.index(n) for n in ("COUNTRY", "SECTOR", "TIME_PERIOD", "OBS_VALUE"))
@@ -211,7 +218,7 @@ def irfcl_gold(text: str) -> dict:
             continue
         key = (r[c], r[t])
         if key not in best or rank[r[sec]] < best[key][0]:
-            best[key] = (rank[r[sec]], round(val / 1e9, 3))
+            best[key] = (rank[r[sec]], round(val / div, digits))
     out = {}
     for (k, y), (_, val) in best.items():
         out.setdefault(k, {})[y] = val
@@ -230,6 +237,28 @@ def year_end_gold(yearly: str, quarterly: str) -> dict:
     for (k, y), (_, v) in latest.items():
         out.setdefault(k, {}).setdefault(y, v)
     return out
+
+
+def gold_price(text: str) -> dict:
+    """SDMX-CSV of the IMF's gold price -> {month ("2026-M09"): US$ per troy ounce}, from 1999."""
+    lines = text.strip().splitlines()
+    h = lines[0].split(",")
+    t, v = h.index("TIME_PERIOD"), h.index("OBS_VALUE")
+    out = {}
+    for line in lines[1:]:
+        r = line.split(",")
+        try:
+            if r[t] >= "1999":
+                out[r[t]] = round(float(r[v]), 2)
+        except ValueError:
+            continue
+    return out
+
+
+def gold_data(raw: dict) -> dict:
+    """For the Gold tab: gold in millions of troy ounces and at market value (US$ billions, to check the ounces'
+    units with) by country and quarter, and the gold price. The page does the rest."""
+    return {"vol": irfcl_gold(raw["goldVol"], 1e6, 4), "val": irfcl_gold(raw["irgQ"]), "price": gold_price(raw["goldPrice"])}
 
 
 def country_groups(text: str) -> dict:
@@ -266,9 +295,9 @@ def countries(raw: dict) -> dict:
             "goldA": a.get("R_F11_MV", {}),
             "gdp": weo.get("NGDPD", {}), "rates": monthly_rates(raw["erM"]), "groups": country_groups(raw["groups"]), "goldIrfcl": year_end_gold(raw["irgA"], raw["irgQ"]),
             "regHist": regime_history(raw["erHist"])}
-    used = set().union(*(data[k].keys() for k in ("resQ", "resA", "goldQ", "goldA", "gdp")))
+    used = set().union(*(data[k].keys() for k in ("resQ", "resA", "goldQ", "goldA", "gdp")), irfcl_gold(raw["goldVol"]).keys())
     names = country_names(raw["names"])
-    data["names"] = {k: names.get(k, k) for k in sorted(used)}
+    data["names"] = {k: names.get(k, SHORT_NAMES.get(k, k)) for k in sorted(used)}
     return data
 
 
@@ -289,6 +318,7 @@ def main():
         raw["groups"] = (RAW.parent / "groups.json").read_text(encoding="utf-8")
         raw["erHist"] = (RAW.parent / "erHist.csv").read_text(encoding="utf-8")
         raw["irgQ"] = (RAW.parent / "irgQ.csv").read_text(encoding="utf-8")
+        raw.update({k: (RAW.parent / f"{k}.csv").read_text(encoding="utf-8") for k in GOLD_URLS})
         status = json.loads(STATUS.read_text(encoding="utf-8")) if STATUS.exists() else {}
     else:
         text, er = download(DATA_URL), download(ER_URL)
@@ -296,6 +326,7 @@ def main():
         raw = {k: download(url.format(start=start)) for k, url in COUNTRY_URLS.items()}
         raw["erHist"] = download(ER_HISTORY_URL)
         raw["irgQ"] = download(IRFCL_GOLD_Q_URL)
+        raw.update({k: download(url) for k, url in GOLD_URLS.items()})
         for k, url in (("names", NAMES_URL), ("groups", GROUPS_URL)):
             with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "cofer-dashboard"}), timeout=120) as res:
                 raw[k] = res.read().decode("utf-8")
@@ -308,7 +339,7 @@ def main():
         STATUS.write_text(json.dumps(status), encoding="utf-8")
     status["latest"] = latest_quarter(text)
 
-    data = {"csv": text, "er": er, "countries": countries(raw), **status}
+    data = {"csv": text, "er": er, "countries": countries(raw), "gold": gold_data(raw), **status}
     template = TEMPLATE.read_text(encoding="utf-8")
     page = lambda tpl, d: tpl.replace("__SNAPSHOT__", json.dumps(d, separators=(",", ":")).replace("</", "<\\/"))
     OUTPUT.parent.mkdir(exist_ok=True)

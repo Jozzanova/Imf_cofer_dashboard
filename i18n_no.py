@@ -37,8 +37,8 @@ BLOCKS = [
           et anslag fra IMF). Norges BNP er SSBs, etter <a href="https://www.ssb.no/nasjonalregnskap-og-konjunkturer/nasjonalregnskap/artikler/oppjustert-niva-og-vekst-for-verdiskaping-i-norge" target="_blank" rel="noopener">hovedrevisjonen av nasjonalregnskapet</a> i
           november 2025, som løftet BNP-nivået med om lag 4 prosent (for 2023). Kilder fra før revisjonen viser lavere BNP, som om lag 483 mrd. US$
           for 2024 mot 501 mrd. nå, og dermed høyere reserver som andel av BNP. Reservene er en beholdning og BNP en årlig strøm, slik de vanligvis sammenlignes. «Siste tilgjengelige» bruker hvert lands
-          nyeste tall, hvis det ikke er mer enn to år gammelt. Der International Investment Position mangler et tall for gull, brukes gull
-          til markedsverdi ved årsslutt fra IMFs <a href="https://data.imf.org/en/datasets/IMF.STA:IRFCL" target="_blank" rel="noopener">IRFCL</a>-statistikk
+          nyeste tall, hvis det ikke er mer enn to år gammelt. Der International Investment Position mangler et tall for gull (eller oppgir nesten
+          ingenting der IRFCL har en milliard dollar eller mer, som for Tyrkia, der reservene også er oppgitt uten gullet), brukes gull til markedsverdi for kvartalet eller ved årsslutt fra IMFs <a href="https://data.imf.org/en/datasets/IMF.STA:IRFCL" target="_blank" rel="noopener">IRFCL</a>-statistikk
           (Norges gull, solgt i 2004, finnes bare der); mangler begge, antas landets sist rapporterte beholdning. Land som ikke er medlemmer av IMF (som Taiwan) eller ikke rapporterer, mangler.
           Dette er nasjonale totaler, ikke valutasammensetningen: den publiserer IMF bare for verden samlet.
           Avanserte økonomier og fremvoksende økonomier og regionene er gruppene i World Economic Outlook. Valutaregimene måles ut fra
@@ -85,6 +85,7 @@ PAIRS = [
     ('aria-controls="tab-explore">Explore ✦</button>', 'aria-controls="tab-explore">Utforsk ✦</button>'),
     ('aria-controls="tab-data">Data</button>', 'aria-controls="tab-data">Data</button>'),
     ('aria-controls="tab-country">Single country</button>', 'aria-controls="tab-country">Enkeltland</button>'),
+    ('aria-controls="tab-gold">Gold</button>', 'aria-controls="tab-gold">Gull</button>'),
     ('aria-label="Selection"', 'aria-label="Utvalg"'),
     ('<span class="lbl">Currencies</span>', '<span class="lbl">Valutaer</span>'),
     ('id="cur-all">All</button>', 'id="cur-all">Alle</button>'),
@@ -474,7 +475,7 @@ NAMES = {
     "MDG": "Madagaskar", "MDV": "Maldivene", "MEX": "Mexico", "MHL": "Marshalløyene", "MKD": "Nord-Makedonia", "MLI": "Mali",
     "MLT": "Malta", "MMR": "Myanmar", "MNE": "Montenegro", "MNG": "Mongolia", "MOZ": "Mosambik", "MRT": "Mauritania",
     "MSR": "Montserrat", "MUS": "Mauritius", "MWI": "Malawi", "MYS": "Malaysia", "NAM": "Namibia", "NER": "Niger", "NGA": "Nigeria",
-    "NIC": "Nicaragua", "NLD": "Nederland", "NOR": "Norge", "NPL": "Nepal", "NRU": "Nauru", "NZL": "New Zealand", "OMN": "Oman",
+    "NIC": "Nicaragua", "NLD": "Nederland", "NOR": "Norge", "EZB": "Den europeiske sentralbanken", "NPL": "Nepal", "NRU": "Nauru", "NZL": "New Zealand", "OMN": "Oman",
     "PAK": "Pakistan", "PAN": "Panama", "PER": "Peru", "PHL": "Filippinene", "PLW": "Palau", "PNG": "Papua Ny-Guinea",
     "POL": "Polen", "PRI": "Puerto Rico", "PRT": "Portugal", "PRY": "Paraguay", "QAT": "Qatar", "ROU": "Romania",
     "RUS": "Russland", "RWA": "Rwanda", "SAU": "Saudi-Arabia", "SDN": "Sudan", "SEN": "Senegal", "SGP": "Singapore",

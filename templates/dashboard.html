@@ -198,7 +198,7 @@
     padding: 10px 12px; margin: 4px 0 14px; }
   .insight:empty { display: none; }
   .grid2.inner { margin-bottom: 0; }
-  #tab-explore, #tab-countries, #tab-country { margin-top: 16px; }
+  #tab-explore, #tab-countries, #tab-country, #tab-gold { margin-top: 16px; }
   .slide-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 8px 16px; }
   .slide-no { font-size: 11.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--accent); }
   .slide-head h2 { font-size: 19px; margin-top: 2px; }
@@ -277,6 +277,7 @@
     <button role="tab" id="tab-btn-shares" data-tab="shares" aria-controls="tab-shares">Currencies</button>
     <button role="tab" id="tab-btn-changes" data-tab="changes" aria-controls="tab-changes">Changes</button>
     <button role="tab" id="tab-btn-countries" data-tab="countries" aria-controls="tab-countries">Countries</button>
+    <button role="tab" id="tab-btn-gold" data-tab="gold" aria-controls="tab-gold">Gold</button>
     <button role="tab" id="tab-btn-data" data-tab="data" aria-controls="tab-data">Data</button>
     <button role="tab" id="tab-btn-country" data-tab="country" aria-controls="tab-country">Single country</button>
     <button role="tab" id="tab-btn-explore" data-tab="explore" aria-controls="tab-explore">Explore ✦</button>
@@ -500,6 +501,8 @@
     </section>
   </div>
 
+  <!-- Gold -->
+  <div role="tabpanel" id="tab-gold" aria-labelledby="tab-btn-gold" hidden><div id="gold"></div></div>
   <!-- Single country: slides -->
   <div role="tabpanel" id="tab-country" aria-labelledby="tab-btn-country" hidden><div id="slides"></div></div>
 
@@ -586,8 +589,8 @@
           an IMF estimate). Norway's GDP is Statistics Norway's, after its <a href="https://www.ssb.no/nasjonalregnskap-og-konjunkturer/nasjonalregnskap/artikler/oppjustert-niva-og-vekst-for-verdiskaping-i-norge" target="_blank" rel="noopener">main revision of the national accounts</a> in
           November 2025, which raised the level of GDP by about 4% (for 2023). Sources from before it show a lower GDP, such as about US$ 483 bn
           for 2024 against 501 bn now, and so higher reserves as a share of GDP. Reserves are a stock and GDP a yearly flow, the usual way to compare them. "Latest available" uses each country's most
-          recent figure, if it is no more than two years old. Where the International Investment Position has no gold figure, the year-end
-          gold at market value from the IMF's <a href="https://data.imf.org/en/datasets/IMF.STA:IRFCL" target="_blank" rel="noopener">IRFCL</a>
+          recent figure, if it is no more than two years old. Where the International Investment Position has no gold figure (or gives next to none
+          where the IRFCL has a billion dollars or more, as for Türkiye, whose reserve assets there also leave it out), the quarter's or year-end gold at market value from the IMF's <a href="https://data.imf.org/en/datasets/IMF.STA:IRFCL" target="_blank" rel="noopener">IRFCL</a>
           statistics is used (Norway's gold, sold in 2004, is only there); failing both, a country's last reported amount is assumed. Countries that are not IMF members (such as Taiwan) or do not report are missing.
           These are national totals, not their currency composition: the IMF publishes that only for the world as a whole.
           Advanced and emerging economies and the regions are the World Economic Outlook's groups. Exchange-rate regimes are measured from
@@ -703,18 +706,18 @@ const source = { kind: "snapshot", at: SNAPSHOT.downloaded, checking: true };
 const state = {
   tab: "shares", cur: CURS.map(c => c.k), freq: "Q", period: "all",
   shView: "stack", shLog: false, amView: "stack", amLog: false, sel: "", shShow: [], amShow: [],
-  chFrom: "", chTo: "", chMetric: "bn", chCur: "USD", dtMetric: "share", dtSet: "cur", dtYear: "latest", dtCty: [], scCty: "NOR",
+  chFrom: "", chTo: "", chMetric: "bn", chCur: "USD", dtMetric: "share", dtSet: "cur", dtYear: "latest", dtCty: [], scCty: "NOR", gYear: "t", gPer: "5y", gShare: "pct", gSel: [], gLog: false,
   raceMetric: "share", raceNoUSD: false, raceSpeed: "1", fxBase: "2016-Q4", fxCur: "USD", flShow: [], fxShow: [],
   cMeasure: "pct", cGold: "with", cYear: "latest", cSort: "v", cDir: "desc", gb: "eu_AE_float~eu_AE_peg", cGroup: "regime", cFilter: "all", cLines: "regime", cAgg: "combined", gScale: "log",
   bY: "bn", bColor: "regime", bEcon: ["AE"], bReg: ["peg", "managed", "float"], bRegion: "all", bSpeed: "1", bLabels: "10", cSel: ["CHE", "HKG", "SAU", "CHN", "JPN", "USA"],
 };
-const LIST_KEYS = new Set(["cur", "cSel", "dtCty", "bEcon", "bReg", "shShow", "amShow", "flShow", "fxShow"]);
-const TABS = ["shares", "changes", "countries", "data", "country", "explore"];
+const LIST_KEYS = new Set(["cur", "cSel", "dtCty", "gSel", "bEcon", "bReg", "shShow", "amShow", "flShow", "fxShow"]);
+const TABS = ["shares", "changes", "countries", "gold", "data", "country", "explore"];
 function readHash() {
   const p = new URLSearchParams(location.hash.slice(1));
   for (const [k, v] of p) {
     if (!(k in state)) continue;
-    if (LIST_KEYS.has(k)) state[k] = v ? v.split(",").filter(x => ["cur", "shShow", "flShow", "fxShow"].includes(k) ? CUR[x] : k === "amShow" ? CUR[x] || x === "UN" : k === "cSel" || k === "dtCty" ? /^[A-Z]{3}$/.test(x) : /^\w+$/.test(x)) : [];
+    if (LIST_KEYS.has(k)) state[k] = v ? v.split(",").filter(x => ["cur", "shShow", "flShow", "fxShow"].includes(k) ? CUR[x] : k === "amShow" ? CUR[x] || x === "UN" : k === "cSel" || k === "dtCty" || k === "gSel" ? /^[A-Z]{3}$/.test(x) : /^\w+$/.test(x)) : [];
     else if (typeof state[k] === "boolean") state[k] = v === "1";
     else state[k] = v;
   }
@@ -722,6 +725,10 @@ function readHash() {
   if (state.tab === "norway") state.tab = "country";  // the tab was called Norway
   if (!TABS.includes(state.tab)) state.tab = "shares";
   if (!/^[A-Z]{3}$/.test(state.scCty)) state.scCty = "NOR";
+  if (!["t", "usd"].includes(state.gYear)) state.gYear = "t";
+  if (!["1y", "5y", "10y", "2000"].includes(state.gPer)) state.gPer = "5y";
+  if (!["pct", "bn"].includes(state.gShare)) state.gShare = "pct";
+  state.gSel = state.gSel.slice(0, 8);
   if (!["Q", "A"].includes(state.freq)) state.freq = "Q";
   if (!CUR[state.chCur] || CUR[state.chCur].yearlyOnly) state.chCur = "USD";
   if (!["share", "bn"].includes(state.raceMetric)) state.raceMetric = "share";
@@ -1280,7 +1287,7 @@ function syncControls() {
   setPressed(document.getElementById("dt-metric-seg"), state.dtMetric);
   document.getElementById("sh-log").checked = state.shLog;
   document.getElementById("am-log").checked = state.amLog;
-  document.getElementById("controls").hidden = ["explore", "countries", "country"].includes(state.tab) || (state.tab === "data" && state.dtSet === "cty");
+  document.getElementById("controls").hidden = ["explore", "countries", "country", "gold"].includes(state.tab) || (state.tab === "data" && state.dtSet === "cty");
   document.getElementById("hint").textContent = state.tab === "changes"
     ? "The period chosen here sets the right-hand chart; the left one compares the two dates above it." : "";
 }
@@ -1708,8 +1715,8 @@ const COUNTRY_URLS = {
   erM: "https://api.imf.org/external/sdmx/3.0/data/dataflow/IMF.STA/ER/+/*.XDC_USD.EOP_RT.M?c%5BTIME_PERIOD%5D=ge:{start}",
   irgA: "https://api.imf.org/external/sdmx/3.0/data/dataflow/IMF.STA/IRFCL/+/*.IRFCLDT1_IRFCL56_USD.*.A",
 };
-// IRFCL gold at each year's end -> {country: {year: US$ bn}}, preferring sector S1XS1311, then S1X (as in update.py)
-function sdmxGold(text) {
+// IRFCL gold -> {country: {period: US$ bn}} (or another unit: the value / div), preferring sector S1XS1311, then S1X (as in update.py)
+function sdmxGold(text, div = 1e9, digits = 3) {
   const lines = text.trim().split(/\r?\n/), h = lines[0].split(",");
   const [c, sec, t, v] = ["COUNTRY", "SECTOR", "TIME_PERIOD", "OBS_VALUE"].map(n => h.indexOf(n));
   const rank = { S1XS1311: 0, S1X: 1, S1311: 2 }, best = {}, out = {};
@@ -1717,7 +1724,7 @@ function sdmxGold(text) {
     const r = lines[n].split(","), val = parseFloat(r[v]);
     if (!/^[A-Z]{3}$/.test(r[c]) || !(r[sec] in rank) || !isFinite(val)) continue;
     const key = `${r[c]}|${r[t]}`;
-    if (!best[key] || rank[r[sec]] < best[key][0]) best[key] = [rank[r[sec]], Math.round(val / 1e6) / 1e3];
+    if (!best[key] || rank[r[sec]] < best[key][0]) best[key] = [rank[r[sec]], Math.round(val / div * 10 ** digits) / 10 ** digits];
   }
   for (const [key, [, val]] of Object.entries(best)) { const [k, y] = key.split("|"); (out[k] ||= {})[y] = val; }
   return out;
@@ -1742,6 +1749,8 @@ let CC = null;  // assembled per-country series, rebuilt when CD changes
 
 // One point per quarter that has a reserves figure; yearly figures fill in the fourth quarter of years
 // without quarterly data. GDP is the calendar year's.
+// the IRFCL's gold at market value, quarterly (from the Gold tab's figures: the build's, or the live ones once fetched)
+const irfclGoldQ = () => globalThis.__goldVal || SNAPSHOT.gold?.val || {};
 function assembleCountries() {
   const out = {};
   const codes = new Set([...Object.keys(CD.resQ), ...Object.keys(CD.resA)]);
@@ -1752,14 +1761,19 @@ function assembleCountries() {
       const p = `${y}-Q4`;
       if (!pts.has(p)) pts.set(p, { p, res: v, gold: CD.goldA[k]?.[y] ?? null });
     }
-    const irg = CD.goldIrfcl?.[k], hasGold = !!(CD.goldQ[k] || CD.goldA[k] || irg);
+    const irg = CD.goldIrfcl?.[k], irq = irfclGoldQ()[k], hasGold = !!(CD.goldQ[k] || CD.goldA[k] || irg || irq);
     const list = [...pts.values()].sort((a, b) => a.p < b.p ? -1 : 1);
     let lastGold = null;
     for (const pt of list) {
       pt.gdp = CD.gdp[k]?.[pt.p.slice(0, 4)] ?? null;
-      // where the IIP has no gold figure, the IRFCL's figure for that year's end (Norway's gold, sold in 2004,
-      // is only there); failing both, a country is taken to keep its last reported amount; one without any
-      // gold figures is taken to hold none; before its first figure, unknown
+      // where the IIP has no gold figure, the IRFCL's for that quarter, or else for that year's end (Norway's gold,
+      // sold in 2004, is only there); also where the IIP has next to none but the IRFCL a billion dollars or more
+      // (Türkiye's IIP gives its gold as zero); failing both, a country is taken to keep its last reported amount;
+      // one without any gold figures is taken to hold none; before its first figure, unknown
+      // (Türkiye's IIP gives its gold as zero, and its reserve assets without it, so the gold is added to them too)
+      const iq = irq?.[pt.p];
+      if (fin(iq) && fin(pt.gold) && iq > 1 && pt.gold < 0.1 * iq) { pt.res += iq - pt.gold; pt.gold = iq; }
+      else if (fin(iq) && !fin(pt.gold)) pt.gold = iq;
       if (!fin(pt.gold) && fin(irg?.[pt.p.slice(0, 4)])) pt.gold = irg[pt.p.slice(0, 4)];
       if (fin(pt.gold)) lastGold = pt.gold;
       else if (lastGold != null) pt.gold = Math.min(lastGold, pt.res);
@@ -2454,6 +2468,244 @@ document.getElementById("b-filters").addEventListener("click", e => {
 });
 document.getElementById("b-region").addEventListener("change", e => { state.bRegion = e.target.value; writeHash(); if (!bub.playing) moveBubbles(); });
 
+// ---------- Gold ----------
+// The monetary authorities' gold in fine troy ounces, quarter by quarter (IMF, IRFCL), with its value to check the
+// ounces' units against, and the gold price in US$ per troy ounce, the month's average (IMF, Primary Commodity
+// Prices). The same addresses as update.py. Countries report from different years (China from 2015, for
+// example), so changes are measured only for countries with figures at both ends.
+const GOLD_URLS = {
+  vol: "https://api.imf.org/external/sdmx/3.0/data/dataflow/IMF.STA/IRFCL/+/*.IRFCLDT1_IRFCL56V_FTO.*.Q",
+  val: "https://api.imf.org/external/sdmx/3.0/data/dataflow/IMF.STA/IRFCL/+/*.IRFCLDT1_IRFCL56_USD.*.Q",
+  price: "https://api.imf.org/external/sdmx/3.0/data/dataflow/IMF.RES/PCPS/+/G001.PGOLD.USD.M",
+};
+const OZ_PER_T = 32150.7466;  // troy ounces in a tonne
+let GD = SNAPSHOT.gold, GT = null;
+const gLive = { state: "idle" };
+const GX = LANG === "no" ? {
+  title: "Gull i sentralbankenes reserver",
+  intro: "Pengemyndighetenes gull i tonn, landene som rapporterer det til IMF hvert kvartal, og gullprisen. Endringer måles bare for land med tall i begge ender av perioden, siden landene har begynt å rapportere i ulike år (Kina fra 2015, for eksempel).",
+  price: "Gullpris", perOz: "US$ per unse", yr: "på et år", held: "Gull i reservene", tonnes: "tonn", countries: n => `${n} land og ESB`,
+  bought: "Kjøpt siste år", net: "netto", value: "Verdi", atPrice: "til dagens pris", share: "Gull, andel av reservene", shareN: n => `${n} land med tall`,
+  priceT: "Gullprisen", priceSub: "US$ per troy unse, månedens gjennomsnitt",
+  yearT: "År for år: kjøp eller pris?", yearSubT: "Netto kjøp, tonn, for landene med tall ved begge årsskiftene", yearSubV: "Endring i gullets verdi, mrd. US$: kjøp (til årets sluttpris) og prisendring (på beholdningen ved årets start)",
+  yearSeg: [["t", "Tonn kjøpt"], ["usd", "Kjøp eller pris, US$"]], buys: "Kjøp", priceEff: "Prisendring", to: q => ` (til ${label(q)})`,
+  moverT: "Største kjøpere og selgere", moverSub: (n, a, b) => `Endring i tonn, ${label(a)}–${label(b)}; ${n} land med tall begge gangene`,
+  perSeg: [["1y", "1 år"], ["5y", "5 år"], ["10y", "10 år"], ["2000", "Siden 2000"]],
+  holdT: "Beholdning over tid", holdSub: "Tonn, kvartalsvis; et land kommer med fra det begynner å rapportere", add: "Legg til et land", log: "Logaritmisk skala",
+  shareT: "Gull som andel av reservene", shareSubP: "De 20 høyeste andelene, siste tall; gull til markedsverdi", shareSubB: "De 20 største beholdningene, mrd. US$ til markedsverdi, siste tall",
+  shareSeg: [["pct", "% av reservene"], ["bn", "Mrd. US$"]],
+  tableT: "Alle landene", cols: ["Land", "Tonn", "Per", "Endring 1 år, t", "Endring 5 år, t", "Verdi, mrd. US$", "Gull, % av reservene"],
+  notes: "Kilder: IMF, International Reserves and Foreign Currency Liquidity (gull i fine troy unser; tonn = unser / 32 150,7), IMF, Primary Commodity Prices (gullpris) og IMF, International Investment Position (andel av reservene). Verdien er tonn ganger dagens gullpris: noen land, som USA, regnskapsfører gullet til en fast bokført pris. Noen tall er rapportert i tusen ganger for mange eller for få unser; de er rettet ut fra gullets verdi eller kvartalet før. Noen store eiere rapporterer ikke unser til IMF (Usbekistan, Libanon, Taiwan og Qatar, for eksempel), så summene er for landene som gjør det.",
+  live: { idle: "", loading: "Henter IMFs nyeste tall …", live: "Direkte fra IMF.", failed: "IMF svarte ikke; viser kopien fra da siden ble laget." },
+} : {
+  title: "Gold in central banks' reserves",
+  intro: "The monetary authorities' gold in tonnes, for the countries that report it to the IMF each quarter, and the gold price. Changes are measured only for countries with figures at both ends of a period, since countries began reporting in different years (China from 2015, for example).",
+  price: "Gold price", perOz: "US$ per ounce", yr: "in a year", held: "Gold in reserves", tonnes: "tonnes", countries: n => `${n} countries and the ECB`,
+  bought: "Bought in the past year", net: "net", value: "Value", atPrice: "at today's price", share: "Gold, share of reserves", shareN: n => `${n} countries with figures`,
+  priceT: "The gold price", priceSub: "US$ per troy ounce, the month's average",
+  yearT: "Year by year: buying or price?", yearSubT: "Net purchases, tonnes, of the countries with figures at both year-ends", yearSubV: "Change in the gold's value, US$ bn: purchases (at the year's closing price) and the change in price (on the holdings at the start of the year)",
+  yearSeg: [["t", "Tonnes bought"], ["usd", "Buying or price, US$"]], buys: "Purchases", priceEff: "Change in price", to: q => ` (to ${label(q)})`,
+  moverT: "Biggest buyers and sellers", moverSub: (n, a, b) => `Change in tonnes, ${label(a)}–${label(b)}; ${n} countries with figures at both dates`,
+  perSeg: [["1y", "1 year"], ["5y", "5 years"], ["10y", "10 years"], ["2000", "Since 2000"]],
+  holdT: "Holdings over time", holdSub: "Tonnes, quarterly; a country appears from when it starts reporting", add: "Add a country", log: "Log scale",
+  shareT: "Gold as a share of reserves", shareSubP: "The 20 highest shares, latest figures; gold at market value", shareSubB: "The 20 largest holdings, US$ bn at market value, latest figures",
+  shareSeg: [["pct", "% of reserves"], ["bn", "US$ bn"]],
+  tableT: "All the countries", cols: ["Country", "Tonnes", "As of", "Change 1 year, t", "Change 5 years, t", "Value, US$ bn", "Gold, % of reserves"],
+  notes: "Sources: IMF, International Reserves and Foreign Currency Liquidity (gold in fine troy ounces; tonnes = ounces / 32,150.7), IMF, Primary Commodity Prices (gold price) and IMF, International Investment Position (share of reserves). The value is tonnes times today's gold price: some countries, such as the US, carry their gold at a fixed book price. Some figures are reported in a thousand times too many or too few ounces; they are corrected from the gold's value or the quarter before. Some large holders do not report ounces to the IMF (Uzbekistan, Lebanon, Taiwan and Qatar, for example), so the totals are for those that do.",
+  live: { idle: "", loading: "Fetching the IMF's latest figures …", live: "Live from the IMF.", failed: "The IMF did not answer; showing the copy from when the page was built." },
+};
+const priceKey = q => `${q.slice(0, 4)}-M${String(+q.slice(-1) * 3).padStart(2, "0")}`;
+const qDate = q => `${q.slice(0, 4)}-${["03-31", "06-30", "09-30", "12-31"][+q.slice(-1) - 1]}`;
+const gName = k => CD.names[k] || k;
+// tonnes by country and quarter, with the units checked; the quarters from 2000 to the latest most countries have reported
+function goldTonnes() {
+  const t = {}, near = (r, s) => Math.abs(Math.log(r / s)) < Math.log(1.5);
+  for (const [k, qs] of Object.entries(GD.vol || {})) {
+    if (!/^[A-Z]{3}$/.test(k)) continue;
+    const out = {};
+    let prev = null;
+    for (const q of Object.keys(qs).sort()) {
+      let oz = qs[q];
+      if (!fin(oz) || oz < 0) continue;
+      // a thousand times too many or too few ounces: against the market value where there is one (a value at a
+      // fixed book price, as in the US, is far off but never by a factor near 1,000), else against the quarter before
+      const v = GD.val?.[k]?.[q], p = GD.price[priceKey(q)];
+      if (oz > 0 && v > 0 && p) { const r = v * 1e3 / (oz * p); if (near(r, 1e-3)) oz /= 1e3; else if (near(r, 1e3)) oz *= 1e3; }
+      else if (oz > 0 && prev > 0) { const r = oz / prev; if (r > 500 && r < 2000) oz /= 1e3; else if (r < 1 / 500 && r > 1 / 2000) oz *= 1e3; }
+      out[q] = oz * 1e6 / OZ_PER_T;
+      prev = oz;
+    }
+    if (Object.keys(out).length) t[k] = out;
+  }
+  const count = {};
+  for (const qs of Object.values(t)) for (const q of Object.keys(qs)) count[q] = (count[q] || 0) + 1;
+  const all = Object.keys(count).sort(), recent = all.slice(-12).map(q => count[q]);
+  const end = [...all].reverse().find(q => count[q] >= 0.85 * Math.max(...recent));
+  const quarters = all.filter(q => q >= "2000-Q1" && q <= end);
+  const months = Object.keys(GD.price).filter(m => m >= "2000").sort();
+  return { t, end, quarters, months };
+}
+// a country's latest figure up to the end quarter, if no more than a year old
+function gLatest(k) {
+  const qs = GT.t[k]; if (!qs) return null;
+  for (let i = 0; i <= 4; i++) { const q = quarterBack(GT.end, i); if (fin(qs[q])) return { q, v: qs[q] }; }
+  return null;
+}
+async function loadGoldLive() {
+  gLive.state = "loading";
+  try {
+    const texts = await Promise.all(Object.values(GOLD_URLS).map(async u => {
+      const res = await fetch(u, { headers: { Accept: CSV_TYPE }, cache: "no-store" });
+      if (!res.ok) throw new Error(`the IMF answered ${res.status}`);
+      return res.text();
+    }));
+    const vol = sdmxGold(texts[0], 1e6, 4), val = sdmxGold(texts[1]), price = {};
+    const lines = texts[2].trim().split(/\r?\n/), h = lines[0].split(","), ti = h.indexOf("TIME_PERIOD"), vi = h.indexOf("OBS_VALUE");
+    for (let n = 1; n < lines.length; n++) { const r = lines[n].split(","), v = parseFloat(r[vi]); if (r[ti] >= "1999" && isFinite(v)) price[r[ti]] = Math.round(v * 100) / 100; }
+    if (!Object.keys(vol).length || !Object.keys(price).length) throw new Error("the IMF's answer had no figures");
+    GD = { vol, val, price }; GT = null;
+    globalThis.__goldVal = val; if (CC) assembleCountries();  // the countries' gold too
+    gLive.state = "live";
+  } catch (err) {
+    gLive.state = "failed";
+  }
+  if (state.tab === "gold") renderGold();
+}
+function renderGold() {
+  if (!CC) assembleCountries();
+  if (!GT) GT = goldTonnes();
+  if (gLive.state === "idle") loadGoldLive();
+  const no = LANG === "no", el = document.getElementById("gold"), end = GT.end;
+  const seg = (key, opts) => `<div class="seg" role="group">${opts.map(([v, t]) => `<button type="button" data-g="${key}" data-v="${v}" aria-pressed="${state[key] === v}">${t}</button>`).join("")}</div>`;
+  const tile = (lab, value, note) => `<div class="tile"><div class="label">${lab}</div><div class="value">${value}</div><div class="note">${note}</div></div>`;
+  const ks = Object.keys(GT.t);
+  // key figures
+  const m1 = GT.months.at(-1), m0 = GT.months[GT.months.length - 13], p1 = GD.price[m1], pg = (p1 / GD.price[m0] - 1) * 100;
+  const latest = ks.map(k => ({ k, ...gLatest(k) })).filter(r => fin(r.v));
+  const total = latest.reduce((s, r) => s + r.v, 0);
+  const yearAgo = quarterBack(end, 4), both = ks.filter(k => fin(GT.t[k][end]) && fin(GT.t[k][yearAgo]));
+  const bought = both.reduce((s, k) => s + GT.t[k][end] - GT.t[k][yearAgo], 0);
+  const valueBn = total * OZ_PER_T * p1 / 1e9;
+  const minP = quarterBack(CC_LATEST, 8), withRes = Object.values(CC).map(c => [...c.pts].reverse().find(pt => fin(pt.res) && fin(pt.gold) && pt.p >= minP)).filter(Boolean);
+  const share = withRes.reduce((s, pt) => s + pt.gold, 0) / withRes.reduce((s, pt) => s + pt.res, 0) * 100;
+  const nC = latest.filter(r => r.k !== "EZB").length;
+  const tiles = tile(GX.price, `$${fmt(p1, 0)}`, `${GX.perOz}, ${m1.replace("-M", "-")} · <span class="${cls(pg)}">${signed(pg, 1, "%")}</span> ${GX.yr}`)
+    + tile(GX.held, `${fmt(total, 0)} ${GX.tonnes}`, `${GX.countries(nC)}, ${label(end)}`)
+    + tile(GX.bought, `<span class="${cls(bought)}">${signed(bought, 0)}</span> ${GX.tonnes}`, `${GX.net}, ${label(yearAgo)}–${label(end)}`)
+    + tile(GX.value, `$${fmt(valueBn, 0)} ${no ? "mrd." : "bn"}`, GX.atPrice)
+    + tile(GX.share, `${fmt(share, 1)}%`, GX.shareN(withRes.length));
+  // default countries for the chart over time: the six largest holders, and Norway
+  const top = latest.slice().sort((a, b) => b.v - a.v).map(r => r.k);
+  if (!state.gSel.length) state.gSel = top.slice(0, 6);
+  const chosen = [...state.gSel.filter(k => GT.t[k] && k !== HOME), ...(GT.t[HOME] ? [HOME] : [])];
+  const others = ks.filter(k => !chosen.includes(k)).sort((a, b) => gName(a).localeCompare(gName(b), no ? "nb" : "en"));
+  el.innerHTML = `
+    <section class="card"><h2>${GX.title}</h2><p class="sub" style="margin:0">${GX.intro}</p>
+      <div class="tiles">${tiles}</div><p class="hint">${GX.live[gLive.state] || ""}</p></section>
+    <div class="grid2">
+      <section class="card"><div class="card-head"><div><h2>${GX.priceT}</h2><p class="sub">${GX.priceSub}</p></div></div><div class="chart" id="g-price"></div></section>
+      <section class="card"><div class="card-head"><div><h2>${GX.yearT}</h2><p class="sub">${state.gYear === "usd" ? GX.yearSubV : GX.yearSubT}</p></div>
+        <div class="row">${seg("gYear", GX.yearSeg)}</div></div><div class="chart" id="g-year"></div></section>
+    </div>
+    <div class="grid2">
+      <section class="card"><div class="card-head"><div><h2>${GX.moverT}</h2><p class="sub" id="g-mover-sub"></p></div>
+        <div class="row">${seg("gPer", GX.perSeg)}</div></div><div class="chart" id="g-mover" style="height:560px"></div></section>
+      <section class="card"><div class="card-head"><div><h2>${GX.shareT}</h2><p class="sub">${state.gShare === "bn" ? GX.shareSubB : GX.shareSubP}</p></div>
+        <div class="row">${seg("gShare", GX.shareSeg)}</div></div><div class="chart" id="g-share" style="height:560px"></div></section>
+    </div>
+    <section class="card"><div class="card-head"><div><h2>${GX.holdT}</h2><p class="sub">${GX.holdSub}</p></div>
+      <div class="row"><select id="g-add" aria-label="${GX.add}"><option value="">${GX.add} …</option>${others.map(k => `<option value="${k}">${esc(gName(k))}</option>`).join("")}</select>
+        <label class="check"><input type="checkbox" id="g-log"${state.gLog ? " checked" : ""}> ${GX.log}</label></div></div>
+      <div class="chips" id="g-chips">${chosen.map((k, i) => k === HOME
+        ? `<span class="chip" aria-pressed="true"><span class="dot" style="background:${css("--text-primary")}"></span>${esc(gName(k))} ★</span>`
+        : `<button class="chip" type="button" aria-pressed="true" data-k="${k}"><span class="dot" style="background:${css(SLOTS[i % SLOTS.length])}"></span>${esc(gName(k))} ×</button>`).join("")}</div>
+      <div class="chart" id="g-hold"></div></section>
+    <section class="card"><h2>${GX.tableT}</h2><div class="table-wrap scroll-y"><table id="gold-table"></table></div><p class="hint">${GX.notes}</p></section>`;
+
+  // the gold price
+  plot(document.getElementById("g-price"), [{ type: "scatter", mode: "lines", x: GT.months.map(m => `${m.replace("-M", "-")}-15`), y: GT.months.map(m => GD.price[m]),
+    line: { color: css("--s4"), width: 2 }, customdata: GT.months.map(m => `$${fmt(GD.price[m], 0)}`), hovertemplate: "%{customdata}<extra></extra>" }],
+    baseLayout({ showlegend: false, hovermode: "x unified", xaxis: { hoverformat: "%b %Y" }, yaxis: { tickprefix: "$", rangemode: "tozero" } }));
+
+  // year by year: net purchases, or the change in value split into purchases and price
+  const lastYear = +end.slice(0, 4), yrs = [];
+  for (let y = 2001; y <= lastYear; y++) {
+    const q0 = `${y - 1}-Q4`, q1 = y === lastYear ? end : `${y}-Q4`;
+    if (q1 <= q0) continue;
+    const pa = GD.price[priceKey(q0)], pb = GD.price[priceKey(q1)];
+    let tb = 0, buy = 0, pr = 0;
+    for (const k of ks) {
+      const a = GT.t[k][q0], b = GT.t[k][q1];
+      if (!fin(a) || !fin(b)) continue;
+      tb += b - a; buy += (b - a) * OZ_PER_T * pb / 1e9; pr += a * OZ_PER_T * (pb - pa) / 1e9;
+    }
+    yrs.push({ x: String(y), lab: `${y}${q1.endsWith("Q4") ? "" : GX.to(q1)}`, tb, buy, pr });
+  }
+  const bn = no ? " mrd." : " bn";
+  const yTr = state.gYear === "usd"
+    ? [{ type: "bar", name: GX.buys, x: yrs.map(r => r.x), y: yrs.map(r => r.buy), marker: { color: css("--s1") }, customdata: yrs.map(r => [r.lab, signed(r.buy, 0, bn)]), hovertemplate: `%{customdata[0]}: %{customdata[1]}<extra>${GX.buys}</extra>` },
+       { type: "bar", name: GX.priceEff, x: yrs.map(r => r.x), y: yrs.map(r => r.pr), marker: { color: css("--s4") }, customdata: yrs.map(r => [r.lab, signed(r.pr, 0, bn)]), hovertemplate: `%{customdata[0]}: %{customdata[1]}<extra>${GX.priceEff}</extra>` }]
+    : [{ type: "bar", x: yrs.map(r => r.x), y: yrs.map(r => r.tb), marker: { color: yrs.map(r => css(r.tb >= 0 ? "--pos" : "--neg")) },
+       customdata: yrs.map(r => [r.lab, signed(r.tb, 0, ` ${GX.tonnes}`)]), hovertemplate: "%{customdata[0]}: %{customdata[1]}<extra></extra>" }];
+  plot(document.getElementById("g-year"), yTr, baseLayout({ barmode: "relative", showlegend: state.gYear === "usd", hovermode: "closest",
+    yaxis: { ticksuffix: state.gYear === "usd" ? bn : " t", zerolinecolor: css("--axis") }, xaxis: { type: "category", dtick: 5 } }));
+
+  // biggest buyers and sellers over the chosen period
+  const q0 = state.gPer === "2000" ? "2000-Q4" : quarterBack(end, { "1y": 4, "5y": 20, "10y": 40 }[state.gPer] || 20);
+  const ch = ks.filter(k => fin(GT.t[k][q0]) && fin(GT.t[k][end])).map(k => ({ k, d: GT.t[k][end] - GT.t[k][q0] }));
+  const buyers = ch.filter(r => r.d > 0.05).sort((a, b) => b.d - a.d).slice(0, 12), sellers = ch.filter(r => r.d < -0.05).sort((a, b) => a.d - b.d).slice(0, 8).reverse();
+  let rowsM = [...buyers, ...sellers];
+  const nor = ch.find(r => r.k === HOME);
+  if (nor && !rowsM.includes(nor)) rowsM.push(nor);
+  rowsM.sort((a, b) => b.d - a.d);
+  document.getElementById("g-mover-sub").textContent = GX.moverSub(ch.length, q0, end);
+  plot(document.getElementById("g-mover"), [{ type: "bar", orientation: "h", y: rowsM.map(r => r.k === HOME ? `<b>★ ${esc(gName(r.k))}</b>` : esc(gName(r.k))), x: rowsM.map(r => r.d),
+    marker: { color: rowsM.map(r => css(r.k === HOME ? "--text-primary" : r.d >= 0 ? "--pos" : "--neg")) }, text: rowsM.map(r => signed(r.d, r.d && Math.abs(r.d) < 10 ? 1 : 0)), textposition: "outside", cliponaxis: false,
+    textfont: { color: css("--text-secondary"), size: 11 }, customdata: rowsM.map(r => signed(r.d, 1, ` ${GX.tonnes}`)), hovertemplate: "%{y}: %{customdata}<extra></extra>" }],
+    baseLayout({ showlegend: false, bargap: 0.25, margin: { l: 8, r: 50, t: 8, b: 8 }, yaxis: { autorange: "reversed", showgrid: false, automargin: true, tickfont: { size: 12, color: css("--text-secondary") } },
+      // room beyond the longest bars for their labels
+      xaxis: { showgrid: true, ticksuffix: " t", zerolinecolor: css("--axis"), range: (() => { const lo = Math.min(0, ...rowsM.map(r => r.d)), hi = Math.max(0, ...rowsM.map(r => r.d)), pad = (hi - lo) * 0.16; return [lo - (lo < 0 ? pad : 0), hi + pad]; })() } }));
+
+  // gold as a share of reserves (or its value), from the countries' reserve figures
+  const sh = Object.values(CC).map(c => { const pt = [...c.pts].reverse().find(p => fin(p.res) && fin(p.gold) && p.res > 0 && p.p >= minP); return pt && { k: c.k, name: c.name, pct: pt.gold / pt.res * 100, bn: pt.gold, p: pt.p }; }).filter(Boolean);
+  const byBn = state.gShare === "bn", f = r => byBn ? r.bn : r.pct;
+  const rowsS = sh.slice().sort((a, b) => f(b) - f(a)).slice(0, 20), shNor = sh.find(r => r.k === HOME);
+  if (shNor && !rowsS.includes(shNor)) rowsS.push(shNor);
+  plot(document.getElementById("g-share"), [{ type: "bar", orientation: "h", y: rowsS.map(r => r.k === HOME ? `<b>★ ${esc(r.name)}</b>` : esc(r.name)), x: rowsS.map(f),
+    marker: { color: rowsS.map(r => css(r.k === HOME ? "--text-primary" : "--s4")) }, text: rowsS.map(r => byBn ? fmt(r.bn, r.bn < 10 ? 1 : 0) : `${fmt(r.pct, 1)}%`), textposition: "outside", cliponaxis: false,
+    textfont: { color: css("--text-secondary"), size: 11 }, customdata: rowsS.map(r => `${byBn ? `$${fmt(r.bn, 1)}${bn}` : `${fmt(r.pct, 1)}%`}, ${label(r.p)}`), hovertemplate: "%{y}: %{customdata}<extra></extra>" }],
+    baseLayout({ showlegend: false, bargap: 0.25, margin: { l: 8, r: 50, t: 8, b: 8 }, yaxis: { autorange: "reversed", showgrid: false, automargin: true, tickfont: { size: 12, color: css("--text-secondary") } },
+      xaxis: { showgrid: true, ticksuffix: byBn ? bn : "%", rangemode: "tozero" } }));
+
+  // holdings over time
+  const hx = GT.quarters;
+  plot(document.getElementById("g-hold"), chosen.map((k, i) => {
+    const ys = hx.map(q => { const v = GT.t[k][q]; return fin(v) && (!state.gLog || v > 0) ? v : null; });
+    return { type: "scatter", mode: "lines", name: k === HOME ? `★ ${gName(k)}` : gName(k), x: hx.map(qDate), y: ys, connectgaps: false,
+      line: { color: css(k === HOME ? "--text-primary" : SLOTS[i % SLOTS.length]), width: k === HOME ? 3 : 2, dash: k === HOME ? "dot" : "solid" },
+      customdata: hx.map((q, j) => fin(ys[j]) ? `${label(q)}: ${fmt(ys[j], ys[j] < 100 ? 1 : 0)} ${GX.tonnes}` : ""), hovertemplate: `%{customdata}<extra>${esc(gName(k))}</extra>` };
+  }), baseLayout({ hovermode: "closest", yaxis: { type: state.gLog ? "log" : "linear", ticksuffix: " t", rangemode: "tozero" }, legend: { itemclick: false, itemdoubleclick: false, orientation: "h", y: 1.02, yanchor: "bottom", x: 0, font: { color: css("--text-secondary") } } }));
+
+  // the table
+  const shareOf = Object.fromEntries(sh.map(r => [r.k, r.pct]));
+  const rowsT = latest.slice().sort((a, b) => b.v - a.v).map(r => {
+    const d = n => { const a = GT.t[r.k][quarterBack(r.q, n)]; return fin(a) ? r.v - a : null; };
+    return { k: r.k, cells: [gName(r.k), fmt(r.v, r.v < 10 ? 1 : 0), label(r.q), signed(d(4), 1), signed(d(20), 1), fmt(r.v * OZ_PER_T * p1 / 1e9, 1), fin(shareOf[r.k]) ? `${fmt(shareOf[r.k], 1)}%` : "–"] };
+  });
+  document.getElementById("gold-table").innerHTML = `<thead><tr>${GX.cols.map(c => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${rowsT.map(r =>
+    `<tr${r.k === HOME ? ' class="home"' : ""}>${r.cells.map((v, j) => `<td${j === 2 ? ' class="muted"' : ""}>${esc(v)}</td>`).join("")}</tr>`).join("")}</tbody>`;
+}
+document.getElementById("gold").addEventListener("click", e => {
+  const b = e.target.closest("button[data-g]");
+  if (b) { state[b.dataset.g] = b.dataset.v; writeHash(); renderGold(); return; }
+  const c = e.target.closest(".chip[data-k]");
+  if (c) { state.gSel = state.gSel.filter(k => k !== c.dataset.k); if (!state.gSel.length) state.gSel = ["USA"]; writeHash(); renderGold(); }
+});
+document.getElementById("gold").addEventListener("change", e => {
+  if (e.target.id === "g-add" && e.target.value) { state.gSel = [...state.gSel, e.target.value].slice(0, 8); writeHash(); renderGold(); }
+  if (e.target.id === "g-log") { state.gLog = e.target.checked; writeHash(); renderGold(); }
+});
+
 // ---------- Single country: a slide set comparing one country (Norway to start) with similar countries, each slide downloadable as a PNG ----------
 // Similar countries: the same kind of economy (advanced or emerging) with the same measured exchange-rate regime. Advanced
 // economies with a floating currency count only those with their own currency (not euro-area members, whose reserves are
@@ -2772,6 +3024,7 @@ function renderTab(tab) {
   else if (tab === "data") renderData();
   else if (tab === "countries") renderCountries();
   else if (tab === "country") renderSingle();
+  else if (tab === "gold") renderGold();
   else renderExplore();
 }
 function showTab(tab, focus = false) {
