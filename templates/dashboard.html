@@ -113,6 +113,16 @@
   .seg button:disabled { opacity: .4; cursor: not-allowed; }
   select { font: inherit; font-size: 13px; padding: 5px 8px; border-radius: 8px; border: 1px solid var(--axis); background: var(--page); color: var(--text-primary); max-width: 100%; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .ms { position: relative; }
+  .ms-pop { position: absolute; z-index: 20; top: calc(100% + 4px); right: 0; width: min(300px, 86vw); background: var(--surface);
+    border: 1px solid var(--axis); border-radius: 10px; padding: 10px; box-shadow: 0 8px 24px rgba(0, 0, 0, .25); }
+  .ms-pop .search { width: 100%; box-sizing: border-box; }
+  .ms-acts { display: flex; flex-wrap: wrap; gap: 2px 8px; margin: 6px 0; }
+  .ms-list { max-height: 320px; overflow-y: auto; display: flex; flex-direction: column; }
+  .ms-list label { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 6px; cursor: pointer; font-size: 13px; color: var(--text-secondary); }
+  .ms-list label:hover { background: var(--hover); }
+  .ms-list label.on { color: var(--text-primary); font-weight: 600; }
+  .ms-list .empty { padding: 6px; color: var(--text-muted); font-size: 13px; }
   .chip { font: inherit; font-size: 12.5px; display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px;
     border: 1px solid var(--axis); background: transparent; color: var(--text-secondary); cursor: pointer; }
   .chip[aria-pressed="true"] { background: var(--hover); color: var(--text-primary); border-color: var(--text-muted); font-weight: 600; }
@@ -377,6 +387,14 @@
           <div class="seg" id="dt-set-seg" role="group" aria-label="Dataset"><button data-v="cur">World, by currency</button><button data-v="cty">Countries</button></div>
           <div class="seg" id="dt-metric-seg" role="group" aria-label="Measure"><button data-v="share">Shares, %</button><button data-v="bn">US$ billions</button></div>
           <select id="dt-year" aria-label="Date"></select>
+          <div class="ms" id="dt-cty">
+            <button class="text-btn" type="button" id="dt-cty-btn" aria-haspopup="true" aria-expanded="false"></button>
+            <div class="ms-pop" id="dt-cty-pop" hidden>
+              <input type="search" class="search" id="dt-cty-q" placeholder="Search countries" aria-label="Search countries" autocomplete="off">
+              <div class="ms-acts"><button class="link-btn" type="button" data-a="shown">Select those shown</button><button class="link-btn" type="button" data-a="none">Show all countries</button></div>
+              <div class="ms-list" id="dt-cty-list" role="group" aria-label="Countries"></div>
+            </div>
+          </div>
           <button class="text-btn" type="button" id="dt-csv">Download CSV</button>
         </div>
       </div>
@@ -685,18 +703,18 @@ const source = { kind: "snapshot", at: SNAPSHOT.downloaded, checking: true };
 const state = {
   tab: "shares", cur: CURS.map(c => c.k), freq: "Q", period: "all",
   shView: "lines", shLog: false, amView: "stack", amLog: false, sel: "", shShow: [], amShow: [],
-  chFrom: "", chTo: "", chMetric: "bn", chCur: "USD", dtMetric: "share", dtSet: "cur", dtYear: "latest",
+  chFrom: "", chTo: "", chMetric: "bn", chCur: "USD", dtMetric: "share", dtSet: "cur", dtYear: "latest", dtCty: [],
   raceMetric: "share", raceNoUSD: false, raceSpeed: "1", fxBase: "2016-Q4", fxCur: "USD", flShow: [], fxShow: [],
   cMeasure: "pct", cGold: "with", cYear: "latest", cSort: "v", cDir: "desc", gb: "eu_AE_float~eu_AE_peg", cGroup: "regime", cFilter: "all", cLines: "regime", cAgg: "combined", gScale: "log",
   bY: "bn", bColor: "regime", bEcon: ["AE"], bReg: ["peg", "managed", "float"], bRegion: "all", bSpeed: "4", bLabels: "10", cSel: ["CHE", "HKG", "SAU", "CHN", "JPN", "USA"],
 };
-const LIST_KEYS = new Set(["cur", "cSel", "bEcon", "bReg", "shShow", "amShow", "flShow", "fxShow"]);
+const LIST_KEYS = new Set(["cur", "cSel", "dtCty", "bEcon", "bReg", "shShow", "amShow", "flShow", "fxShow"]);
 const TABS = ["shares", "changes", "countries", "explore", "data", "norway"];
 function readHash() {
   const p = new URLSearchParams(location.hash.slice(1));
   for (const [k, v] of p) {
     if (!(k in state)) continue;
-    if (LIST_KEYS.has(k)) state[k] = v ? v.split(",").filter(x => ["cur", "shShow", "flShow", "fxShow"].includes(k) ? CUR[x] : k === "amShow" ? CUR[x] || x === "UN" : k === "cSel" ? /^[A-Z]{3}$/.test(x) : /^\w+$/.test(x)) : [];
+    if (LIST_KEYS.has(k)) state[k] = v ? v.split(",").filter(x => ["cur", "shShow", "flShow", "fxShow"].includes(k) ? CUR[x] : k === "amShow" ? CUR[x] || x === "UN" : k === "cSel" || k === "dtCty" ? /^[A-Z]{3}$/.test(x) : /^\w+$/.test(x)) : [];
     else if (typeof state[k] === "boolean") state[k] = v === "1";
     else state[k] = v;
   }
@@ -1104,7 +1122,7 @@ function countryData() {
   document.getElementById("dt-year").value = state.dtYear;
   const head = ["Country", "Economy", "Region", "Exchange rate", "As of", "Reserves, US$ bn", "Gold, US$ bn", "Excluding gold, US$ bn",
     "GDP, US$ bn", "Reserves, % of GDP", "Excluding gold, % of GDP"];
-  const rows = Object.values(CC).map(c => {
+  const all = Object.values(CC).map(c => {
     const pt = state.dtYear === "latest" ? c.pts.at(-1) : c.pts.find(p => p.p === `${state.dtYear}-Q4`);
     if (!pt) return null;
     const pct = v => fin(v) && pt.gdp > 0 ? v / pt.gdp * 100 : null;
@@ -1112,18 +1130,24 @@ function countryData() {
       GEO.find(g => g.k === geoOf(c.k))?.name || "", REGIMES[c.k]?.note || "", label(pt.p),
       pt.res, pt.gold, pt.exGold, pt.gdp, pct(pt.res), pct(pt.exGold)] };
   }).filter(Boolean).sort((a, b) => (b.cells[5] ?? -1) - (a.cells[5] ?? -1));
-  return { head, rows, d: [null, null, null, null, null, 1, 1, 1, 0, 1, 1] };
+  // the countries chosen in the selector (none chosen: all of them)
+  const rows = all.filter(r => !state.dtCty.length || state.dtCty.includes(r.k));
+  return { head, rows, all, d: [null, null, null, null, null, 1, 1, 1, 0, 1, 1] };
 }
 function renderData() {
   setPressed(document.getElementById("dt-set-seg"), state.dtSet);
   const cty = state.dtSet === "cty";
   document.getElementById("dt-metric-seg").hidden = cty;
   document.getElementById("dt-year").hidden = !cty;
+  document.getElementById("dt-cty").hidden = !cty;
+  if (!cty) closeCtyPick();
   document.getElementById("controls").hidden = cty;
   document.getElementById("tab-data").style.marginTop = cty ? "16px" : "";  // no controls card above it then
   if (cty) {
-    const { head, rows, d } = countryData();
-    document.getElementById("dt-sub").textContent = `${rows.length} countries, ${state.dtYear === "latest" ? "each country's latest figures" : `end of ${state.dtYear}`}, largest reserves first. ` +
+    const { head, rows, all, d } = countryData();
+    ctyPickAll = all;
+    renderCtyPick();
+    document.getElementById("dt-sub").textContent = `${rows.length} ${rows.length === 1 ? "country" : "countries"}, ${state.dtYear === "latest" ? "each country's latest figures" : `end of ${state.dtYear}`}, largest reserves first. ` +
       "Reserves include gold at market value; exchange-rate regimes as measured over the last two years.";
     document.getElementById("dt-table").innerHTML = `<thead><tr>${head.map(h => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${rows.map(r =>
       `<tr${r.k === HOME ? ' class="home"' : ""}>${r.cells.map((v, j) => `<td${j && j < 5 ? ' class="muted" style="text-align:left"' : ""}>${d[j] == null ? esc(v) : fin(v) ? fmt(v, d[j]) : '<span class="muted">–</span>'}</td>`).join("")}</tr>`).join("")}</tbody>`;
@@ -1141,6 +1165,60 @@ function renderData() {
     `<thead><tr><th>Period</th>${cols.map(c => `<th>${esc(c.name)}</th>`).join("")}</tr></thead>` +
     `<tbody>${rows.map(r => `<tr><td>${label(r.p)}</td>${r.vals.map((v, j) => `<td>${fin(v) ? fmt(v, cols[j].d) : '<span class="muted">–</span>'}</td>`).join("")}</tr>`).join("")}</tbody>`;
 }
+// country selector for the countries table: a search box and a checkbox per country
+const MS = LANG === "no"
+  ? { all: n => `Alle land (${n}) ▾`, some: (k, n) => `${k} av ${n} land ▾`, none: "Ingen land passer" }
+  : { all: n => `All countries (${n}) ▾`, some: (k, n) => `${k} of ${n} countries ▾`, none: "No country matches" };
+let ctyPickAll = [];
+const ctyMatch = () => {
+  const q = document.getElementById("dt-cty-q").value.trim().toLocaleLowerCase();
+  return ctyPickAll.filter(r => !q || r.cells[0].toLocaleLowerCase().includes(q) || r.k.toLowerCase() === q);
+};
+function renderCtyPick() {
+  const n = ctyPickAll.length, k = ctyPickAll.filter(r => state.dtCty.includes(r.k)).length;
+  document.getElementById("dt-cty-btn").textContent = state.dtCty.length ? MS.some(k, n) : MS.all(n);
+  if (document.getElementById("dt-cty-pop").hidden) return;
+  // Norway first, then the chosen countries, then the rest, each alphabetically
+  const rank = r => r.k === HOME ? 0 : state.dtCty.includes(r.k) ? 1 : 2;
+  const list = ctyMatch().sort((a, b) => rank(a) - rank(b) || a.cells[0].localeCompare(b.cells[0], LANG === "no" ? "nb" : "en"));
+  document.getElementById("dt-cty-list").innerHTML = list.length ? list.map(r => {
+    const on = state.dtCty.includes(r.k);
+    return `<label class="${on ? "on" : ""}"><input type="checkbox" value="${r.k}"${on ? " checked" : ""}>${esc(r.cells[0])}${r.k === HOME ? " ★" : ""}</label>`;
+  }).join("") : `<div class="empty">${MS.none}</div>`;
+}
+function closeCtyPick() {
+  document.getElementById("dt-cty-pop").hidden = true;
+  document.getElementById("dt-cty-btn").setAttribute("aria-expanded", "false");
+}
+function setDtCty(list) { state.dtCty = list; writeHash(); renderData(); }
+document.getElementById("dt-cty-btn").addEventListener("click", () => {
+  const pop = document.getElementById("dt-cty-pop");
+  if (!pop.hidden) return closeCtyPick();
+  pop.hidden = false;
+  document.getElementById("dt-cty-btn").setAttribute("aria-expanded", "true");
+  renderCtyPick();
+  document.getElementById("dt-cty-q").focus();
+});
+document.getElementById("dt-cty-q").addEventListener("input", renderCtyPick);
+document.getElementById("dt-cty-q").addEventListener("keydown", e => {
+  // Enter ticks the first match
+  if (e.key !== "Enter") return;
+  const m = ctyMatch()[0];
+  if (m && !state.dtCty.includes(m.k)) { setDtCty([...state.dtCty, m.k]); e.target.select(); }
+});
+document.getElementById("dt-cty-list").addEventListener("change", e => {
+  const k = e.target.value;
+  setDtCty(e.target.checked ? [...state.dtCty, k] : state.dtCty.filter(x => x !== k));
+});
+document.querySelector("#dt-cty .ms-acts").addEventListener("click", e => {
+  const a = e.target.closest("button")?.dataset.a;
+  if (a === "shown") setDtCty([...new Set([...state.dtCty, ...ctyMatch().map(r => r.k)])]);
+  if (a === "none") { document.getElementById("dt-cty-q").value = ""; setDtCty([]); }
+});
+document.addEventListener("click", e => { if (!e.target.closest("#dt-cty")) closeCtyPick(); });
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && !document.getElementById("dt-cty-pop").hidden) { closeCtyPick(); document.getElementById("dt-cty-btn").focus(); }
+});
 document.getElementById("dt-csv").addEventListener("click", () => {
   const q = s => /[",]/.test(s) ? `"${String(s).replace(/"/g, '""')}"` : String(s);
   const num = v => fin(v) ? String(+v.toFixed(6)) : "";
