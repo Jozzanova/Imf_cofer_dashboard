@@ -2201,7 +2201,7 @@ async function loadCountriesLive() {
     const fresh = { names: CD.names, groups: CD.groups, regHist: CD.regHist, goldIrfcl: mergedGold, resQ: q.R || {}, goldQ: q.R_F11_MV || {}, resA: a.R || {}, goldA: a.R_F11_MV || {},
       gdp: w.NGDPD || {}, rates: rates.G163 ? rates : CD.rates };
     if (!Object.keys(fresh.resQ).length || !Object.keys(fresh.gdp).length) throw new Error("the IMF's answer had no figures");
-    CD = fresh; CC = null;
+    CD = fresh; assembleCountries();  // at once, so nothing finds the countries missing in between
     Object.assign(cLive, { state: "live", at: new Date().toISOString() });
   } catch (err) {
     cLive.state = "failed";
