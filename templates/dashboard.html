@@ -114,6 +114,7 @@
   select { font: inherit; font-size: 13px; padding: 5px 8px; border-radius: 8px; border: 1px solid var(--axis); background: var(--page); color: var(--text-primary); max-width: 100%; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; }
   .ms { position: relative; }
+  #g-cty .ms-pop { left: 0; right: auto; }  /* it sits on the left, under the intro */
   .ms-pop { position: absolute; z-index: 20; top: calc(100% + 4px); right: 0; width: min(300px, 86vw); background: var(--surface);
     border: 1px solid var(--axis); border-radius: 10px; padding: 10px; box-shadow: 0 8px 24px rgba(0, 0, 0, .25); }
   .ms-pop .search { width: 100%; box-sizing: border-box; }
@@ -502,7 +503,21 @@
   </div>
 
   <!-- Gold -->
-  <div role="tabpanel" id="tab-gold" aria-labelledby="tab-btn-gold" hidden><div id="gold"></div></div>
+  <div role="tabpanel" id="tab-gold" aria-labelledby="tab-btn-gold" hidden>
+    <section class="card">
+      <div class="card-head"><div><h2 id="gold-title"></h2><p class="sub" id="gold-intro" style="margin:0"></p></div>
+        <div class="row"><div class="ms" id="g-cty">
+            <button class="text-btn" type="button" id="g-cty-btn" aria-haspopup="true" aria-expanded="false"></button>
+            <div class="ms-pop" id="g-cty-pop" hidden>
+              <input type="search" class="search" id="g-cty-q" placeholder="Search countries" aria-label="Search countries" autocomplete="off">
+              <div class="ms-acts"><button class="link-btn" type="button" data-a="shown">Select those shown</button><button class="link-btn" type="button" data-a="none">Show all countries</button></div>
+              <div class="ms-list" id="g-cty-list" role="group" aria-label="Countries"></div>
+            </div>
+          </div></div></div>
+      <div class="tiles" id="gold-tiles"></div><p class="hint" id="gold-live"></p>
+    </section>
+    <div id="gold"></div>
+  </div>
   <!-- Single country: slides -->
   <div role="tabpanel" id="tab-country" aria-labelledby="tab-btn-country" hidden><div id="slides"></div></div>
 
@@ -706,18 +721,18 @@ const source = { kind: "snapshot", at: SNAPSHOT.downloaded, checking: true };
 const state = {
   tab: "shares", cur: CURS.map(c => c.k), freq: "Q", period: "all",
   shView: "stack", shLog: false, amView: "stack", amLog: false, sel: "", shShow: [], amShow: [],
-  chFrom: "", chTo: "", chMetric: "bn", chCur: "USD", dtMetric: "share", dtSet: "cur", dtYear: "latest", dtCty: [], scCty: "NOR", gYear: "t", gPer: "5y", gShare: "pct", gSel: [], gLog: false,
+  chFrom: "", chTo: "", chMetric: "bn", chCur: "USD", dtMetric: "share", dtSet: "cur", dtYear: "latest", dtCty: [], scCty: "NOR", gYear: "t", gPer: "5y", gShare: "pct", gSel: [], gCty: [], gLog: false,
   raceMetric: "share", raceNoUSD: false, raceSpeed: "1", fxBase: "2016-Q4", fxCur: "USD", flShow: [], fxShow: [],
   cMeasure: "pct", cGold: "with", cYear: "latest", cSort: "v", cDir: "desc", gb: "eu_AE_float~eu_AE_peg", cGroup: "regime", cFilter: "all", cLines: "regime", cAgg: "combined", gScale: "log",
   bY: "bn", bColor: "regime", bEcon: ["AE"], bReg: ["peg", "managed", "float"], bRegion: "all", bSpeed: "1", bLabels: "10", cSel: ["CHE", "HKG", "SAU", "CHN", "JPN", "USA"],
 };
-const LIST_KEYS = new Set(["cur", "cSel", "dtCty", "gSel", "bEcon", "bReg", "shShow", "amShow", "flShow", "fxShow"]);
+const LIST_KEYS = new Set(["cur", "cSel", "dtCty", "gSel", "gCty", "bEcon", "bReg", "shShow", "amShow", "flShow", "fxShow"]);
 const TABS = ["shares", "changes", "countries", "gold", "data", "country", "explore"];
 function readHash() {
   const p = new URLSearchParams(location.hash.slice(1));
   for (const [k, v] of p) {
     if (!(k in state)) continue;
-    if (LIST_KEYS.has(k)) state[k] = v ? v.split(",").filter(x => ["cur", "shShow", "flShow", "fxShow"].includes(k) ? CUR[x] : k === "amShow" ? CUR[x] || x === "UN" : k === "cSel" || k === "dtCty" || k === "gSel" ? /^[A-Z]{3}$/.test(x) : /^\w+$/.test(x)) : [];
+    if (LIST_KEYS.has(k)) state[k] = v ? v.split(",").filter(x => ["cur", "shShow", "flShow", "fxShow"].includes(k) ? CUR[x] : k === "amShow" ? CUR[x] || x === "UN" : k === "cSel" || k === "dtCty" || k === "gSel" || k === "gCty" ? /^[A-Z]{3}$/.test(x) : /^\w+$/.test(x)) : [];
     else if (typeof state[k] === "boolean") state[k] = v === "1";
     else state[k] = v;
   }
@@ -1149,13 +1164,12 @@ function renderData() {
   document.getElementById("dt-metric-seg").hidden = cty;
   document.getElementById("dt-year").hidden = !cty;
   document.getElementById("dt-cty").hidden = !cty;
-  if (!cty) closeCtyPick();
+  if (!cty) dtPick.close();
   document.getElementById("controls").hidden = cty;
   document.getElementById("tab-data").style.marginTop = cty ? "16px" : "";  // no controls card above it then
   if (cty) {
     const { head, rows, all, d } = countryData();
-    ctyPickAll = all;
-    renderCtyPick();
+    dtPick.setAll(all.map(r => ({ k: r.k, name: r.cells[0] })));
     document.getElementById("dt-sub").textContent = `${rows.length} ${rows.length === 1 ? "country" : "countries"}, ${state.dtYear === "latest" ? "each country's latest figures" : `end of ${state.dtYear}`}, largest reserves first. ` +
       "Reserves include gold at market value; exchange-rate regimes as measured over the last two years.";
     document.getElementById("dt-table").innerHTML = `<thead><tr>${head.map(h => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${rows.map(r =>
@@ -1174,60 +1188,60 @@ function renderData() {
     `<thead><tr><th>Period</th>${cols.map(c => `<th>${esc(c.name)}</th>`).join("")}</tr></thead>` +
     `<tbody>${rows.map(r => `<tr><td>${label(r.p)}</td>${r.vals.map((v, j) => `<td>${fin(v) ? fmt(v, cols[j].d) : '<span class="muted">–</span>'}</td>`).join("")}</tr>`).join("")}</tbody>`;
 }
-// country selector for the countries table: a search box and a checkbox per country
+// country selectors (the countries table, the Gold tab): a search box and a checkbox per country. The markup has
+// ids <id>, <id>-btn, -pop, -q, -list; the chosen countries are state[key] (none chosen: all of them).
 const MS = LANG === "no"
   ? { all: n => `Alle land (${n}) ▾`, some: (k, n) => `${k} av ${n} land ▾`, none: "Ingen land passer" }
   : { all: n => `All countries (${n}) ▾`, some: (k, n) => `${k} of ${n} countries ▾`, none: "No country matches" };
-let ctyPickAll = [];
-const ctyMatch = () => {
-  const q = document.getElementById("dt-cty-q").value.trim().toLocaleLowerCase();
-  return ctyPickAll.filter(r => !q || r.cells[0].toLocaleLowerCase().includes(q) || r.k.toLowerCase() === q);
-};
-function renderCtyPick() {
-  const n = ctyPickAll.length, k = ctyPickAll.filter(r => state.dtCty.includes(r.k)).length;
-  document.getElementById("dt-cty-btn").textContent = state.dtCty.length ? MS.some(k, n) : MS.all(n);
-  if (document.getElementById("dt-cty-pop").hidden) return;
-  // Norway first, then the chosen countries, then the rest, each alphabetically
-  const rank = r => r.k === HOME ? 0 : state.dtCty.includes(r.k) ? 1 : 2;
-  const list = ctyMatch().sort((a, b) => rank(a) - rank(b) || a.cells[0].localeCompare(b.cells[0], LANG === "no" ? "nb" : "en"));
-  document.getElementById("dt-cty-list").innerHTML = list.length ? list.map(r => {
-    const on = state.dtCty.includes(r.k);
-    return `<label class="${on ? "on" : ""}"><input type="checkbox" value="${r.k}"${on ? " checked" : ""}>${esc(r.cells[0])}${r.k === HOME ? " ★" : ""}</label>`;
-  }).join("") : `<div class="empty">${MS.none}</div>`;
+function countryPicker(id, key, onChange) {
+  const $ = s => document.getElementById(s ? `${id}-${s}` : id);
+  let all = [];  // [{k, name}]
+  const match = () => {
+    const q = $("q").value.trim().toLocaleLowerCase();
+    return all.filter(r => !q || r.name.toLocaleLowerCase().includes(q) || r.k.toLowerCase() === q);
+  };
+  function render() {
+    const n = all.length, k = all.filter(r => state[key].includes(r.k)).length;
+    $("btn").textContent = state[key].length ? MS.some(k, n) : MS.all(n);
+    if ($("pop").hidden) return;
+    // Norway first, then the chosen countries, then the rest, each alphabetically
+    const rank = r => r.k === HOME ? 0 : state[key].includes(r.k) ? 1 : 2;
+    const list = match().sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name, LANG === "no" ? "nb" : "en"));
+    $("list").innerHTML = list.length ? list.map(r => {
+      const on = state[key].includes(r.k);
+      return `<label class="${on ? "on" : ""}"><input type="checkbox" value="${r.k}"${on ? " checked" : ""}>${esc(r.name)}${r.k === HOME ? " ★" : ""}</label>`;
+    }).join("") : `<div class="empty">${MS.none}</div>`;
+  }
+  function close() { $("pop").hidden = true; $("btn").setAttribute("aria-expanded", "false"); }
+  const set = list => { state[key] = list; writeHash(); onChange(); };
+  $("btn").addEventListener("click", () => {
+    if (!$("pop").hidden) return close();
+    $("pop").hidden = false;
+    $("btn").setAttribute("aria-expanded", "true");
+    render();
+    $("q").focus();
+  });
+  $("q").addEventListener("input", render);
+  $("q").addEventListener("keydown", e => {
+    // Enter ticks the first match
+    if (e.key !== "Enter") return;
+    const m = match()[0];
+    if (m && !state[key].includes(m.k)) { set([...state[key], m.k]); e.target.select(); }
+  });
+  $("list").addEventListener("change", e => {
+    const k = e.target.value;
+    set(e.target.checked ? [...state[key], k] : state[key].filter(x => x !== k));
+  });
+  $().querySelector(".ms-acts").addEventListener("click", e => {
+    const a = e.target.closest("button")?.dataset.a;
+    if (a === "shown") set([...new Set([...state[key], ...match().map(r => r.k)])]);
+    if (a === "none") { $("q").value = ""; set([]); }
+  });
+  document.addEventListener("click", e => { if (!e.target.closest(`#${id}`)) close(); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("pop").hidden) { close(); $("btn").focus(); } });
+  return { setAll(list) { all = list; render(); }, close };
 }
-function closeCtyPick() {
-  document.getElementById("dt-cty-pop").hidden = true;
-  document.getElementById("dt-cty-btn").setAttribute("aria-expanded", "false");
-}
-function setDtCty(list) { state.dtCty = list; writeHash(); renderData(); }
-document.getElementById("dt-cty-btn").addEventListener("click", () => {
-  const pop = document.getElementById("dt-cty-pop");
-  if (!pop.hidden) return closeCtyPick();
-  pop.hidden = false;
-  document.getElementById("dt-cty-btn").setAttribute("aria-expanded", "true");
-  renderCtyPick();
-  document.getElementById("dt-cty-q").focus();
-});
-document.getElementById("dt-cty-q").addEventListener("input", renderCtyPick);
-document.getElementById("dt-cty-q").addEventListener("keydown", e => {
-  // Enter ticks the first match
-  if (e.key !== "Enter") return;
-  const m = ctyMatch()[0];
-  if (m && !state.dtCty.includes(m.k)) { setDtCty([...state.dtCty, m.k]); e.target.select(); }
-});
-document.getElementById("dt-cty-list").addEventListener("change", e => {
-  const k = e.target.value;
-  setDtCty(e.target.checked ? [...state.dtCty, k] : state.dtCty.filter(x => x !== k));
-});
-document.querySelector("#dt-cty .ms-acts").addEventListener("click", e => {
-  const a = e.target.closest("button")?.dataset.a;
-  if (a === "shown") setDtCty([...new Set([...state.dtCty, ...ctyMatch().map(r => r.k)])]);
-  if (a === "none") { document.getElementById("dt-cty-q").value = ""; setDtCty([]); }
-});
-document.addEventListener("click", e => { if (!e.target.closest("#dt-cty")) closeCtyPick(); });
-document.addEventListener("keydown", e => {
-  if (e.key === "Escape" && !document.getElementById("dt-cty-pop").hidden) { closeCtyPick(); document.getElementById("dt-cty-btn").focus(); }
-});
+const dtPick = countryPicker("dt-cty", "dtCty", () => renderData());
 document.getElementById("dt-csv").addEventListener("click", () => {
   const q = s => /[",]/.test(s) ? `"${String(s).replace(/"/g, '""')}"` : String(s);
   const num = v => fin(v) ? String(+v.toFixed(6)) : "";
@@ -2484,7 +2498,7 @@ const gLive = { state: "idle" };
 const GX = LANG === "no" ? {
   title: "Gull i sentralbankenes reserver",
   intro: "Pengemyndighetenes gull i tonn, landene som rapporterer det til IMF hvert kvartal, og gullprisen. Endringer måles bare for land med tall i begge ender av perioden, siden landene har begynt å rapportere i ulike år (Kina fra 2015, for eksempel).",
-  price: "Gullpris", perOz: "US$ per unse", yr: "på et år", held: "Gull i reservene", tonnes: "tonn", countries: n => `${n} land og ESB`,
+  price: "Gullpris", perOz: "US$ per unse", yr: "på et år", held: "Gull i reservene", tonnes: "tonn", countries: (n, ecb) => ecb ? `${n} land og ESB` : `${n} land`, filterNote: "Bare de valgte landene.",
   bought: "Kjøpt siste år", net: "netto", value: "Verdi", atPrice: "til dagens pris", share: "Gull, andel av reservene", shareN: n => `${n} land med tall`,
   priceT: "Gullprisen", priceSub: "US$ per troy unse, månedens gjennomsnitt",
   yearT: "År for år: kjøp eller pris?", yearSubT: "Netto kjøp, tonn, for landene med tall ved begge årsskiftene", yearSubV: "Endring i gullets verdi, mrd. US$: kjøp (til årets sluttpris) og prisendring (på beholdningen ved årets start)",
@@ -2492,7 +2506,7 @@ const GX = LANG === "no" ? {
   moverT: "Største kjøpere og selgere", moverSub: (n, a, b) => `Endring i tonn, ${label(a)}–${label(b)}; ${n} land med tall begge gangene`,
   perSeg: [["1y", "1 år"], ["5y", "5 år"], ["10y", "10 år"], ["2000", "Siden 2000"]],
   holdT: "Beholdning over tid", holdSub: "Tonn, kvartalsvis; et land kommer med fra det begynner å rapportere", add: "Legg til et land", log: "Logaritmisk skala",
-  shareT: "Gull som andel av reservene", shareSubP: "De 20 høyeste andelene, siste tall; gull til markedsverdi", shareSubB: "De 20 største beholdningene, mrd. US$ til markedsverdi, siste tall",
+  shareT: "Gull som andel av reservene", shareSubP: "De 20 høyeste andelene, siste tall; gull til markedsverdi", shareSubB: "De 20 største beholdningene, mrd. US$ til markedsverdi, siste tall", shareSubF: "De valgte landene, siste tall; gull til markedsverdi",
   shareSeg: [["pct", "% av reservene"], ["bn", "Mrd. US$"]],
   tableT: "Alle landene", cols: ["Land", "Tonn", "Per", "Endring 1 år, t", "Endring 5 år, t", "Verdi, mrd. US$", "Gull, % av reservene"],
   notes: "Kilder: IMF, International Reserves and Foreign Currency Liquidity (gull i fine troy unser; tonn = unser / 32 150,7), IMF, Primary Commodity Prices (gullpris) og IMF, International Investment Position (andel av reservene). Verdien er tonn ganger dagens gullpris: noen land, som USA, regnskapsfører gullet til en fast bokført pris. Noen tall er rapportert i tusen ganger for mange eller for få unser; de er rettet ut fra gullets verdi eller kvartalet før. Hull er fylt ut fra verdien (for land som regnskapsfører gullet til markedsverdi) eller der kvartalene på hver side er like. Noen store eiere rapporterer ikke unser til IMF (Usbekistan, Libanon, Taiwan og Qatar, for eksempel), så summene er for landene som gjør det.",
@@ -2500,7 +2514,7 @@ const GX = LANG === "no" ? {
 } : {
   title: "Gold in central banks' reserves",
   intro: "The monetary authorities' gold in tonnes, for the countries that report it to the IMF each quarter, and the gold price. Changes are measured only for countries with figures at both ends of a period, since countries began reporting in different years (China from 2015, for example).",
-  price: "Gold price", perOz: "US$ per ounce", yr: "in a year", held: "Gold in reserves", tonnes: "tonnes", countries: n => `${n} countries and the ECB`,
+  price: "Gold price", perOz: "US$ per ounce", yr: "in a year", held: "Gold in reserves", tonnes: "tonnes", countries: (n, ecb) => ecb ? `${n} countries and the ECB` : `${n} ${n === 1 ? "country" : "countries"}`, filterNote: "Only the chosen countries.",
   bought: "Bought in the past year", net: "net", value: "Value", atPrice: "at today's price", share: "Gold, share of reserves", shareN: n => `${n} countries with figures`,
   priceT: "The gold price", priceSub: "US$ per troy ounce, the month's average",
   yearT: "Year by year: buying or price?", yearSubT: "Net purchases, tonnes, of the countries with figures at both year-ends", yearSubV: "Change in the gold's value, US$ bn: purchases (at the year's closing price) and the change in price (on the holdings at the start of the year)",
@@ -2508,7 +2522,7 @@ const GX = LANG === "no" ? {
   moverT: "Biggest buyers and sellers", moverSub: (n, a, b) => `Change in tonnes, ${label(a)}–${label(b)}; ${n} countries with figures at both dates`,
   perSeg: [["1y", "1 year"], ["5y", "5 years"], ["10y", "10 years"], ["2000", "Since 2000"]],
   holdT: "Holdings over time", holdSub: "Tonnes, quarterly; a country appears from when it starts reporting", add: "Add a country", log: "Log scale",
-  shareT: "Gold as a share of reserves", shareSubP: "The 20 highest shares, latest figures; gold at market value", shareSubB: "The 20 largest holdings, US$ bn at market value, latest figures",
+  shareT: "Gold as a share of reserves", shareSubP: "The 20 highest shares, latest figures; gold at market value", shareSubB: "The 20 largest holdings, US$ bn at market value, latest figures", shareSubF: "The chosen countries, latest figures; gold at market value",
   shareSeg: [["pct", "% of reserves"], ["bn", "US$ bn"]],
   tableT: "All the countries", cols: ["Country", "Tonnes", "As of", "Change 1 year, t", "Change 5 years, t", "Value, US$ bn", "Gold, % of reserves"],
   notes: "Sources: IMF, International Reserves and Foreign Currency Liquidity (gold in fine troy ounces; tonnes = ounces / 32,150.7), IMF, Primary Commodity Prices (gold price) and IMF, International Investment Position (share of reserves). The value is tonnes times today's gold price: some countries, such as the US, carry their gold at a fixed book price. Some figures are reported in a thousand times too many or too few ounces; they are corrected from the gold's value or the quarter before. Gaps are filled from the value (for countries that carry their gold at market value) or where the quarters either side are the same. Some large holders do not report ounces to the IMF (Uzbekistan, Lebanon, Taiwan and Qatar, for example), so the totals are for those that do.",
@@ -2598,7 +2612,10 @@ function renderGold() {
   const no = LANG === "no", el = document.getElementById("gold"), end = GT.end;
   const seg = (key, opts) => `<div class="seg" role="group">${opts.map(([v, t]) => `<button type="button" data-g="${key}" data-v="${v}" aria-pressed="${state[key] === v}">${t}</button>`).join("")}</div>`;
   const tile = (lab, value, note) => `<div class="tile"><div class="label">${lab}</div><div class="value">${value}</div><div class="note">${note}</div></div>`;
-  const ks = Object.keys(GT.t);
+  // the countries chosen in the selector (none chosen: all of them)
+  const allKs = Object.keys(GT.t), filt = state.gCty.filter(k => GT.t[k]), inF = k => !filt.length || filt.includes(k);
+  goldPick.setAll(allKs.map(k => ({ k, name: gName(k) })));
+  const ks = filt.length ? filt : allKs;
   // key figures
   const m1 = GT.months.at(-1), m0 = GT.months[GT.months.length - 13], p1 = GD.price[m1], pg = (p1 / GD.price[m0] - 1) * 100;
   const latest = ks.map(k => ({ k, ...gLatest(k) })).filter(r => fin(r.v));
@@ -2606,22 +2623,26 @@ function renderGold() {
   const yearAgo = quarterBack(end, 4), both = ks.filter(k => fin(GT.t[k][end]) && fin(GT.t[k][yearAgo]));
   const bought = both.reduce((s, k) => s + GT.t[k][end] - GT.t[k][yearAgo], 0);
   const valueBn = total * OZ_PER_T * p1 / 1e9;
-  const minP = quarterBack(CC_LATEST, 8), withRes = Object.values(CC).map(c => [...c.pts].reverse().find(pt => fin(pt.res) && fin(pt.gold) && pt.p >= minP)).filter(Boolean);
-  const share = withRes.reduce((s, pt) => s + pt.gold, 0) / withRes.reduce((s, pt) => s + pt.res, 0) * 100;
-  const nC = latest.filter(r => r.k !== "EZB").length;
+  const minP = quarterBack(CC_LATEST, 8), withRes = Object.values(CC).filter(c => inF(c.k)).map(c => [...c.pts].reverse().find(pt => fin(pt.res) && fin(pt.gold) && pt.p >= minP)).filter(Boolean);
+  const share = withRes.length ? withRes.reduce((s, pt) => s + pt.gold, 0) / withRes.reduce((s, pt) => s + pt.res, 0) * 100 : null;
+  const nC = latest.filter(r => r.k !== "EZB").length, ecb = latest.some(r => r.k === "EZB");
   const tiles = tile(GX.price, `$${fmt(p1, 0)}`, `${GX.perOz}, ${m1.replace("-M", "-")} · <span class="${cls(pg)}">${signed(pg, 1, "%")}</span> ${GX.yr}`)
-    + tile(GX.held, `${fmt(total, 0)} ${GX.tonnes}`, `${GX.countries(nC)}, ${label(end)}`)
+    + tile(GX.held, `${fmt(total, total < 10 ? 1 : 0)} ${GX.tonnes}`, `${GX.countries(nC, ecb)}, ${label(end)}`)
     + tile(GX.bought, `<span class="${cls(bought)}">${signed(bought, 0)}</span> ${GX.tonnes}`, `${GX.net}, ${label(yearAgo)}–${label(end)}`)
     + tile(GX.value, `$${fmt(valueBn, 0)} ${no ? "mrd." : "bn"}`, GX.atPrice)
-    + tile(GX.share, `${fmt(share, 1)}%`, GX.shareN(withRes.length));
+    + tile(GX.share, fin(share) ? `${fmt(share, 1)}%` : "–", GX.shareN(withRes.length));
   // default countries for the chart over time: the six largest holders, and Norway
   const top = latest.slice().sort((a, b) => b.v - a.v).map(r => r.k);
   if (!state.gSel.length) state.gSel = top.slice(0, 6);
-  const chosen = [...state.gSel.filter(k => GT.t[k] && k !== HOME), ...(GT.t[HOME] ? [HOME] : [])];
+  // with countries chosen in the selector: those (the eight largest holders among them)
+  const chosen = filt.length ? [...top.filter(k => filt.includes(k) && k !== HOME).slice(0, 8), ...(filt.includes(HOME) && GT.t[HOME] ? [HOME] : [])]
+    : [...state.gSel.filter(k => GT.t[k] && k !== HOME), ...(GT.t[HOME] ? [HOME] : [])];
   const others = ks.filter(k => !chosen.includes(k)).sort((a, b) => gName(a).localeCompare(gName(b), no ? "nb" : "en"));
+  document.getElementById("gold-title").textContent = GX.title;
+  document.getElementById("gold-intro").textContent = GX.intro;
+  document.getElementById("gold-tiles").innerHTML = tiles;
+  document.getElementById("gold-live").textContent = [filt.length ? GX.filterNote : "", GX.live[gLive.state] || ""].filter(Boolean).join(" ");
   el.innerHTML = `
-    <section class="card"><h2>${GX.title}</h2><p class="sub" style="margin:0">${GX.intro}</p>
-      <div class="tiles">${tiles}</div><p class="hint">${GX.live[gLive.state] || ""}</p></section>
     <div class="grid2">
       <section class="card"><div class="card-head"><div><h2>${GX.priceT}</h2><p class="sub">${GX.priceSub}</p></div></div><div class="chart" id="g-price"></div></section>
       <section class="card"><div class="card-head"><div><h2>${GX.yearT}</h2><p class="sub">${state.gYear === "usd" ? GX.yearSubV : GX.yearSubT}</p></div>
@@ -2630,14 +2651,14 @@ function renderGold() {
     <div class="grid2">
       <section class="card"><div class="card-head"><div><h2>${GX.moverT}</h2><p class="sub" id="g-mover-sub"></p></div>
         <div class="row">${seg("gPer", GX.perSeg)}</div></div><div class="chart" id="g-mover" style="height:560px"></div></section>
-      <section class="card"><div class="card-head"><div><h2>${GX.shareT}</h2><p class="sub">${state.gShare === "bn" ? GX.shareSubB : GX.shareSubP}</p></div>
+      <section class="card"><div class="card-head"><div><h2>${GX.shareT}</h2><p class="sub">${filt.length ? GX.shareSubF : state.gShare === "bn" ? GX.shareSubB : GX.shareSubP}</p></div>
         <div class="row">${seg("gShare", GX.shareSeg)}</div></div><div class="chart" id="g-share" style="height:560px"></div></section>
     </div>
     <section class="card"><div class="card-head"><div><h2>${GX.holdT}</h2><p class="sub">${GX.holdSub}</p></div>
-      <div class="row"><select id="g-add" aria-label="${GX.add}"><option value="">${GX.add} …</option>${others.map(k => `<option value="${k}">${esc(gName(k))}</option>`).join("")}</select>
+      <div class="row"><select id="g-add" aria-label="${GX.add}"${filt.length ? " hidden" : ""}><option value="">${GX.add} …</option>${others.map(k => `<option value="${k}">${esc(gName(k))}</option>`).join("")}</select>
         <label class="check"><input type="checkbox" id="g-log"${state.gLog ? " checked" : ""}> ${GX.log}</label></div></div>
-      <div class="chips" id="g-chips">${chosen.map((k, i) => k === HOME
-        ? `<span class="chip" aria-pressed="true"><span class="dot" style="background:${css("--text-primary")}"></span>${esc(gName(k))} ★</span>`
+      <div class="chips" id="g-chips">${chosen.map((k, i) => k === HOME || filt.length
+        ? `<span class="chip" aria-pressed="true"><span class="dot" style="background:${css(k === HOME ? "--text-primary" : SLOTS[i % SLOTS.length])}"></span>${esc(gName(k))}${k === HOME ? " ★" : ""}</span>`
         : `<button class="chip" type="button" aria-pressed="true" data-k="${k}"><span class="dot" style="background:${css(SLOTS[i % SLOTS.length])}"></span>${esc(gName(k))} ×</button>`).join("")}</div>
       <div class="chart" id="g-hold"></div></section>
     <section class="card"><h2>${GX.tableT}</h2><div class="table-wrap scroll-y"><table id="gold-table"></table></div><p class="hint">${GX.notes}</p></section>`;
@@ -2674,11 +2695,15 @@ function renderGold() {
   const q0 = state.gPer === "2000" ? "2000-Q4" : quarterBack(end, { "1y": 4, "5y": 20, "10y": 40 }[state.gPer] || 20);
   const ch = ks.filter(k => fin(GT.t[k][q0]) && fin(GT.t[k][end])).map(k => ({ k, d: GT.t[k][end] - GT.t[k][q0] }));
   const buyers = ch.filter(r => r.d > 0.05).sort((a, b) => b.d - a.d).slice(0, 12), sellers = ch.filter(r => r.d < -0.05).sort((a, b) => a.d - b.d).slice(0, 8).reverse();
-  let rowsM = [...buyers, ...sellers];
+  // with countries chosen in the selector: all of them, changed or not
+  let rowsM = filt.length ? ch.slice() : [...buyers, ...sellers];
   const nor = ch.find(r => r.k === HOME);
   if (nor && !rowsM.includes(nor)) rowsM.push(nor);
   rowsM.sort((a, b) => b.d - a.d);
   document.getElementById("g-mover-sub").textContent = GX.moverSub(ch.length, q0, end);
+  // bars of the usual thickness however many countries there are
+  const barsH = n => `${Math.min(560, 70 + n * 26)}px`;
+  document.getElementById("g-mover").style.height = barsH(rowsM.length);
   plot(document.getElementById("g-mover"), [{ type: "bar", orientation: "h", y: rowsM.map(r => r.k === HOME ? `<b>★ ${esc(gName(r.k))}</b>` : esc(gName(r.k))), x: rowsM.map(r => r.d),
     marker: { color: rowsM.map(r => css(r.k === HOME ? "--text-primary" : r.d >= 0 ? "--pos" : "--neg")) }, text: rowsM.map(r => signed(r.d, r.d && Math.abs(r.d) < 10 ? 1 : 0)), textposition: "outside", cliponaxis: false,
     textfont: { color: css("--text-secondary"), size: 11 }, customdata: rowsM.map(r => signed(r.d, 1, ` ${GX.tonnes}`)), hovertemplate: "%{y}: %{customdata}<extra></extra>" }],
@@ -2687,10 +2712,11 @@ function renderGold() {
       xaxis: { showgrid: true, ticksuffix: " t", zerolinecolor: css("--axis"), range: (() => { const lo = Math.min(0, ...rowsM.map(r => r.d)), hi = Math.max(0, ...rowsM.map(r => r.d)), pad = (hi - lo) * 0.16; return [lo - (lo < 0 ? pad : 0), hi + pad]; })() } }));
 
   // gold as a share of reserves (or its value), from the countries' reserve figures
-  const sh = Object.values(CC).map(c => { const pt = [...c.pts].reverse().find(p => fin(p.res) && fin(p.gold) && p.res > 0 && p.p >= minP); return pt && { k: c.k, name: c.name, pct: pt.gold / pt.res * 100, bn: pt.gold, p: pt.p }; }).filter(Boolean);
+  const sh = Object.values(CC).filter(c => inF(c.k)).map(c => { const pt = [...c.pts].reverse().find(p => fin(p.res) && fin(p.gold) && p.res > 0 && p.p >= minP); return pt && { k: c.k, name: c.name, pct: pt.gold / pt.res * 100, bn: pt.gold, p: pt.p }; }).filter(Boolean);
   const byBn = state.gShare === "bn", f = r => byBn ? r.bn : r.pct;
   const rowsS = sh.slice().sort((a, b) => f(b) - f(a)).slice(0, 20), shNor = sh.find(r => r.k === HOME);
   if (shNor && !rowsS.includes(shNor)) rowsS.push(shNor);
+  document.getElementById("g-share").style.height = barsH(rowsS.length);
   plot(document.getElementById("g-share"), [{ type: "bar", orientation: "h", y: rowsS.map(r => r.k === HOME ? `<b>★ ${esc(r.name)}</b>` : esc(r.name)), x: rowsS.map(f),
     marker: { color: rowsS.map(r => css(r.k === HOME ? "--text-primary" : "--s4")) }, text: rowsS.map(r => byBn ? fmt(r.bn, r.bn < 10 ? 1 : 0) : `${fmt(r.pct, 1)}%`), textposition: "outside", cliponaxis: false,
     textfont: { color: css("--text-secondary"), size: 11 }, customdata: rowsS.map(r => `${byBn ? `$${fmt(r.bn, 1)}${bn}` : `${fmt(r.pct, 1)}%`}, ${label(r.p)}`), hovertemplate: "%{y}: %{customdata}<extra></extra>" }],
@@ -2715,6 +2741,7 @@ function renderGold() {
   document.getElementById("gold-table").innerHTML = `<thead><tr>${GX.cols.map(c => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${rowsT.map(r =>
     `<tr${r.k === HOME ? ' class="home"' : ""}>${r.cells.map((v, j) => `<td${j === 2 ? ' class="muted"' : ""}>${esc(v)}</td>`).join("")}</tr>`).join("")}</tbody>`;
 }
+const goldPick = countryPicker("g-cty", "gCty", () => renderGold());
 document.getElementById("gold").addEventListener("click", e => {
   const b = e.target.closest("button[data-g]");
   if (b) { state[b.dataset.g] = b.dataset.v; writeHash(); renderGold(); return; }
