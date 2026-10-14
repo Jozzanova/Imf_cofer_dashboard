@@ -39,7 +39,9 @@ Tabs:
   countries that report them, and the ECB) and the gold price (IMF, Primary Commodity Prices): key
   figures, the price since 2000, net purchases year by year (or the change in value split into
   purchases and price), the biggest buyers and sellers over 1, 5 or 10 years or since 2000, holdings
-  over time for chosen countries, gold as a share of reserves, and a table. Changes count only the
+  over time for chosen countries, gold as a share of reserves, why that share changed over 1, 5 or
+  10 years (the gold price, buying and selling, and the other reserves, split by a Shapley
+  decomposition so the parts add up exactly), and a table. Changes count only the
   countries with figures at both ends, since countries began reporting in different years; ounces
   reported a thousand times too many or too few are corrected from the gold's value.
   Filters by advanced/emerging economy, exchange-rate regime and region, and a country selector
