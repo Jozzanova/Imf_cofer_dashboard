@@ -42,6 +42,8 @@ Tabs:
   over time for chosen countries, gold as a share of reserves, and a table. Changes count only the
   countries with figures at both ends, since countries began reporting in different years; ounces
   reported a thousand times too many or too few are corrected from the gold's value.
+  Filters by advanced/emerging economy, exchange-rate regime and region, and a country selector
+  with a search box, apply to everything but the gold price.
 - **Data**: the numbers as a table, with a CSV download: the world by currency (shares or
   US$, with world GDP and FX reserves as % of it), or every country (reserves with and without
   gold, gold, GDP and % of GDP, with its economy, region and exchange-rate regime; a selector with a

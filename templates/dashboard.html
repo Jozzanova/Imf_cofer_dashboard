@@ -115,6 +115,12 @@
   .chips { display: flex; flex-wrap: wrap; gap: 6px; }
   .ms { position: relative; }
   #g-cty .ms-pop { left: 0; right: auto; }  /* it sits on the left, under the intro */
+  .ms > .text-btn { border: 1.5px solid var(--accent); font-weight: 600; padding: 6px 12px; }
+  .ms > .text-btn::before { content: "⌕ "; color: var(--accent); }
+  .gold-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin: 14px 0 4px; padding: 10px 12px;
+    border: 1px solid var(--border); border-radius: 10px; background: var(--page); }
+  .flt-lbl { color: var(--text-muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+  #g-groups { display: contents; }
   .ms-pop { position: absolute; z-index: 20; top: calc(100% + 4px); right: 0; width: min(300px, 86vw); background: var(--surface);
     border: 1px solid var(--axis); border-radius: 10px; padding: 10px; box-shadow: 0 8px 24px rgba(0, 0, 0, .25); }
   .ms-pop .search { width: 100%; box-sizing: border-box; }
@@ -505,15 +511,18 @@
   <!-- Gold -->
   <div role="tabpanel" id="tab-gold" aria-labelledby="tab-btn-gold" hidden>
     <section class="card">
-      <div class="card-head"><div><h2 id="gold-title"></h2><p class="sub" id="gold-intro" style="margin:0"></p></div>
-        <div class="row"><div class="ms" id="g-cty">
+      <h2 id="gold-title"></h2><p class="sub" id="gold-intro" style="margin:0"></p>
+      <div class="gold-filters" id="g-filters"><span class="flt-lbl">Filter</span>
+          <div class="ms" id="g-cty">
             <button class="text-btn" type="button" id="g-cty-btn" aria-haspopup="true" aria-expanded="false"></button>
             <div class="ms-pop" id="g-cty-pop" hidden>
               <input type="search" class="search" id="g-cty-q" placeholder="Search countries" aria-label="Search countries" autocomplete="off">
               <div class="ms-acts"><button class="link-btn" type="button" data-a="shown">Select those shown</button><button class="link-btn" type="button" data-a="none">Show all countries</button></div>
               <div class="ms-list" id="g-cty-list" role="group" aria-label="Countries"></div>
             </div>
-          </div></div></div>
+          </div>
+          <span id="g-groups"></span>
+      </div>
       <div class="tiles" id="gold-tiles"></div><p class="hint" id="gold-live"></p>
     </section>
     <div id="gold"></div>
@@ -721,12 +730,12 @@ const source = { kind: "snapshot", at: SNAPSHOT.downloaded, checking: true };
 const state = {
   tab: "shares", cur: CURS.map(c => c.k), freq: "Q", period: "all",
   shView: "stack", shLog: false, amView: "stack", amLog: false, sel: "", shShow: [], amShow: [],
-  chFrom: "", chTo: "", chMetric: "bn", chCur: "USD", dtMetric: "share", dtSet: "cur", dtYear: "latest", dtCty: [], scCty: "NOR", gYear: "t", gPer: "5y", gShare: "pct", gSel: [], gCty: [], gLog: false,
+  chFrom: "", chTo: "", chMetric: "bn", chCur: "USD", dtMetric: "share", dtSet: "cur", dtYear: "latest", dtCty: [], scCty: "NOR", gYear: "t", gPer: "5y", gShare: "pct", gSel: [], gCty: [], gEcon: ["AE", "EM"], gReg: ["peg", "managed", "float"], gGeo: "all", gLog: false,
   raceMetric: "share", raceNoUSD: false, raceSpeed: "1", fxBase: "2016-Q4", fxCur: "USD", flShow: [], fxShow: [],
   cMeasure: "pct", cGold: "with", cYear: "latest", cSort: "v", cDir: "desc", gb: "eu_AE_float~eu_AE_peg", cGroup: "regime", cFilter: "all", cLines: "regime", cAgg: "combined", gScale: "log",
   bY: "bn", bColor: "regime", bEcon: ["AE"], bReg: ["peg", "managed", "float"], bRegion: "all", bSpeed: "1", bLabels: "10", cSel: ["CHE", "HKG", "SAU", "CHN", "JPN", "USA"],
 };
-const LIST_KEYS = new Set(["cur", "cSel", "dtCty", "gSel", "gCty", "bEcon", "bReg", "shShow", "amShow", "flShow", "fxShow"]);
+const LIST_KEYS = new Set(["cur", "cSel", "dtCty", "gSel", "gCty", "gEcon", "gReg", "bEcon", "bReg", "shShow", "amShow", "flShow", "fxShow"]);
 const TABS = ["shares", "changes", "countries", "gold", "data", "country", "explore"];
 function readHash() {
   const p = new URLSearchParams(location.hash.slice(1));
@@ -744,6 +753,9 @@ function readHash() {
   if (!["1y", "5y", "10y", "2000"].includes(state.gPer)) state.gPer = "5y";
   if (!["pct", "bn"].includes(state.gShare)) state.gShare = "pct";
   state.gSel = state.gSel.slice(0, 8);
+  state.gEcon = state.gEcon.filter(x => ["AE", "EM"].includes(x)); if (!state.gEcon.length) state.gEcon = ["AE", "EM"];
+  state.gReg = state.gReg.filter(x => ["peg", "managed", "float"].includes(x)); if (!state.gReg.length) state.gReg = ["peg", "managed", "float"];
+  if (!["all", "eu", "ap", "am", "me", "af"].includes(state.gGeo)) state.gGeo = "all";
   if (!["Q", "A"].includes(state.freq)) state.freq = "Q";
   if (!CUR[state.chCur] || CUR[state.chCur].yearlyOnly) state.chCur = "USD";
   if (!["share", "bn"].includes(state.raceMetric)) state.raceMetric = "share";
@@ -2499,6 +2511,7 @@ const GX = LANG === "no" ? {
   title: "Gull i sentralbankenes reserver",
   intro: "Pengemyndighetenes gull i tonn, landene som rapporterer det til IMF hvert kvartal, og gullprisen. Endringer måles bare for land med tall i begge ender av perioden, siden landene har begynt å rapportere i ulike år (Kina fra 2015, for eksempel).",
   price: "Gullpris", perOz: "US$ per unse", yr: "på et år", held: "Gull i reservene", tonnes: "tonn", countries: (n, ecb) => ecb ? `${n} land og ESB` : `${n} land`, filterNote: "Bare de valgte landene.",
+  econ: [["AE", "Avanserte"], ["EM", "Fremvoksende"]], reg: [["peg", "Fast"], ["managed", "Styrt"], ["float", "Flytende"]], geoAll: "Alle regioner", region: "Region", reset: "Nullstill filtrene",
   bought: "Kjøpt siste år", net: "netto", value: "Verdi", atPrice: "til dagens pris", share: "Gull, andel av reservene", shareN: n => `${n} land med tall`,
   priceT: "Gullprisen", priceSub: "US$ per troy unse, månedens gjennomsnitt",
   yearT: "År for år: kjøp eller pris?", yearSubT: "Netto kjøp, tonn, for landene med tall ved begge årsskiftene", yearSubV: "Endring i gullets verdi, mrd. US$: kjøp (til årets sluttpris) og prisendring (på beholdningen ved årets start)",
@@ -2515,6 +2528,7 @@ const GX = LANG === "no" ? {
   title: "Gold in central banks' reserves",
   intro: "The monetary authorities' gold in tonnes, for the countries that report it to the IMF each quarter, and the gold price. Changes are measured only for countries with figures at both ends of a period, since countries began reporting in different years (China from 2015, for example).",
   price: "Gold price", perOz: "US$ per ounce", yr: "in a year", held: "Gold in reserves", tonnes: "tonnes", countries: (n, ecb) => ecb ? `${n} countries and the ECB` : `${n} ${n === 1 ? "country" : "countries"}`, filterNote: "Only the chosen countries.",
+  econ: [["AE", "Advanced"], ["EM", "Emerging & developing"]], reg: [["peg", "Pegged"], ["managed", "Managed"], ["float", "Floating"]], geoAll: "All regions", region: "Region", reset: "Reset filters",
   bought: "Bought in the past year", net: "net", value: "Value", atPrice: "at today's price", share: "Gold, share of reserves", shareN: n => `${n} countries with figures`,
   priceT: "The gold price", priceSub: "US$ per troy ounce, the month's average",
   yearT: "Year by year: buying or price?", yearSubT: "Net purchases, tonnes, of the countries with figures at both year-ends", yearSubV: "Change in the gold's value, US$ bn: purchases (at the year's closing price) and the change in price (on the holdings at the start of the year)",
@@ -2612,10 +2626,20 @@ function renderGold() {
   const no = LANG === "no", el = document.getElementById("gold"), end = GT.end;
   const seg = (key, opts) => `<div class="seg" role="group">${opts.map(([v, t]) => `<button type="button" data-g="${key}" data-v="${v}" aria-pressed="${state[key] === v}">${t}</button>`).join("")}</div>`;
   const tile = (lab, value, note) => `<div class="tile"><div class="label">${lab}</div><div class="value">${value}</div><div class="note">${note}</div></div>`;
-  // the countries chosen in the selector (none chosen: all of them)
-  const allKs = Object.keys(GT.t), filt = state.gCty.filter(k => GT.t[k]), inF = k => !filt.length || filt.includes(k);
+  // the filters: advanced or emerging economy, exchange-rate regime (as measured now) and region (the ECB counts
+  // as an advanced European floater); then the countries chosen in the selector, among those (none chosen: all)
+  const gInfo = k => k === "EZB" ? { e: "AE", r: "float", g: "eu" } : { e: CD.groups?.econ?.[k], r: REGIMES[k]?.r, g: geoOf(k) };
+  const full = state.gEcon.length === 2 && state.gReg.length === 3 && state.gGeo === "all";
+  const inGroups = k => { if (full) return true; const x = gInfo(k); return state.gEcon.includes(x.e) && state.gReg.includes(x.r) && (state.gGeo === "all" || x.g === state.gGeo); };
+  const allKs = Object.keys(GT.t).filter(inGroups), filt = state.gCty.filter(k => allKs.includes(k));
+  const inF = k => inGroups(k) && (!filt.length || filt.includes(k));
   goldPick.setAll(allKs.map(k => ({ k, name: gName(k) })));
-  const ks = filt.length ? filt : allKs;
+  const ks = filt.length ? filt : allKs, filtered = filt.length > 0 || !full;
+  const chip = (key, v, txt) => `<button class="chip" type="button" data-gf="${key}" data-v="${v}" aria-pressed="${state[key].includes(v)}">${esc(txt)}</button>`;
+  document.getElementById("g-groups").innerHTML = `<div class="chips">${GX.econ.map(([v, x]) => chip("gEcon", v, x)).join("")}</div>
+    <div class="chips">${GX.reg.map(([v, x]) => chip("gReg", v, x)).join("")}</div>
+    <select id="g-geo" aria-label="${GX.region}"><option value="all">${GX.geoAll}</option>${GEO.map(g => `<option value="${g.k}"${state.gGeo === g.k ? " selected" : ""}>${esc(g.name)}</option>`).join("")}</select>
+    ${filtered ? `<button class="link-btn" type="button" id="g-reset">${GX.reset}</button>` : ""}`;
   // key figures
   const m1 = GT.months.at(-1), m0 = GT.months[GT.months.length - 13], p1 = GD.price[m1], pg = (p1 / GD.price[m0] - 1) * 100;
   const latest = ks.map(k => ({ k, ...gLatest(k) })).filter(r => fin(r.v));
@@ -2623,7 +2647,7 @@ function renderGold() {
   const yearAgo = quarterBack(end, 4), both = ks.filter(k => fin(GT.t[k][end]) && fin(GT.t[k][yearAgo]));
   const bought = both.reduce((s, k) => s + GT.t[k][end] - GT.t[k][yearAgo], 0);
   const valueBn = total * OZ_PER_T * p1 / 1e9;
-  const minP = quarterBack(CC_LATEST, 8), withRes = Object.values(CC).filter(c => inF(c.k)).map(c => [...c.pts].reverse().find(pt => fin(pt.res) && fin(pt.gold) && pt.p >= minP)).filter(Boolean);
+  const minP = quarterBack(CC_LATEST, 8), withRes = Object.values(CC).filter(c => GT.t[c.k] ? inF(c.k) : inGroups(c.k) && !filt.length).map(c => [...c.pts].reverse().find(pt => fin(pt.res) && fin(pt.gold) && pt.p >= minP)).filter(Boolean);
   const share = withRes.length ? withRes.reduce((s, pt) => s + pt.gold, 0) / withRes.reduce((s, pt) => s + pt.res, 0) * 100 : null;
   const nC = latest.filter(r => r.k !== "EZB").length, ecb = latest.some(r => r.k === "EZB");
   const tiles = tile(GX.price, `$${fmt(p1, 0)}`, `${GX.perOz}, ${m1.replace("-M", "-")} · <span class="${cls(pg)}">${signed(pg, 1, "%")}</span> ${GX.yr}`)
@@ -2635,13 +2659,14 @@ function renderGold() {
   const top = latest.slice().sort((a, b) => b.v - a.v).map(r => r.k);
   if (!state.gSel.length) state.gSel = top.slice(0, 6);
   // with countries chosen in the selector: those (the eight largest holders among them)
-  const chosen = filt.length ? [...top.filter(k => filt.includes(k) && k !== HOME).slice(0, 8), ...(filt.includes(HOME) && GT.t[HOME] ? [HOME] : [])]
+  // with filters: the eight (or, with only the groups filtered, six) largest holders among the countries left
+  const chosen = filtered ? [...top.filter(k => ks.includes(k) && k !== HOME).slice(0, filt.length ? 8 : 6), ...(ks.includes(HOME) ? [HOME] : [])]
     : [...state.gSel.filter(k => GT.t[k] && k !== HOME), ...(GT.t[HOME] ? [HOME] : [])];
   const others = ks.filter(k => !chosen.includes(k)).sort((a, b) => gName(a).localeCompare(gName(b), no ? "nb" : "en"));
   document.getElementById("gold-title").textContent = GX.title;
   document.getElementById("gold-intro").textContent = GX.intro;
   document.getElementById("gold-tiles").innerHTML = tiles;
-  document.getElementById("gold-live").textContent = [filt.length ? GX.filterNote : "", GX.live[gLive.state] || ""].filter(Boolean).join(" ");
+  document.getElementById("gold-live").textContent = [filtered ? GX.filterNote : "", GX.live[gLive.state] || ""].filter(Boolean).join(" ");
   el.innerHTML = `
     <div class="grid2">
       <section class="card"><div class="card-head"><div><h2>${GX.priceT}</h2><p class="sub">${GX.priceSub}</p></div></div><div class="chart" id="g-price"></div></section>
@@ -2655,9 +2680,9 @@ function renderGold() {
         <div class="row">${seg("gShare", GX.shareSeg)}</div></div><div class="chart" id="g-share" style="height:560px"></div></section>
     </div>
     <section class="card"><div class="card-head"><div><h2>${GX.holdT}</h2><p class="sub">${GX.holdSub}</p></div>
-      <div class="row"><select id="g-add" aria-label="${GX.add}"${filt.length ? " hidden" : ""}><option value="">${GX.add} …</option>${others.map(k => `<option value="${k}">${esc(gName(k))}</option>`).join("")}</select>
+      <div class="row"><select id="g-add" aria-label="${GX.add}"${filtered ? " hidden" : ""}><option value="">${GX.add} …</option>${others.map(k => `<option value="${k}">${esc(gName(k))}</option>`).join("")}</select>
         <label class="check"><input type="checkbox" id="g-log"${state.gLog ? " checked" : ""}> ${GX.log}</label></div></div>
-      <div class="chips" id="g-chips">${chosen.map((k, i) => k === HOME || filt.length
+      <div class="chips" id="g-chips">${chosen.map((k, i) => k === HOME || filtered
         ? `<span class="chip" aria-pressed="true"><span class="dot" style="background:${css(k === HOME ? "--text-primary" : SLOTS[i % SLOTS.length])}"></span>${esc(gName(k))}${k === HOME ? " ★" : ""}</span>`
         : `<button class="chip" type="button" aria-pressed="true" data-k="${k}"><span class="dot" style="background:${css(SLOTS[i % SLOTS.length])}"></span>${esc(gName(k))} ×</button>`).join("")}</div>
       <div class="chart" id="g-hold"></div></section>
@@ -2712,7 +2737,7 @@ function renderGold() {
       xaxis: { showgrid: true, ticksuffix: " t", zerolinecolor: css("--axis"), range: (() => { const lo = Math.min(0, ...rowsM.map(r => r.d)), hi = Math.max(0, ...rowsM.map(r => r.d)), pad = (hi - lo) * 0.16; return [lo - (lo < 0 ? pad : 0), hi + pad]; })() } }));
 
   // gold as a share of reserves (or its value), from the countries' reserve figures
-  const sh = Object.values(CC).filter(c => inF(c.k)).map(c => { const pt = [...c.pts].reverse().find(p => fin(p.res) && fin(p.gold) && p.res > 0 && p.p >= minP); return pt && { k: c.k, name: c.name, pct: pt.gold / pt.res * 100, bn: pt.gold, p: pt.p }; }).filter(Boolean);
+  const sh = Object.values(CC).filter(c => GT.t[c.k] ? inF(c.k) : inGroups(c.k) && !filt.length).map(c => { const pt = [...c.pts].reverse().find(p => fin(p.res) && fin(p.gold) && p.res > 0 && p.p >= minP); return pt && { k: c.k, name: c.name, pct: pt.gold / pt.res * 100, bn: pt.gold, p: pt.p }; }).filter(Boolean);
   const byBn = state.gShare === "bn", f = r => byBn ? r.bn : r.pct;
   const rowsS = sh.slice().sort((a, b) => f(b) - f(a)).slice(0, 20), shNor = sh.find(r => r.k === HOME);
   if (shNor && !rowsS.includes(shNor)) rowsS.push(shNor);
@@ -2742,6 +2767,16 @@ function renderGold() {
     `<tr${r.k === HOME ? ' class="home"' : ""}>${r.cells.map((v, j) => `<td${j === 2 ? ' class="muted"' : ""}>${esc(v)}</td>`).join("")}</tr>`).join("")}</tbody>`;
 }
 const goldPick = countryPicker("g-cty", "gCty", () => renderGold());
+document.getElementById("g-filters").addEventListener("click", e => {
+  const c = e.target.closest("[data-gf]");
+  if (c) {
+    const key = c.dataset.gf, v = c.dataset.v, next = state[key].includes(v) ? state[key].filter(x => x !== v) : [...state[key], v];
+    state[key] = next.length ? next : (key === "gEcon" ? ["AE", "EM"] : ["peg", "managed", "float"]);  // none: all again
+    writeHash(); renderGold();
+  }
+  if (e.target.id === "g-reset") { Object.assign(state, { gEcon: ["AE", "EM"], gReg: ["peg", "managed", "float"], gGeo: "all", gCty: [] }); writeHash(); renderGold(); }
+});
+document.getElementById("g-filters").addEventListener("change", e => { if (e.target.id === "g-geo") { state.gGeo = e.target.value; writeHash(); renderGold(); } });
 document.getElementById("gold").addEventListener("click", e => {
   const b = e.target.closest("button[data-g]");
   if (b) { state[b.dataset.g] = b.dataset.v; writeHash(); renderGold(); return; }
