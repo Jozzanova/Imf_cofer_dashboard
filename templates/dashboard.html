@@ -1248,13 +1248,14 @@ function renderTiles() {
     const v = f.share[k][n], d = f.share[k][yr];
     return tile(`${dot(k)}${esc(CUR[k].name)}`, `${fmt(v, 1)}%`, `<span class="${cls(v - d)}">${signed(v - d, 2, " pp")}</span> in a year`);
   };
-  const beyond = i => ["CNY", "CAD", "AUD", "CHF", "OTHC"].reduce((s, k) => s + (f.share[k][i] ?? 0), 0);
+  // the rest beside the four shown: the shares then add up to 100%
+  const beyond = i => ["GBP", "CAD", "AUD", "CHF", "OTHC"].reduce((s, k) => s + (f.share[k][i] ?? 0), 0);
   const t = f.total[n], tPrev = f.total[yr], g = (t / tPrev - 1) * 100;
   document.getElementById("tiles-head").innerHTML = `Latest quarter: <b>${label(f.periods[n])}</b> · change over the past year, since ${py}`;
   document.getElementById("tiles").innerHTML =
     tile("Total FX reserves", `$${fmt(t / 1000, 2)} tn`, `<span class="${cls(g)}">${signed(g, 1, "%")}</span> in a year`) +
     ["USD", "EUR", "JPY", "CNY"].map(shareTile).join("") +
-    tile("Beyond the big four", `${fmt(beyond(n), 1)}%`, `<span class="${cls(beyond(n) - beyond(yr))}">${signed(beyond(n) - beyond(yr), 2, " pp")}</span> in a year · all but USD, EUR, JPY, GBP`);
+    tile("Remaining currencies", `${fmt(beyond(n), 1)}%`, `<span class="${cls(beyond(n) - beyond(yr))}">${signed(beyond(n) - beyond(yr), 2, " pp")}</span> in a year · all but USD, EUR, JPY, CNY`);
 }
 
 // ---------- controls ----------
