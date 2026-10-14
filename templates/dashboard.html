@@ -853,6 +853,23 @@ function selIdx() {
 }
 const selShape = () => ({ type: "line", xref: "x", yref: "paper", x0: F().x[selIdx()], x1: F().x[selIdx()], y0: 0, y1: 1,
   line: { color: css("--text-muted"), width: 1.5, dash: "dot" } });
+// where the IMF began to report a currency on its own (before, it is part of "Other currencies"): a dashed line,
+// on charts showing that currency or the others
+const SPLITS = [
+  { q: "2012-Q4", a: "2012", ks: ["CAD", "AUD", "OTHC"], t: LANG === "no" ? "CAD og AUD skilt ut fra her" : "CAD and AUD reported separately from here" },
+  { q: "2016-Q4", a: "2016", ks: ["CNY", "OTHC"], t: LANG === "no" ? "CNY skilt ut fra her" : "CNY reported separately from here" }];
+function splitMarks(w, ks) {
+  const f = F(), shapes = [], annotations = [];
+  for (const m of SPLITS) {
+    const i = f.periods.indexOf(state.freq === "Q" ? m.q : m.a);
+    if (i < w.i0 || i > w.i1 || !m.ks.some(k => ks.includes(k))) continue;
+    shapes.push({ type: "line", xref: "x", yref: "paper", x0: f.x[i], x1: f.x[i], y0: 0, y1: 1, layer: "above", line: { color: css("--text-muted"), width: 1, dash: "dash" } });
+    // the labels one above the other: the lines are close
+    annotations.push({ x: f.x[i], xref: "x", y: 0.03 + annotations.length * 0.09, yref: "paper", xanchor: "left", yanchor: "bottom", xshift: 4, showarrow: false, text: m.t,
+      font: { size: 10.5, color: css("--text-secondary") }, bgcolor: css("--surface"), borderpad: 3 });
+  }
+  return { shapes, annotations };
+}
 // a click anywhere on a chart picks that date
 function bindDatePick(el) {
   el.removeAllListeners?.("plotly_click");
@@ -940,15 +957,17 @@ function drawShares() {
   if (state.shView === "stack") {
     const all = ks.length >= 9 && !state.shShow.length;
     freshIfShownChanged("sh", el);
+    const mk = splitMarks(w, ks);
     plot(el, applyShown("sh", series.map(s => areaTrace(s.k, x, s.y, "%", 2))), baseLayout({
-      hovermode: "x unified", xaxis: { hoverformat: hoverX() }, shapes: [selShape()], legend: legendCfg(),
+      hovermode: "x unified", xaxis: { hoverformat: hoverX() }, shapes: [selShape(), ...mk.shapes], annotations: mk.annotations, legend: legendCfg(),
       yaxis: { ticksuffix: "%", range: all ? [0, 100] : undefined, rangemode: "tozero" } }));
   } else {
     const traces = applyShown("sh", series.map(s => lineTrace(s.k, x, s.y, "%", 2))), on = traces.filter(t => t.visible === true);
+    const mk = splitMarks(w, ks);
     plot(el, traces, baseLayout({
-      hovermode: "x unified", xaxis: { hoverformat: hoverX() }, shapes: [selShape()], legend: legendCfg(),
+      hovermode: "x unified", xaxis: { hoverformat: hoverX() }, shapes: [selShape(), ...mk.shapes], legend: legendCfg(),
       yaxis: state.shLog ? { type: "log", ticksuffix: "%" } : { ticksuffix: "%", rangemode: "tozero" },
-      annotations: directLabels(on, state.shLog), margin: { l: 8, r: on.length <= 4 ? 130 : 8, t: 8, b: 8 } }));
+      annotations: [...directLabels(on, state.shLog), ...mk.annotations], margin: { l: 8, r: on.length <= 4 ? 130 : 8, t: 8, b: 8 } }));
   }
   bindLegendPick("sh", el);
   bindDatePick(el);
@@ -1019,11 +1038,11 @@ function drawAmounts() {
   } else traces = series.map(s => lineTrace(s.k, x, s.y, " bn", 0));
   applyShown("am", traces);
   if (stack) freshIfShownChanged("am", el);
-  const on = traces.filter(t => t.visible === true);
+  const on = traces.filter(t => t.visible === true), mk = splitMarks(w, ks);
   plot(el, traces, baseLayout({
-    hovermode: "x unified", xaxis: { hoverformat: hoverX() }, shapes: [selShape()], legend: legendCfg(),
+    hovermode: "x unified", xaxis: { hoverformat: hoverX() }, shapes: [selShape(), ...mk.shapes], legend: legendCfg(),
     yaxis: !stack && state.amLog ? { type: "log", tickprefix: "$" } : { tickprefix: "$", tickformat: ",.0f", rangemode: "tozero" },
-    annotations: stack ? [] : directLabels(on, state.amLog), margin: { l: 8, r: !stack && on.length <= 4 ? 130 : 8, t: 8, b: 8 } }));
+    annotations: [...(stack ? [] : directLabels(on, state.amLog)), ...mk.annotations], margin: { l: 8, r: !stack && on.length <= 4 ? 130 : 8, t: 8, b: 8 } }));
   bindLegendPick("am", el);
   bindDatePick(el);
   drawSide("am");
