@@ -737,15 +737,15 @@ const state = {
   chFrom: "", chTo: "", chMetric: "bn", chCur: "USD", dtMetric: "share", dtSet: "cur", dtYear: "latest", dtCty: [], scCty: "NOR", gYear: "t", gPer: "5y", gShare: "pct", gSel: [], gCty: [], gEcon: ["AE", "EM"], gReg: ["peg", "managed", "float"], gGeo: "all", gLog: false,
   raceMetric: "share", raceNoUSD: false, raceSpeed: "1", fxBase: "2016-Q4", fxCur: "USD", flShow: [], fxShow: [],
   cMeasure: "pct", cGold: "with", cYear: "latest", cSort: "v", cDir: "desc", gb: "eu_AE_float~eu_AE_peg", cGroup: "regime", cFilter: "all", cLines: "regime", cAgg: "combined", gScale: "log",
-  bY: "bn", bColor: "regime", bEcon: ["AE"], bReg: ["peg", "managed", "float"], bRegion: "all", bSpeed: "1", bLabels: "10", cSel: ["CHE", "HKG", "SAU", "CHN", "JPN", "USA"],
+  bY: "bn", bColor: "regime", bEcon: ["AE"], bReg: ["peg", "managed", "float"], bRegion: "all", bHi: [], bSpeed: "1", bLabels: "10", cSel: ["CHE", "HKG", "SAU", "CHN", "JPN", "USA"],
 };
-const LIST_KEYS = new Set(["cur", "cSel", "dtCty", "gSel", "gCty", "gEcon", "gReg", "bEcon", "bReg", "shShow", "amShow", "flShow", "fxShow"]);
+const LIST_KEYS = new Set(["cur", "cSel", "bHi", "dtCty", "gSel", "gCty", "gEcon", "gReg", "bEcon", "bReg", "shShow", "amShow", "flShow", "fxShow"]);
 const TABS = ["shares", "changes", "countries", "gold", "data", "country", "explore"];
 function readHash() {
   const p = new URLSearchParams(location.hash.slice(1));
   for (const [k, v] of p) {
     if (!(k in state)) continue;
-    if (LIST_KEYS.has(k)) state[k] = v ? v.split(",").filter(x => ["cur", "shShow", "flShow", "fxShow"].includes(k) ? CUR[x] : k === "amShow" ? CUR[x] || x === "UN" : k === "cSel" || k === "dtCty" || k === "gSel" || k === "gCty" ? /^[A-Z]{3}$/.test(x) : /^\w+$/.test(x)) : [];
+    if (LIST_KEYS.has(k)) state[k] = v ? v.split(",").filter(x => ["cur", "shShow", "flShow", "fxShow"].includes(k) ? CUR[x] : k === "amShow" ? CUR[x] || x === "UN" : k === "cSel" || k === "bHi" || k === "dtCty" || k === "gSel" || k === "gCty" ? /^[A-Z]{3}$/.test(x) : /^\w+$/.test(x)) : [];
     else if (typeof state[k] === "boolean") state[k] = v === "1";
     else state[k] = v;
   }
@@ -2238,14 +2238,6 @@ async function loadCountriesLive() {
   }
   if (state.tab === "countries") renderCountries(); else if (state.tab === "data") renderData(); else if (state.tab === "country") renderSingle(); else syncCountryControls();
 }
-// a bubble clicked: that country into the chart over time below (the oldest choice making room if it is full),
-// the chart switched to the chosen countries, and scrolled into view
-function followCountry(k) {
-  if (k !== HOME && !state.cSel.includes(k)) state.cSel = [...state.cSel.slice(state.cSel.length >= MAX_COUNTRIES ? 1 : 0), k];
-  state.cLines = "countries";
-  writeHash(); syncCountryControls(); renderCountryTable(); drawCountryLines(); if (!bub.playing) moveBubbles(250);
-  document.getElementById("c-line").scrollIntoView({ behavior: "smooth", block: "center" });
-}
 function toggleCountry(k, addOnly = false) {
   if (k === HOME) return;  // always shown
   if (state.cSel.includes(k)) { if (!addOnly) state.cSel = state.cSel.filter(x => x !== k); }
@@ -2323,20 +2315,20 @@ function bubbleTarget(y) {
   const { rows, world } = bubbleYear(y, lastYear), shown = rows.filter(bubKeep);
   // names on the largest holders (as many as chosen), the countries chosen for the chart over time, and Norway
   const nLabels = state.bLabels === "all" ? Infinity : +state.bLabels;
-  const named = new Set(shown.slice().sort((p, q) => q.a - p.a).slice(0, nLabels).map(r => r.c.k).concat(state.cSel, HOME));
+  const named = new Set(shown.slice().sort((p, q) => q.a - p.a).slice(0, nLabels).map(r => r.c.k).concat(state.cSel, HOME, state.bHi));
   const pts = new Map();
   for (const r of shown) {
     const cat = groupCat(state.bColor, r[state.bColor]);
     pts.set(r.c.k, {
       lx: Math.log10(r.gdp), ly: Math.log10(pctY ? r.pct : r.a), s: Math.max(5, 70 * Math.sqrt(r.share / MAX_SHARE)),
-      color: css(cat?.color || "--other"), text: named.has(r.c.k) ? (r.c.k === HOME ? `★ ${r.c.name}` : r.c.name) : "", home: r.c.k === HOME,  // plain text: Plotly can drop rich text when it updates
+      color: css(cat?.color || "--other"), text: named.has(r.c.k) ? (r.c.k === HOME ? `★ ${r.c.name}` : r.c.name) : "", home: r.c.k === HOME, hi: state.bHi.includes(r.c.k),  // plain text: Plotly can drop rich text when it updates
       cd: [r.c.name, `$${fmt(r.gdp, 0)} bn`, `$${fmt(r.a, r.a < 10 ? 1 : 0)} bn`, `${fmt(r.pct, 1)}%`, `${fmt(r.share, 2)}%`, cat?.name || "–", r.c.k],
     });
   }
   const total = shown.reduce((s, r) => s + r.a, 0);
   const sub = `${y}${y === lastYear ? " (latest quarter)" : ", year end"}: ${shown.length} of ${rows.length} countries shown, ` +
     `holding ${fmt(world ? total / world * 100 : 0, 1)}% of the reserves of all countries with figures, ${goldWords()}. Bubble area: share of world reserves. ` +
-    (state.bColor === "regime" || state.bReg.length < 3 ? "Exchange-rate regimes measured by this dashboard for each year from the IMF's exchange rates, with the IMF's de facto tests (a 2% band; see the note under “Compare groups”), approximating its official classification. " : "") + "Click a bubble to follow that country below.";
+    (state.bColor === "regime" || state.bReg.length < 3 ? "Exchange-rate regimes measured by this dashboard for each year from the IMF's exchange rates, with the IMF's de facto tests (a 2% band; see the note under “Compare groups”), approximating its official classification. " : "") + "Click a bubble to highlight that country (again to remove it).";
   return { pts, sub, year: y };
 }
 function syncBubbleControls() {
@@ -2354,14 +2346,18 @@ function syncBubbleControls() {
   });
   document.getElementById("b-region").value = state.bRegion;
 }
-const bubTrace = list => ({
+// highlighted (clicked) bubbles are ringed and in full colour, and the others fade while any is highlighted
+const bubTrace = list => {
+  const any = list.some(p => p.hi);
+  return {
   type: "scatter", mode: "markers", showlegend: false,
   x: list.map(p => 10 ** p.lx), y: list.map(p => 10 ** p.ly),
-  marker: { size: list.map(p => p.s), sizemode: "diameter", color: list.map(p => p.color), opacity: 0.78,
-    line: { color: list.map(p => css(p.home ? "--text-primary" : "--surface")), width: list.map(p => p.home ? 3 : 1) } },
+  marker: { size: list.map(p => p.s), sizemode: "diameter", color: list.map(p => p.color), opacity: list.map(p => !any || p.hi ? 0.85 : p.home ? 0.6 : 0.25),
+    line: { color: list.map(p => css(p.hi || p.home ? "--text-primary" : "--surface")), width: list.map(p => p.hi ? 3.5 : p.home ? 3 : 1) } },
   customdata: list.map(p => p.cd),
   hovertemplate: "<b>%{customdata[0]}</b> (%{customdata[5]})<br>GDP %{customdata[1]}<br>Reserves %{customdata[2]} = %{customdata[3]} of GDP<br>%{customdata[4]} of world reserves<extra></extra>",
-});
+  };
+};
 const bySize = m => [...m.values()].sort((p, q) => q.s - p.s);  // the largest drawn first, so small ones stay visible
 // The names, as a series of their own: invisible markers the size of the bubbles (so the text sits just
 // above each) in a fixed order. Plotly loses labels when a series with text is re-sorted from frame to
@@ -2371,7 +2367,7 @@ const labelTrace = list => {
   return { type: "scatter", mode: "markers+text", showlegend: false, hoverinfo: "skip",
     x: named.map(p => 10 ** p.lx), y: named.map(p => 10 ** p.ly), text: named.map(p => p.text),
     textposition: "top center", cliponaxis: false,
-    textfont: { size: named.map(p => p.home ? 13 : 11), color: named.map(p => css(p.home ? "--text-primary" : "--text-secondary")) },
+    textfont: { size: named.map(p => p.home || p.hi ? 13 : 11), color: named.map(p => css(p.home || p.hi ? "--text-primary" : "--text-secondary")) },
     marker: { size: named.map(p => p.s), sizemode: "diameter", opacity: 0 } };
 };
 function showBubbleYear(y, sub) {
@@ -2422,7 +2418,11 @@ function drawBubbles() {
   showBubbleYear(bub.year, target.sub);
   if (!el._bubBound) {
     el._bubBound = true;
-    el.on("plotly_click", ev => { const k = ev.points?.[0]?.customdata?.[6]; if (k) followCountry(k); });
+    el.on("plotly_click", ev => {
+      const k = ev.points?.[0]?.customdata?.[6]; if (!k) return;
+      state.bHi = state.bHi.includes(k) ? state.bHi.filter(x => x !== k) : [...state.bHi, k];
+      writeHash(); if (!bub.playing) moveBubbles(150);
+    });
   }
 }
 // move the bubbles from where they are to the target over ms milliseconds; eased for a single change,
@@ -2443,7 +2443,7 @@ function tweenBubbles(target, ms, steady, done) {
     const t = Math.min(1, (now - t0) / ms), e = ease(t);
     const list = pairs.map(({ a, b }) => ({
       lx: a.lx + (b.lx - a.lx) * e, ly: a.ly + (b.ly - a.ly) * e, s: a.s + (b.s - a.s) * e,
-      color: e < 0.5 ? a.color : b.color, text: e < 0.5 ? a.text : b.text, cd: e < 0.5 ? a.cd : b.cd, home: a.home || b.home,
+      color: e < 0.5 ? a.color : b.color, text: e < 0.5 ? a.text : b.text, cd: e < 0.5 ? a.cd : b.cd, home: a.home || b.home, hi: e < 0.5 ? a.hi : b.hi,
     }));
     bubFrame(el, bubTrace(list), list);
     if (!labelled && e >= 0.5) { labelled = true; showBubbleYear(target.year, target.sub); }
@@ -2461,7 +2461,7 @@ function bubFrame(el, tr, list) {
   const lt = labelTrace(list);
   Plotly.restyle(el, { x: [tr.x, lt.x], y: [tr.y, lt.y], text: [undefined, lt.text], customdata: [tr.customdata, undefined],
     "textfont.size": [undefined, lt.textfont.size], "textfont.color": [undefined, lt.textfont.color],
-    "marker.size": [tr.marker.size, lt.marker.size], "marker.color": [tr.marker.color, undefined],
+    "marker.size": [tr.marker.size, lt.marker.size], "marker.color": [tr.marker.color, undefined], "marker.opacity": [tr.marker.opacity, 0],
     "marker.line.color": [tr.marker.line.color, undefined], "marker.line.width": [tr.marker.line.width, undefined] }, [0, 1]);
 }
 const moveBubbles = (ms = 450) => { syncBubbleControls(); tweenBubbles(bubbleTarget(bub.year), ms, false); };
