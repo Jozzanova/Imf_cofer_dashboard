@@ -221,8 +221,8 @@
   .gb-key { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--text-secondary); margin: 2px 0 6px; }
   .gb-key > span { display: inline-flex; align-items: center; gap: 6px; }
   .gb-swatch { width: 22px; height: 12px; border-radius: 2px; background-color: var(--gc); display: inline-block; }
-  .gb-swatch.pat-managed { background-image: repeating-linear-gradient(45deg, var(--surface) 0 1.5px, transparent 1.5px 5px); }
-  .gb-swatch.pat-float { background-image: radial-gradient(var(--surface) 1.1px, transparent 1.3px); background-size: 5px 5px; }
+  .gb-swatch.pat-managed { background-image: repeating-linear-gradient(45deg, rgb(from var(--surface) r g b / .75) 0 1px, transparent 1px 3.5px); }
+  .gb-swatch.pat-float { background-image: radial-gradient(rgb(from var(--surface) r g b / .75) 0.8px, transparent 1px); background-size: 3.5px 3.5px; }
   .gb-scroll { max-height: calc(15 * 21px + 12px); overflow-y: auto; overscroll-behavior: contain; border-bottom: 1px solid var(--grid); }
   .gb-stats { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12.5px; color: var(--text-secondary); margin-bottom: 4px; }
   .gb-stats b { color: var(--text-primary); font-weight: 650; }
@@ -1954,7 +1954,7 @@ function drawBuilder() {
     plot(el, [{
       type: "bar", orientation: "h", y: list.map(r => r.c.k === HOME ? `<b>★ ${esc(r.c.name)}</b>` : esc(r.c.name)), x: list.map(r => r.v),
       marker: { color: list.map(r => r.c.k === HOME ? css("--text-primary") : css(GB_COLORS[i])), opacity: 0.9,
-        pattern: g.reg.length > 1 ? { shape: list.map(r => REG_PATTERN[REGIMES[r.c.k]?.r] ?? ""), fillmode: "overlay", fgcolor: css("--surface"), size: 6, solidity: 0.4 } : undefined },
+        pattern: g.reg.length > 1 ? { shape: list.map(r => REG_PATTERN[REGIMES[r.c.k]?.r] ?? ""), fillmode: "overlay", fgcolor: css("--surface"), fgopacity: 0.75, size: 4, solidity: 0.3 } : undefined },
       text: list.map(r => cFmt(r.v)), textposition: "outside", cliponaxis: false, textfont: { color: css("--text-secondary"), size: 11.5 },
       customdata: list.map(r => [r.c.name, REGIMES[r.c.k]?.note || "–", fmtBn(r.a), r.c.k]),
       hovertemplate: "<b>%{customdata[0]}</b><br>%{text} · %{customdata[2]}<br>%{customdata[1]}<extra></extra>",
