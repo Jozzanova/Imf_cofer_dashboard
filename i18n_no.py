@@ -86,6 +86,14 @@ PAIRS = [
     ('aria-controls="tab-data">Data</button>', 'aria-controls="tab-data">Data</button>'),
     ('aria-controls="tab-country">Single country</button>', 'aria-controls="tab-country">Enkeltland</button>'),
     ('aria-controls="tab-gold">Gold</button>', 'aria-controls="tab-gold">Gull</button>'),
+    ('''<p class="hint">The IMF has reported the Canadian and Australian dollars separately since 2012 Q4 and the Chinese renminbi since 2016 Q4;
+        before then they are part of “Other currencies”, so that share drops at those dates without any change in holdings.</p>''',
+     '''<p class="hint">IMF har rapportert kanadiske og australske dollar for seg siden 2012 K4 og kinesiske renminbi siden 2016 K4;
+        før det inngår de i «Andre valutaer», så den andelen faller på disse tidspunktene uten at beholdningene har endret seg.</p>'''),
+    ('''<p class="hint">The IMF has reported the Canadian and Australian dollars separately since 2012 Q4 and the Chinese renminbi since 2016 Q4;
+        before then they are part of “Other currencies”, so that amount drops at those dates without any change in holdings.</p>''',
+     '''<p class="hint">IMF har rapportert kanadiske og australske dollar for seg siden 2012 K4 og kinesiske renminbi siden 2016 K4;
+        før det inngår de i «Andre valutaer», så det beløpet faller på disse tidspunktene uten at beholdningene har endret seg.</p>'''),
     ('aria-label="Selection"', 'aria-label="Utvalg"'),
     ('<span class="lbl">Currencies</span>', '<span class="lbl">Valutaer</span>'),
     ('id="cur-all">All</button>', 'id="cur-all">Alle</button>'),
