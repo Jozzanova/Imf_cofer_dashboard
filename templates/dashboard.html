@@ -2607,8 +2607,8 @@ function buildSlides() {
   }));
   slides.push({ title: ST.s5t,
     comment: no
-      ? `Norges Bank solgte gullbeholdningen sin i 2004, så Norge holder ikke gull i reservene. Medianlandet blant de lignende landene har ${pctTxt(goldMed)} av reservene i gull${fin(goldMed5) ? `, mot ${pctTxt(goldMed5)} fem år tidligere` : ""}.`
-      : `Norges Bank sold its gold in 2004, so Norway holds no gold in its reserves. The median similar country holds ${pctTxt(goldMed)} of its reserves in gold${fin(goldMed5) ? `, against ${pctTxt(goldMed5)} five years earlier` : ""}.`,
+      ? `Norge solgte gullet i reservene i 2004 og holder ikke gull i dag. Medianlandet blant de lignende landene har ${pctTxt(goldMed)} av reservene i gull${fin(goldMed5) ? `, mot ${pctTxt(goldMed5)} fem år tidligere` : ""}.`
+      : `Norway sold the gold in its reserves in 2004 and holds none today. The median similar country holds ${pctTxt(goldMed)} of its reserves in gold${fin(goldMed5) ? `, against ${pctTxt(goldMed5)} five years earlier` : ""}.`,
     refs: `${ST.peersNote} ${ST.srcBase} ${ST.latest(asOf)}`,
     fig: () => ({
       data: [{ type: "bar", orientation: "h", y: gold.map(r => r.k === HOME ? `<b>★ ${esc(r.name)}</b>` : esc(r.name)), x: gold.map(r => r.gs),
