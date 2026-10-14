@@ -565,7 +565,9 @@
           (foreign exchange, gold at market value, SDRs, the reserve position in the IMF and other reserve assets), quarterly where the country
           reports quarterly and otherwise at year-end, divided by that calendar year's GDP in US dollars from the IMF's
           <a href="https://data.imf.org/en/datasets/IMF.RES:WEO" target="_blank" rel="noopener">World Economic Outlook</a> (the latest year is
-          an IMF estimate). Reserves are a stock and GDP a yearly flow, the usual way to compare them. "Latest available" uses each country's most
+          an IMF estimate). Norway's GDP is Statistics Norway's, after its <a href="https://www.ssb.no/nasjonalregnskap-og-konjunkturer/nasjonalregnskap/artikler/oppjustert-niva-og-vekst-for-verdiskaping-i-norge" target="_blank" rel="noopener">main revision of the national accounts</a> in
+          November 2025, which raised the level of GDP by about 4% (for 2023). Sources from before it show a lower GDP, such as about US$ 483 bn
+          for 2024 against 501 bn now, and so higher reserves as a share of GDP. Reserves are a stock and GDP a yearly flow, the usual way to compare them. "Latest available" uses each country's most
           recent figure, if it is no more than two years old. Where the International Investment Position has no gold figure, the year-end
           gold at market value from the IMF's <a href="https://data.imf.org/en/datasets/IMF.STA:IRFCL" target="_blank" rel="noopener">IRFCL</a>
           statistics is used (Norway's gold, sold in 2004, is only there); failing both, a country's last reported amount is assumed. Countries that are not IMF members (such as Taiwan) or do not report are missing.
@@ -2389,6 +2391,7 @@ const ST = LANG === "no" ? {
   srcTime: "Kilder: som over; hvert år med valutaregimet målt ut fra de to årene med valutakurser fram til årets slutt. Medianer per år for land med tall.",
   peersNote: "Lignende land: avanserte økonomier med egen flytende valuta (ikke euroområdet, som har felles reserver, og ikke USA, som utsteder dollaren).",
   s1t: "Norges reserver i sammenheng", s2t: "Norge og andre avanserte land med flytende valuta", s3t: "Flytende eller fast valutakurs", s4t: "Over tid: Norge og gruppenes median", s5t: "Gull i reservene", s6t: "De lignende landene i detalj",
+  gdpRev: "Norges BNP etter SSBs hovedrevisjon av nasjonalregnskapet (november 2025), som løftet BNP-nivået med om lag 4 %; eldre kilder viser lavere BNP.",
   latest: p => `Siste tall per ${p}.`,
 } : {
   tab: "Norway compared with similar countries", intro: "Slides comparing Norway's foreign exchange reserves with countries with floating and fixed exchange rates, advanced and emerging. Each slide can be downloaded as a PNG (16:9, white background) for presentations.",
@@ -2396,6 +2399,7 @@ const ST = LANG === "no" ? {
   norway: "Norway", median: "median", countries: "countries", pctGdp: "Reserves, % of GDP", bn: "Reserves, US$ bn", goldShare: "Gold, % of reserves", d5: "Change in 5 years, pp", regime: "Exchange-rate regime", n: "Countries", country: "Country",
   srcBase: "Sources: IMF International Investment Position (reserve assets, gold at market value), IMF IRFCL (gold where missing), IMF World Economic Outlook (GDP). Exchange-rate regimes measured by this dashboard from the IMF's exchange rates (Exchange Rates dataset) over the last two years.",
   srcTime: "Sources: as above; each year with the exchange-rate regime measured from the two years of exchange rates up to its end. Medians per year of the countries with figures.",
+  gdpRev: "Norway's GDP after Statistics Norway's main revision of the national accounts (November 2025), which raised its level by about 4%; older sources show a lower GDP.",
   peersNote: "Similar countries: advanced economies with their own floating currency (not the euro area, which pools its reserves, nor the US, which issues the dollar).",
   s1t: "Norway's reserves in context", s2t: "Norway and other advanced economies with a floating currency", s3t: "Floating or fixed exchange rates", s4t: "Over time: Norway and the groups' medians", s5t: "Gold in the reserves", s6t: "The similar countries in detail",
   latest: p => `Latest figures as of ${p}.`,
@@ -2438,7 +2442,7 @@ function buildSlides() {
     comment: no
       ? `Norges offisielle valutareserver er ${fmt(nor.res, 0)} mrd. US$, ${pctTxt(nor.pct)} av BNP: ${comp(nor.pct, peerMed)} medianen for avanserte land med egen flytende valuta (${pctTxt(peerMed)}). ${fixedMore ? "Medianlandet med fast kurs holder mer, blant både avanserte og fremvoksende økonomier: en fast kurs må forsvares med reserver. " : ""}Statens pensjonsfond utland regnes ikke med i reservene.`
       : `Norway's official reserves are $${fmt(nor.res, 0)} bn, ${pctTxt(nor.pct)} of GDP: ${comp(nor.pct, peerMed)} the median of advanced economies with their own floating currency (${pctTxt(peerMed)}). ${fixedMore ? "The median country with a fixed rate holds more, among both advanced and emerging economies: a peg has to be defended with reserves. " : ""}The Government Pension Fund Global is not counted as reserves.`,
-    refs: `${ST.srcBase} ${ST.latest(asOf)}`,
+    refs: `${ST.srcBase} ${ST.gdpRev} ${ST.latest(asOf)}`,
     table: { head: ["", ST.n, ST.pctGdp, ST.bn, ST.goldShare, ST.d5],
       rows: [[ST.norway, "–", pctTxt(nor.pct), fmt(nor.res, 0), pctTxt(nor.goldShare ?? 0), signed(nor.d5, 1)],
         ...groups.map(x => [`${ST.group(x.key)} (${ST.median})`, String(x.rows.length), pctTxt(med(x.key, r => r.pct)), fmt(med(x.key, r => r.res), 0),

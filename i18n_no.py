@@ -34,7 +34,9 @@ BLOCKS = [
           (valuta, gull til markedsverdi, SDR, reserveposisjonen i IMF og andre reserver), kvartalsvis der landet
           rapporterer kvartalsvis og ellers ved årsslutt, delt på samme kalenderårs BNP i US-dollar fra IMFs
           <a href="https://data.imf.org/en/datasets/IMF.RES:WEO" target="_blank" rel="noopener">World Economic Outlook</a> (siste år er
-          et anslag fra IMF). Reservene er en beholdning og BNP en årlig strøm, slik de vanligvis sammenlignes. «Siste tilgjengelige» bruker hvert lands
+          et anslag fra IMF). Norges BNP er SSBs, etter <a href="https://www.ssb.no/nasjonalregnskap-og-konjunkturer/nasjonalregnskap/artikler/oppjustert-niva-og-vekst-for-verdiskaping-i-norge" target="_blank" rel="noopener">hovedrevisjonen av nasjonalregnskapet</a> i
+          november 2025, som løftet BNP-nivået med om lag 4 prosent (for 2023). Kilder fra før revisjonen viser lavere BNP, som om lag 483 mrd. US$
+          for 2024 mot 501 mrd. nå, og dermed høyere reserver som andel av BNP. Reservene er en beholdning og BNP en årlig strøm, slik de vanligvis sammenlignes. «Siste tilgjengelige» bruker hvert lands
           nyeste tall, hvis det ikke er mer enn to år gammelt. Der International Investment Position mangler et tall for gull, brukes gull
           til markedsverdi ved årsslutt fra IMFs <a href="https://data.imf.org/en/datasets/IMF.STA:IRFCL" target="_blank" rel="noopener">IRFCL</a>-statistikk
           (Norges gull, solgt i 2004, finnes bare der); mangler begge, antas landets sist rapporterte beholdning. Land som ikke er medlemmer av IMF (som Taiwan) eller ikke rapporterer, mangler.
