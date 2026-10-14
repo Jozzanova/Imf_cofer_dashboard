@@ -2328,7 +2328,7 @@ function bubbleTarget(y) {
   const total = shown.reduce((s, r) => s + r.a, 0);
   const sub = `${y}${y === lastYear ? " (latest quarter)" : ", year end"}: ${shown.length} of ${rows.length} countries shown, ` +
     `holding ${fmt(world ? total / world * 100 : 0, 1)}% of the reserves of all countries with figures, ${goldWords()}. Bubble area: share of world reserves. ` +
-    (state.bColor === "regime" || state.bReg.length < 3 ? "Exchange-rate regimes as measured in each year. " : "") + "Click a bubble to follow that country below.";
+    (state.bColor === "regime" || state.bReg.length < 3 ? "Exchange-rate regimes measured by this dashboard for each year from the IMF's exchange rates, with the IMF's de facto tests (a 2% band; see the note under “Compare groups”), approximating its official classification. " : "") + "Click a bubble to follow that country below.";
   return { pts, sub, year: y };
 }
 function syncBubbleControls() {
