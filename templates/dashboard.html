@@ -737,7 +737,7 @@ const state = {
   chFrom: "", chTo: "", chMetric: "bn", chCur: "USD", dtMetric: "share", dtSet: "cur", dtYear: "latest", dtCty: [], scCty: "NOR", gYear: "t", gPer: "5y", gShare: "pct", gSel: [], gCty: [], gEcon: ["AE", "EM"], gReg: ["peg", "managed", "float"], gGeo: "all", gLog: false,
   raceMetric: "share", raceNoUSD: false, raceSpeed: "1", fxBase: "2016-Q4", fxCur: "USD", flShow: [], fxShow: [],
   cMeasure: "pct", cGold: "with", cYear: "latest", cSort: "v", cDir: "desc", gb: "eu_AE_float~eu_AE_peg", cGroup: "regime", cFilter: "all", cLines: "regime", cAgg: "combined", gScale: "log",
-  bY: "bn", bColor: "regime", bEcon: ["AE"], bReg: ["peg", "managed", "float"], bRegion: "all", bHi: [], bSpeed: "1", bLabels: "10", cSel: ["CHE", "HKG", "SAU", "CHN", "JPN", "USA"],
+  bY: "bn", bColor: "region", bEcon: ["AE", "EM"], bReg: ["peg", "managed", "float"], bRegion: "all", bHi: [], bSpeed: "1", bLabels: "10", cSel: ["CHE", "HKG", "SAU", "CHN", "JPN", "USA"],
 };
 const LIST_KEYS = new Set(["cur", "cSel", "bHi", "dtCty", "gSel", "gCty", "gEcon", "gReg", "bEcon", "bReg", "shShow", "amShow", "flShow", "fxShow"]);
 const TABS = ["shares", "changes", "countries", "gold", "data", "country", "explore"];
@@ -771,7 +771,7 @@ function readHash() {
   if (!["combined", "median"].includes(state.cAgg)) state.cAgg = "combined";
   if (!["log", "lin"].includes(state.gScale)) state.gScale = "log";
   if (!["bn", "pct"].includes(state.bY)) state.bY = "bn";
-  if (!["econ", "region", "regime"].includes(state.bColor)) state.bColor = "regime";
+  if (!["econ", "region", "regime"].includes(state.bColor)) state.bColor = "region";
   if (!["1", "2", "4"].includes(state.bSpeed)) state.bSpeed = "1";
   if (!["6", "10", "20", "all"].includes(state.bLabels)) state.bLabels = "10";
 
@@ -2404,8 +2404,7 @@ function drawBubbles() {
   }
   const tick = v => `$${v >= 1000 ? fmt(v / 1000, 0) + " tn" : fmt(v, v < 1 ? 1 : 0) + " bn"}`;
   const vals = [0.1, 1, 10, 100, 1000, 10000, 100000];
-  plot(el, [bubTrace(bySize(target.pts)), labelTrace(bySize(target.pts)), ...G.cats.map(cat => ({ type: "scatter", mode: "markers", name: cat.name, x: [null], y: [null],
-    hoverinfo: "skip", marker: { size: 10, color: css(cat.color) } }))], baseLayout({
+  plot(el, [bubTrace(bySize(target.pts)), labelTrace(bySize(target.pts)), ...bubLegend()], baseLayout({
     hovermode: "closest", showlegend: true, shapes, annotations,
     legend: { orientation: "h", y: 1.02, yanchor: "bottom", x: 0, font: { color: css("--text-secondary") }, itemclick: false, itemdoubleclick: false },
     xaxis: { type: "log", range: bub.range.x, title: { text: "GDP, US$ (log scale)", font: { size: 12, color: css("--text-muted") } },
@@ -2425,6 +2424,9 @@ function drawBubbles() {
     });
   }
 }
+// the legend: an empty series per colour of the grouping chosen
+const bubLegend = () => GROUPINGS[state.bColor].cats.map(cat => ({ type: "scatter", mode: "markers", name: cat.name, x: [null], y: [null],
+  hoverinfo: "skip", marker: { size: 10, color: css(cat.color) } }));
 // move the bubbles from where they are to the target over ms milliseconds; eased for a single change,
 // steady while playing so the years run into each other without stopping
 function tweenBubbles(target, ms, steady, done) {
@@ -2495,6 +2497,10 @@ for (const [id, key] of [["b-y-seg", "bY"], ["b-color-seg", "bColor"], ["b-speed
     if (key === "bSpeed") return;  // takes effect from the next year
     if (key === "bLabels") { if (!bub.playing) moveBubbles(200); return; }
     if (key === "bColor" && !bub.playing) { drawBubbles(); return; }
+    if (key === "bColor") {  // while playing: the bubbles take the new colours from the next year; the legend now
+      const el = document.getElementById("b-chart");
+      Plotly.deleteTraces(el, el.data.map((_, i) => i).slice(2)); Plotly.addTraces(el, bubLegend());
+    }
     if (key === "bY") { bub.playing = false; document.getElementById("b-play").textContent = "▶ Play"; drawBubbles(); }
   });
 }
