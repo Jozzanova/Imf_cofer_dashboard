@@ -26,10 +26,6 @@ Tabs:
   chart, bars show every currency on one date: the latest, or any date clicked on the chart.
 - **Changes**: the change between any two dates, by currency, in US$, % or share points, and
   each quarter's change for one currency.
-- **Data** (last): the numbers as a table, with a CSV download: the world by currency (shares or
-  US$, with world GDP and FX reserves as % of it), or every country (reserves with and without
-  gold, gold, GDP and % of GDP, with its economy, region and exchange-rate regime; a selector with a
-  search box picks which countries to show and download).
 - **Countries**: each country's reserves (IMF, International Investment Position) as % of GDP
   (IMF, World Economic Outlook) or in US$, with or without gold: a group builder (groups of
   countries by region, economy and exchange-rate regime, up to four side by side as ranked bars,
@@ -39,13 +35,17 @@ Tabs:
   pegged/managed/floating and region; also gold alone, and comparisons of advanced and
   emerging economies, regions, and pegged, managed and floating currencies (measured from the
   IMF's monthly exchange rates), also year by year since 1980.
-- **Single country** (last): a slide set comparing any country (Norway to start) with similar countries
+- **Data**: the numbers as a table, with a CSV download: the world by currency (shares or
+  US$, with world GDP and FX reserves as % of it), or every country (reserves with and without
+  gold, gold, GDP and % of GDP, with its economy, region and exchange-rate regime; a selector with a
+  search box picks which countries to show and download).
+- **Single country**: a slide set comparing any country (Norway to start) with similar countries
   (the same kind of economy with the same exchange-rate regime; euro-area members with each other; at
   most the 15 closest in GDP) and with advanced and emerging economies with floating, managed and
   pegged currencies: key figures, the peers ranked, fixed against floating, the medians over time,
   gold and a table. Each slide has a comment worked out from the latest figures and its sources, and
   downloads as a 16:9 PNG on a white background for presentations.
-- **Explore**: a bar chart race of the currencies since 1999; how much of each currency's change in
+- **Explore** (last): a bar chart race of the currencies since 1999; how much of each currency's change in
   share came from exchange-rate moves and how much from central banks' holdings (with the IMF's
   exchange rates); estimated purchases and sales; and the effective number of reserve currencies.
 

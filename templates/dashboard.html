@@ -277,9 +277,9 @@
     <button role="tab" id="tab-btn-shares" data-tab="shares" aria-controls="tab-shares">Currencies</button>
     <button role="tab" id="tab-btn-changes" data-tab="changes" aria-controls="tab-changes">Changes</button>
     <button role="tab" id="tab-btn-countries" data-tab="countries" aria-controls="tab-countries">Countries</button>
-    <button role="tab" id="tab-btn-explore" data-tab="explore" aria-controls="tab-explore">Explore ✦</button>
     <button role="tab" id="tab-btn-data" data-tab="data" aria-controls="tab-data">Data</button>
     <button role="tab" id="tab-btn-country" data-tab="country" aria-controls="tab-country">Single country</button>
+    <button role="tab" id="tab-btn-explore" data-tab="explore" aria-controls="tab-explore">Explore ✦</button>
   </nav>
 
   <section class="card controls" id="controls" aria-label="Selection">
@@ -709,7 +709,7 @@ const state = {
   bY: "bn", bColor: "regime", bEcon: ["AE"], bReg: ["peg", "managed", "float"], bRegion: "all", bSpeed: "1", bLabels: "10", cSel: ["CHE", "HKG", "SAU", "CHN", "JPN", "USA"],
 };
 const LIST_KEYS = new Set(["cur", "cSel", "dtCty", "bEcon", "bReg", "shShow", "amShow", "flShow", "fxShow"]);
-const TABS = ["shares", "changes", "countries", "explore", "data", "country"];
+const TABS = ["shares", "changes", "countries", "data", "country", "explore"];
 function readHash() {
   const p = new URLSearchParams(location.hash.slice(1));
   for (const [k, v] of p) {
