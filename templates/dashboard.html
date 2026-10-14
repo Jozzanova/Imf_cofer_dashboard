@@ -706,7 +706,7 @@ const state = {
   chFrom: "", chTo: "", chMetric: "bn", chCur: "USD", dtMetric: "share", dtSet: "cur", dtYear: "latest", dtCty: [],
   raceMetric: "share", raceNoUSD: false, raceSpeed: "1", fxBase: "2016-Q4", fxCur: "USD", flShow: [], fxShow: [],
   cMeasure: "pct", cGold: "with", cYear: "latest", cSort: "v", cDir: "desc", gb: "eu_AE_float~eu_AE_peg", cGroup: "regime", cFilter: "all", cLines: "regime", cAgg: "combined", gScale: "log",
-  bY: "bn", bColor: "regime", bEcon: ["AE"], bReg: ["peg", "managed", "float"], bRegion: "all", bSpeed: "4", bLabels: "10", cSel: ["CHE", "HKG", "SAU", "CHN", "JPN", "USA"],
+  bY: "bn", bColor: "regime", bEcon: ["AE"], bReg: ["peg", "managed", "float"], bRegion: "all", bSpeed: "1", bLabels: "10", cSel: ["CHE", "HKG", "SAU", "CHN", "JPN", "USA"],
 };
 const LIST_KEYS = new Set(["cur", "cSel", "dtCty", "bEcon", "bReg", "shShow", "amShow", "flShow", "fxShow"]);
 const TABS = ["shares", "changes", "countries", "explore", "data", "norway"];
@@ -732,7 +732,7 @@ function readHash() {
   if (!["log", "lin"].includes(state.gScale)) state.gScale = "log";
   if (!["bn", "pct"].includes(state.bY)) state.bY = "bn";
   if (!["econ", "region", "regime"].includes(state.bColor)) state.bColor = "regime";
-  if (!["1", "2", "4"].includes(state.bSpeed)) state.bSpeed = "4";
+  if (!["1", "2", "4"].includes(state.bSpeed)) state.bSpeed = "1";
   if (!["6", "10", "20", "all"].includes(state.bLabels)) state.bLabels = "10";
 
   state.cSel = state.cSel.slice(0, 8);
