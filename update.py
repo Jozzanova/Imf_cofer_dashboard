@@ -54,6 +54,13 @@ COUNTRY_URLS = {
     # where the International Investment Position has no gold figure (Norway's stops in 1993, for example)
     "irgA": "https://api.imf.org/external/sdmx/3.0/data/dataflow/IMF.STA/IRFCL/+/*.IRFCLDT1_IRFCL56_USD.*.A",
 }
+# Norway's GDP, total and mainland Norway (without oil and gas extraction, pipeline transport and ocean shipping),
+# quarterly at current prices in NOK million: Statistics Norway (SSB), table 09190. Only the mainland share is used:
+# it is applied to the IMF's GDP in US dollars, so that Norway can be shown against its mainland economy.
+SSB_URL = "https://data.ssb.no/api/v0/no/table/09190"
+SSB_QUERY = {"query": [{"code": "Makrost", "selection": {"filter": "item", "values": ["bnpb.nr23_9", "bnpb.nr23_9fn"]}},
+                       {"code": "ContentsCode", "selection": {"filter": "item", "values": ["Priser"]}}],
+             "response": {"format": "json-stat2"}}
 # The full monthly history of the same exchange rates (about 14 MB), used only here, to measure each
 # country's exchange-rate regime year by year (the page then needs only the result).
 ER_HISTORY_URL = "https://api.imf.org/external/sdmx/3.0/data/dataflow/IMF.STA/ER/+/*.XDC_USD.EOP_RT.M"
@@ -301,6 +308,24 @@ def countries(raw: dict) -> dict:
     return data
 
 
+def mainland_share(text: str) -> dict:
+    """SSB's GDP (json-stat2) -> mainland Norway's share of GDP: each full year's, and the latest four quarters'
+    (used for the years after the last full one, the IMF's estimates included)."""
+    d = json.loads(text)
+    quarters = list(d["dimension"]["Tid"]["category"]["index"])
+    order = list(d["dimension"]["Makrost"]["category"]["index"])
+    n, v = len(quarters), d["value"]
+    tot, fn = (v[order.index(k) * n:(order.index(k) + 1) * n] for k in ("bnpb.nr23_9", "bnpb.nr23_9fn"))
+    years = {}
+    for y in sorted({q[:4] for q in quarters}):
+        idx = [i for i, q in enumerate(quarters) if q[:4] == y and tot[i] and fn[i] is not None]
+        if len(idx) == 4:
+            years[y] = round(sum(fn[i] for i in idx) / sum(tot[i] for i in idx), 5)
+    last = [i for i in range(n) if tot[i] and fn[i] is not None][-4:]
+    return {"years": years, "lastYear": max(years), "last4": round(sum(fn[i] for i in last) / sum(tot[i] for i in last), 5),
+            "last4From": quarters[last[0]], "last4To": quarters[last[-1]]}
+
+
 def latest_quarter(text: str) -> str:
     header = text.splitlines()[0].split(",")
     freq, period = header.index("FREQUENCY"), header.index("TIME_PERIOD")
@@ -318,6 +343,7 @@ def main():
         raw["groups"] = (RAW.parent / "groups.json").read_text(encoding="utf-8")
         raw["erHist"] = (RAW.parent / "erHist.csv").read_text(encoding="utf-8")
         raw["irgQ"] = (RAW.parent / "irgQ.csv").read_text(encoding="utf-8")
+        raw["ssb"] = (RAW.parent / "ssb.json").read_text(encoding="utf-8")
         raw.update({k: (RAW.parent / f"{k}.csv").read_text(encoding="utf-8") for k in GOLD_URLS})
         status = json.loads(STATUS.read_text(encoding="utf-8")) if STATUS.exists() else {}
     else:
@@ -330,16 +356,19 @@ def main():
         for k, url in (("names", NAMES_URL), ("groups", GROUPS_URL)):
             with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "cofer-dashboard"}), timeout=120) as res:
                 raw[k] = res.read().decode("utf-8")
+        ssb = urllib.request.Request(SSB_URL, data=json.dumps(SSB_QUERY).encode(), headers={"Content-Type": "application/json", "User-Agent": "cofer-dashboard"})
+        with urllib.request.urlopen(ssb, timeout=120) as res:
+            raw["ssb"] = res.read().decode("utf-8")
         status = {"downloaded": datetime.now(timezone.utc).isoformat(timespec="seconds")}
         RAW.parent.mkdir(parents=True, exist_ok=True)
         RAW.write_text(text, encoding="utf-8")
         RAW_ER.write_text(er, encoding="utf-8")
         for k, t in raw.items():
-            (RAW.parent / f"{k}.{'json' if k in ('names', 'groups') else 'csv'}").write_text(t, encoding="utf-8")
+            (RAW.parent / f"{k}.{'json' if k in ('names', 'groups', 'ssb') else 'csv'}").write_text(t, encoding="utf-8")
         STATUS.write_text(json.dumps(status), encoding="utf-8")
     status["latest"] = latest_quarter(text)
 
-    data = {"csv": text, "er": er, "countries": countries(raw), "gold": gold_data(raw), **status}
+    data = {"csv": text, "er": er, "countries": {**countries(raw), "noFn": mainland_share(raw["ssb"])}, "gold": gold_data(raw), **status}
     template = TEMPLATE.read_text(encoding="utf-8")
     page = lambda tpl, d: tpl.replace("__SNAPSHOT__", json.dumps(d, separators=(",", ":")).replace("</", "<\\/"))
     OUTPUT.parent.mkdir(exist_ok=True)

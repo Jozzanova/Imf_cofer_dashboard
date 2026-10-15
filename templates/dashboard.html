@@ -411,6 +411,7 @@
               <div class="ms-list" id="dt-cty-list" role="group" aria-label="Countries"></div>
             </div>
           </div>
+          <div id="dt-nogdp"></div>
           <button class="text-btn" type="button" id="dt-peers" aria-pressed="false" title="Switzerland, Japan, Norway, New Zealand, Sweden, Canada, the UK, Australia and the US">Norway and peers</button>
           <button class="text-btn" type="button" id="dt-csv">Download CSV</button>
         </div>
@@ -431,6 +432,7 @@
           <div class="seg" id="c-gold-seg"><button data-v="with">Including gold</button><button data-v="without">Excluding gold</button><button data-v="only">Only gold</button></div>
         </div>
         <div class="control"><span class="lbl">Date</span><select id="c-year" aria-label="Date"></select></div>
+        <div id="c-nogdp"></div>
       </div>
       <div class="hint" id="c-status"></div>
     </section>
@@ -754,7 +756,7 @@ const source = { kind: "snapshot", at: SNAPSHOT.downloaded, checking: true };
 const state = {
   tab: "shares", cur: CURS.map(c => c.k), freq: "Q", period: "all",
   shView: "stack", shLog: false, amView: "stack", amLog: false, sel: "", shShow: [], amShow: [],
-  chFrom: "", chTo: "", chMetric: "bn", chCur: "USD", dtMetric: "share", dtSet: "cur", dtYear: "latest", dtCty: [], scCty: "NOR", gYear: "t", gPer: "5y", gShare: "pct", gDec: "5y", gSel: [], gCty: [], gEcon: ["AE", "EM"], gReg: ["peg", "managed", "float"], gGeo: "all", gLog: false,
+  chFrom: "", chTo: "", chMetric: "bn", chCur: "USD", dtMetric: "share", dtSet: "cur", dtYear: "latest", noGdp: "total", dtCty: [], scCty: "NOR", gYear: "t", gPer: "5y", gShare: "pct", gDec: "5y", gSel: [], gCty: [], gEcon: ["AE", "EM"], gReg: ["peg", "managed", "float"], gGeo: "all", gLog: false,
   raceMetric: "share", raceNoUSD: false, raceSpeed: "1", fxBase: "2016-Q4", fxCur: "USD", flShow: [], fxShow: [],
   cMeasure: "pct", cGold: "with", cYear: "latest", cSort: "v", cDir: "desc", gb: "eu_AE_float~eu_AE_peg", cGroup: "regime", gView: "box", cFilter: "all", cLines: "regime", cAgg: "combined", gScale: "log",
   bY: "bn", bColor: "region", bEcon: ["AE", "EM"], bReg: ["peg", "managed", "float"], bRegion: "all", grEcon: ["AE", "EM"], grReg: ["peg", "managed", "float"], grGeo: "all", grEuro: true, bHi: [], bSpeed: "1", bLabels: "10", cSel: ["CHE", "HKG", "SAU", "CHN", "JPN", "USA"],
@@ -795,6 +797,7 @@ function readHash() {
   if (!["combined", "median"].includes(state.cAgg)) state.cAgg = "combined";
   if (!["log", "lin"].includes(state.gScale)) state.gScale = "log";
   if (!["box", "bars"].includes(state.gView)) state.gView = "box";
+  if (!["total", "fn"].includes(state.noGdp)) state.noGdp = "total";
   if (!["bn", "pct"].includes(state.bY)) state.bY = "bn";
   if (!["econ", "region", "regime"].includes(state.bColor)) state.bColor = "region";
   if (!["1", "2", "4"].includes(state.bSpeed)) state.bSpeed = "1";
@@ -1206,6 +1209,8 @@ function renderData() {
   document.getElementById("dt-year").hidden = !cty;
   document.getElementById("dt-cty").hidden = !cty;
   document.getElementById("dt-peers").hidden = !cty;
+  document.getElementById("dt-nogdp").hidden = !cty;
+  document.getElementById("dt-nogdp").innerHTML = nogdpSeg();
   if (!cty) dtPick.close();
   document.getElementById("controls").hidden = cty;
   document.getElementById("tab-data").style.marginTop = cty ? "16px" : "";  // no controls card above it then
@@ -1219,7 +1224,7 @@ function renderData() {
       `<tr${r.k === HOME ? ' class="home"' : ""}>${r.cells.map((v, j) => `<td${j && j < 5 ? ' class="muted" style="text-align:left"' : ""}>${d[j] == null ? esc(v) : fin(v) ? fmt(v, d[j]) : '<span class="muted">–</span>'}</td>`).join("")}</tr>`).join("")}</tbody>`;
     document.getElementById("dt-hint").innerHTML = `Reserves: IMF, <a href="https://data.imf.org/en/datasets/IMF.STA:IIP" target="_blank" rel="noopener">International Investment Position</a>;
       GDP: IMF, <a href="https://data.imf.org/en/datasets/IMF.RES:WEO" target="_blank" rel="noopener">World Economic Outlook</a> (the latest year an estimate).
-      "Download CSV" saves this table.`;
+      "Download CSV" saves this table. ${fnNote()}`;
     return;
   }
   const { cols, rows } = dataRows();
@@ -1815,6 +1820,21 @@ let CC = null;  // assembled per-country series, rebuilt when CD changes
 // without quarterly data. GDP is the calendar year's.
 // the IRFCL's gold at market value, quarterly (from the Gold tab's figures: the build's, or the live ones once fetched)
 const irfclGoldQ = () => globalThis.__goldVal || SNAPSHOT.gold?.val || {};
+// Norway's GDP can be shown for mainland Norway (without oil and gas extraction, pipeline transport and ocean shipping):
+// the IMF's GDP times mainland Norway's share of GDP at current prices in Statistics Norway's national accounts; for the
+// years after the last full one (the IMF's estimates), the share in the latest four quarters
+function fnShare(y) {
+  const s = CD.noFn; if (!s) return null;
+  return s.years[y] ?? (y > s.lastYear ? s.last4 : null);
+}
+const FN = LANG === "no"
+  ? { lbl: "Norges BNP", total: "Totalt (IMF)", fn: "Fastlands-Norge (SSB)",
+      note: s => `Norges BNP er her Fastlands-Norge (uten utvinning av olje og gass, rørtransport og utenriks sjøfart): IMFs BNP i US-dollar ganget med Fastlands-Norges andel av BNP i løpende priser i SSBs nasjonalregnskap (tabell 09190), ${fmt(s.years[s.lastYear] * 100, 1)} % i ${s.lastYear}; for årene etter, andelen de siste fire kvartalene (${s.last4From.replace("K", " K")}–${s.last4To.replace("K", " K")}), ${fmt(s.last4 * 100, 1)} %.` }
+  : { lbl: "Norway's GDP", total: "Total (IMF)", fn: "Mainland (SSB)",
+      note: s => `Norway's GDP is here mainland Norway (without oil and gas extraction, pipeline transport and ocean shipping): the IMF's GDP in US dollars times mainland Norway's share of GDP at current prices in Statistics Norway's national accounts (table 09190), ${fmt(s.years[s.lastYear] * 100, 1)}% in ${s.lastYear}; for the years after, the share in the latest four quarters (${s.last4From.replace("K", " Q")}–${s.last4To.replace("K", " Q")}), ${fmt(s.last4 * 100, 1)}%.` };
+const fnNote = () => state.noGdp === "fn" && CD.noFn ? FN.note(CD.noFn) : "";
+const nogdpSeg = () => `<div class="control nogdp"><span class="lbl">${FN.lbl}</span><div class="seg nogdp-seg" role="group" aria-label="${FN.lbl}">` +
+  `<button type="button" data-v="total" aria-pressed="${state.noGdp === "total"}">${FN.total}</button><button type="button" data-v="fn" aria-pressed="${state.noGdp === "fn"}">${FN.fn}</button></div></div>`;
 function assembleCountries() {
   const out = {};
   const codes = new Set([...Object.keys(CD.resQ), ...Object.keys(CD.resA)]);
@@ -1830,6 +1850,7 @@ function assembleCountries() {
     let lastGold = null;
     for (const pt of list) {
       pt.gdp = CD.gdp[k]?.[pt.p.slice(0, 4)] ?? null;
+      if (k === "NOR" && state.noGdp === "fn") { const sh = fnShare(pt.p.slice(0, 4)); pt.gdp = fin(pt.gdp) && sh ? pt.gdp * sh : null; }
       // where the IIP has no gold figure, the IRFCL's for that quarter, or else for that year's end (Norway's gold,
       // sold in 2004, is only there); also where the IIP has next to none but the IRFCL a billion dollars or more
       // (Türkiye's IIP gives its gold as zero); failing both, a country is taken to keep its last reported amount;
@@ -1908,7 +1929,8 @@ function syncCountryControls() {
     : cLive.state === "loading" ? `the copy downloaded ${when(SNAPSHOT.downloaded)}; asking the IMF for newer figures…`
     : cLive.state === "failed" ? `the copy downloaded ${when(SNAPSHOT.downloaded)} (the IMF could not be reached)`
     : `the copy downloaded ${when(SNAPSHOT.downloaded)}`;
-  document.getElementById("c-status").textContent = `${Object.keys(CC).length} countries; figures ${how}.`;
+  document.getElementById("c-status").textContent = `${Object.keys(CC).length} countries; figures ${how}. ${fnNote()}`;
+  document.getElementById("c-nogdp").innerHTML = nogdpSeg();
 }
 
 // ---- the group builder: groups of countries defined by region, economy and exchange-rate regime, each
@@ -2316,7 +2338,7 @@ async function loadCountriesLive() {
     // the live yearly gold, with the build's year-ends from quarterly figures where a year is missing
     const mergedGold = structuredClone(CD.goldIrfcl || {});
     for (const [k, ys] of Object.entries(goldIrfcl)) Object.assign(mergedGold[k] ||= {}, ys);
-    const fresh = { names: CD.names, groups: CD.groups, regHist: CD.regHist, goldIrfcl: mergedGold, resQ: q.R || {}, goldQ: q.R_F11_MV || {}, resA: a.R || {}, goldA: a.R_F11_MV || {},
+    const fresh = { noFn: CD.noFn, names: CD.names, groups: CD.groups, regHist: CD.regHist, goldIrfcl: mergedGold, resQ: q.R || {}, goldQ: q.R_F11_MV || {}, resA: a.R || {}, goldA: a.R_F11_MV || {},
       gdp: w.NGDPD || {}, rates: rates.G163 ? rates : CD.rates };
     if (!Object.keys(fresh.resQ).length || !Object.keys(fresh.gdp).length) throw new Error("the IMF's answer had no figures");
     CD = fresh; assembleCountries();  // at once, so nothing finds the countries missing in between
@@ -2326,6 +2348,11 @@ async function loadCountriesLive() {
   }
   if (state.tab === "countries") renderCountries(); else if (state.tab === "data") renderData(); else if (state.tab === "country") renderSingle(); else syncCountryControls();
 }
+document.addEventListener("click", e => {
+  const b = e.target.closest(".nogdp-seg button"); if (!b || b.dataset.v === state.noGdp) return;
+  state.noGdp = b.dataset.v; writeHash(); assembleCountries();
+  if (state.tab === "countries") renderCountries(); else if (state.tab === "data") renderData(); else if (state.tab === "country") renderSingle();
+});
 function toggleCountry(k, addOnly = false) {
   if (k === HOME) return;  // always shown
   if (state.cSel.includes(k)) { if (!addOnly) state.cSel = state.cSel.filter(x => x !== k); }
@@ -3078,7 +3105,7 @@ function buildSlides() {
     comment: no
       ? `${N}: offisielle valutareserver på ${fmt(me.res, 0)} mrd. US$, ${pctTxt(me.pct)} av BNP, ${comp(me.pct, peerMed)} medianen (${pctTxt(peerMed)}) for ${pDesc}. ${fixedMore ? "Medianlandet med fast kurs holder mer enn medianlandet med flytende kurs, blant både avanserte og fremvoksende økonomier: en fast kurs må forsvares med reserver. " : ""}${isNor ? "Statens pensjonsfond utland regnes ikke med i reservene." : ""}`.trim()
       : `${N}: official reserves of $${fmt(me.res, 0)} bn, ${pctTxt(me.pct)} of GDP, ${comp(me.pct, peerMed)} the median (${pctTxt(peerMed)}) of ${pDesc}. ${fixedMore ? "The median country with a fixed rate holds more than the median floater, among both advanced and emerging economies: a peg has to be defended with reserves. " : ""}${isNor ? "The Government Pension Fund Global is not counted as reserves." : ""}`.trim(),
-    refs: `${ST.srcBase}${isNor ? ` ${ST.gdpRev}` : ""} ${ST.latest(asOf)}`,
+    refs: `${ST.srcBase}${isNor ? ` ${ST.gdpRev}` : ""}${fnNote() ? ` ${fnNote()}` : ""} ${ST.latest(asOf)}`,
     table: { head: ["", ST.n, ST.pctGdp, ST.bn, ST.goldShare, ST.d5],
       rows: [[N, "–", pctTxt(me.pct), fmt(me.res, 0), pctTxt(me.goldShare ?? 0), signed(me.d5, 1)],
         ...groups.map(x => [`${ST.group(x.key)} (${ST.median})`, String(x.rows.length), pctTxt(med(x.key, r => r.pct)), fmt(med(x.key, r => r.res), 0),
@@ -3206,7 +3233,7 @@ function renderSingle() {
   const pickHtml = `<label class="check">${ST.pick}: <select id="sc-cty" aria-label="${ST.pick}">${list.map(r =>
     `<option value="${r.k}"${r.k === state.scCty ? " selected" : ""}>${esc(r.name)}${r.k === HOME ? " ★" : ""}</option>`).join("")}</select></label>`;
   wrap.innerHTML = `<section class="card"><div class="card-head"><div><h2>${esc(ST.tab(me?.name || "–"))}</h2><p class="sub" style="margin:0">${esc(ST.intro)}</p></div>
-    <div class="row">${pickHtml}</div></div>${slides.length ? "" : `<div class="empty">${ST.none}</div>`}</section>` + slides.map((s, i) => `
+    <div class="row">${pickHtml}${nogdpSeg()}</div></div>${slides.length ? "" : `<div class="empty">${ST.none}</div>`}</section>` + slides.map((s, i) => `
     <section class="card slide" data-i="${i}">
       <div class="slide-head"><div><span class="slide-no">${ST.slide} ${i + 1}</span><h2>${esc(s.title)}</h2></div>
         <button class="text-btn slide-png" type="button">⬇ ${ST.download}</button></div>
