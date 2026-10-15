@@ -166,8 +166,8 @@
   /* tabs */
   .tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; padding: 6px; background: var(--surface);
     border: 1px solid var(--border); border-radius: 12px; }
-  .tabs button { font: inherit; font-size: 15px; font-weight: 600; padding: 10px 20px; border: 1px solid var(--axis); border-radius: 8px;
-    background: var(--page); color: var(--text-primary); cursor: pointer; flex: 1 1 150px; }
+  .tabs button { font: inherit; font-size: 15px; font-weight: 600; padding: 10px 14px; border: 1px solid var(--axis); border-radius: 8px;
+    background: var(--page); color: var(--text-primary); cursor: pointer; flex: 1 1 120px; }
   .tabs button:hover { background: var(--hover); border-color: var(--text-muted); }
   .tabs button[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
   .tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -208,6 +208,7 @@
   .insight { font-size: 14px; color: var(--text-primary); background: var(--page); border: 1px solid var(--border); border-radius: 8px;
     padding: 10px 12px; margin: 4px 0 14px; }
   .insight:empty { display: none; }
+  .sub-h { font-size: 15px; margin: 22px 0 2px; }
   .grid2.inner { margin-bottom: 0; }
   #tab-explore, #tab-countries, #tab-country, #tab-gold { margin-top: 16px; }
   .slide-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 8px 16px; }
@@ -286,6 +287,7 @@
 
   <nav class="tabs" role="tablist" aria-label="Views">
     <button role="tab" id="tab-btn-shares" data-tab="shares" aria-controls="tab-shares">Currencies</button>
+    <button role="tab" id="tab-btn-usd" data-tab="usd" aria-controls="tab-usd">The dollar</button>
     <button role="tab" id="tab-btn-changes" data-tab="changes" aria-controls="tab-changes">Changes</button>
     <button role="tab" id="tab-btn-countries" data-tab="countries" aria-controls="tab-countries">Countries</button>
     <button role="tab" id="tab-btn-gold" data-tab="gold" aria-controls="tab-gold">Gold</button>
@@ -393,6 +395,9 @@
       <div class="table-wrap"><table id="ch-table"></table></div>
     </section>
   </div>
+
+  <!-- The dollar -->
+  <div role="tabpanel" id="tab-usd" aria-labelledby="tab-btn-usd" hidden><div id="usd"></div></div>
 
   <!-- Data -->
   <div role="tabpanel" id="tab-data" aria-labelledby="tab-btn-data" hidden>
@@ -756,13 +761,13 @@ const source = { kind: "snapshot", at: SNAPSHOT.downloaded, checking: true };
 const state = {
   tab: "shares", cur: CURS.map(c => c.k), freq: "Q", period: "all",
   shView: "stack", shLog: false, amView: "stack", amLog: false, sel: "", shShow: [], amShow: [],
-  chFrom: "", chTo: "", chMetric: "bn", chCur: "USD", dtMetric: "share", dtSet: "cur", dtYear: "latest", noGdp: "total", dtCty: [], scCty: "NOR", gYear: "t", gPer: "5y", gShare: "pct", gDec: "5y", gSel: [], gCty: [], gEcon: ["AE", "EM"], gReg: ["peg", "managed", "float"], gGeo: "all", gLog: false,
+  chFrom: "", chTo: "", chMetric: "bn", chCur: "USD", dtMetric: "share", dtSet: "cur", dtYear: "latest", noGdp: "total", uTrend: "10y", uBase: "2016-Q4", dtCty: [], scCty: "NOR", gYear: "t", gPer: "5y", gShare: "pct", gDec: "5y", gSel: [], gCty: [], gEcon: ["AE", "EM"], gReg: ["peg", "managed", "float"], gGeo: "all", gLog: false,
   raceMetric: "share", raceNoUSD: false, raceSpeed: "1", fxBase: "2016-Q4", fxCur: "USD", flShow: [], fxShow: [],
   cMeasure: "pct", cGold: "with", cYear: "latest", cSort: "v", cDir: "desc", gb: "eu_AE_float~eu_AE_peg", cGroup: "regime", gView: "box", cFilter: "all", cLines: "regime", cAgg: "combined", gScale: "log",
   bY: "bn", bColor: "region", bEcon: ["AE", "EM"], bReg: ["peg", "managed", "float"], bRegion: "all", grEcon: ["AE", "EM"], grReg: ["peg", "managed", "float"], grGeo: "all", grEuro: true, bHi: [], bSpeed: "1", bLabels: "10", cSel: ["CHE", "HKG", "SAU", "CHN", "JPN", "USA"],
 };
 const LIST_KEYS = new Set(["cur", "cSel", "bHi", "dtCty", "gSel", "gCty", "gEcon", "gReg", "grEcon", "grReg", "bEcon", "bReg", "shShow", "amShow", "flShow", "fxShow"]);
-const TABS = ["shares", "changes", "countries", "gold", "data", "country", "explore"];
+const TABS = ["shares", "usd", "changes", "countries", "gold", "data", "country", "explore"];
 function readHash() {
   const p = new URLSearchParams(location.hash.slice(1));
   for (const [k, v] of p) {
@@ -798,6 +803,7 @@ function readHash() {
   if (!["log", "lin"].includes(state.gScale)) state.gScale = "log";
   if (!["box", "bars"].includes(state.gView)) state.gView = "box";
   if (!["total", "fn"].includes(state.noGdp)) state.noGdp = "total";
+  if (!["1999", "2008", "10y", "5y"].includes(state.uTrend)) state.uTrend = "10y";
   if (!["bn", "pct"].includes(state.bY)) state.bY = "bn";
   if (!["econ", "region", "regime"].includes(state.bColor)) state.bColor = "region";
   if (!["1", "2", "4"].includes(state.bSpeed)) state.bSpeed = "1";
@@ -1356,7 +1362,7 @@ function syncControls() {
   setPressed(document.getElementById("dt-metric-seg"), state.dtMetric);
   document.getElementById("sh-log").checked = state.shLog;
   document.getElementById("am-log").checked = state.amLog;
-  document.getElementById("controls").hidden = ["explore", "countries", "country", "gold"].includes(state.tab) || (state.tab === "data" && state.dtSet === "cty");
+  document.getElementById("controls").hidden = ["explore", "countries", "country", "gold", "usd"].includes(state.tab) || (state.tab === "data" && state.dtSet === "cty");
   document.getElementById("hint").textContent = state.tab === "changes"
     ? "The period chosen here sets the right-hand chart; the left one compares the two dates above it." : "";
 }
@@ -3317,6 +3323,213 @@ document.getElementById("slides").addEventListener("click", e => {
 });
 
 // ---------- tabs ----------
+// ---------- The dollar: the US dollar's place in the reserves over time ----------
+const DX = LANG === "no" ? {
+  title: "Dollaren som reservevaluta",
+  intro: "Hvordan US-dollarens plass i verdens valutareserver har endret seg siden 1995: den lange trenden, hvor mye som skyldes valutakurser og hvor mye sentralbankenes valg, hvilke valutaer som har vunnet terreng, og dollaren ved siden av gull. COFER dekker reservene der landene rapporterer valutasammensetningen til IMF.",
+  share: "Dollarens andel", inYear: "på et år", peak: "Høyeste andel", sincePeak: "siden da", amount: "Reserver i dollar", trend: "Trend", ppYear: " pp per år",
+  trendT: "Dollarens andel, med trend",
+  trendSeg: [["1999", "Siden 1999"], ["2008", "Siden 2008"], ["10y", "10 år"], ["5y", "5 år"]],
+  trendSub: (a, b, s, y, v) => `Andel av de fordelte reservene, kvartalsvis fra 1999 (årlig før). Den stiplede linjen er en rett trendlinje tilpasset ${a}–${b}: ${s} per år. Prikket: trenden ført fem år videre, til ${y}: ${v} %. En illustrasjon, ikke en prognose.`,
+  actual: "Faktisk andel", trendL: "Trend", ahead: "Trenden videre",
+  fxT: "Valutakurser eller sentralbankenes valg?", base: "Fra",
+  fxSub: b => `Dollarens faktiske andel, og hva den ville vært om valutakursene hadde holdt seg som i ${b}. Når dollaren styrker seg, er reserver i andre valutaer verdt færre dollar, og dollarens andel stiger uten at noen kjøper dollar; den prikkete linjen tar bort den virkningen.`,
+  atRates: b => `Til kursene i ${b}`,
+  fxIns: (b, e, a, z, tot, fx, hold, c) => `Fra ${b} til ${e} gikk dollarens andel fra <b>${a} %</b> til <b>${z} %</b> (${tot}). Valutakursene står for <b>${fx}</b> og endringer i beholdningene for <b>${hold}</b>. Med kursene fra ${b} ville andelen vært ${c} %.`,
+  idxT: "Dollaren mot de andre reservevalutaene",
+  idxSub: s => `En indeks for dollaren mot euro, yen, pund, renminbi, kanadiske og australske dollar og sveitsiske franc, vektet med deres andeler av reservene (kjedet kvartalsvis; ${s} = 100). Opp: sterkere dollar.`,
+  idxName: "Dollarindeks",
+  scT: "Dollarens verdi og andel, kvartal for kvartal",
+  scSub: (n, s, r) => `Hvert punkt er et kvartal (${n}): endringen i dollarindeksen (bortover) og i dollarens andel (oppover). Linjen er tilpasset: en 1 % sterkere dollar har gått sammen med ${s} pp høyere andel (korrelasjon ${r}).`,
+  scX: "Endring i dollarindeksen, %", scY: "Endring i andelen, pp", fit: "Tilpasset linje",
+  whereT: (b, e) => `Hvor dollarens andel ble av, ${b} til ${e}`,
+  whereSub: "Endringen i hver valutas andel, i prosentpoeng, delt i virkningen av valutakursene og endringer i beholdningene. «Andre valutaer» har ingen enkelt valutakurs og holdes til dagens verdier.",
+  hold: "Beholdninger", rates: "Valutakurser", total: "Endring i alt",
+  goldT: "Dollaren ved siden av gull",
+  goldSub: "Dollarens andel av valutareservene (COFER), dens andel av valutareservene pluss gull til markedsverdi, og gullets andel av det samme. Gull: sentralbankenes beholdninger (IMF IRFCL) til IMFs gullpris. Dollardelen av de ufordelte reservene er antatt å være som i de fordelte.",
+  usdFx: "Dollar, % av valutareservene", usdAll: "Dollar, % av valuta og gull", goldS: "Gull, % av valuta og gull",
+  none: "Valutakursene kunne ikke hentes, så denne delen er ikke tilgjengelig nå.",
+} : {
+  title: "The dollar as a reserve currency",
+  intro: "How the US dollar's place in the world's foreign-exchange reserves has changed since 1995: the long trend, how much of it is exchange rates and how much central banks' choices, which currencies have gained, and the dollar beside gold. COFER covers the reserves whose currency composition countries report to the IMF.",
+  share: "Dollar share", inYear: "in a year", peak: "Highest share", sincePeak: "since then", amount: "Dollar reserves", trend: "Trend", ppYear: " pp a year",
+  trendT: "The dollar's share, with its trend",
+  trendSeg: [["1999", "Since 1999"], ["2008", "Since 2008"], ["10y", "10 years"], ["5y", "5 years"]],
+  trendSub: (a, b, s, y, v) => `Share of allocated reserves, quarterly from 1999 (yearly before). The dashed line is a straight-line trend fitted to ${a}–${b}: ${s} a year. Dotted: the trend carried five years on, to ${y}: ${v}%. An illustration, not a forecast.`,
+  actual: "Actual share", trendL: "Trend", ahead: "Trend carried on",
+  fxT: "Exchange rates or central banks' choices?", base: "From",
+  fxSub: b => `The dollar's actual share, and what it would have been had exchange rates stayed as in ${b}. When the dollar strengthens, reserves in other currencies are worth fewer dollars and the dollar's share rises without anyone buying dollars; the dotted line takes that out.`,
+  atRates: b => `At ${b} exchange rates`,
+  fxIns: (b, e, a, z, tot, fx, hold, c) => `From ${b} to ${e} the dollar's share went from <b>${a}%</b> to <b>${z}%</b> (${tot}). Exchange rates account for <b>${fx}</b> and changes in holdings for <b>${hold}</b>. At ${b} exchange rates the share would be ${c}%.`,
+  idxT: "The dollar against the other reserve currencies",
+  idxSub: s => `An index of the dollar against the euro, yen, pound, renminbi, Canadian and Australian dollars and Swiss franc, weighted by their shares of reserves (chained quarterly; ${s} = 100). Up: a stronger dollar.`,
+  idxName: "Dollar index",
+  scT: "The dollar's value and its share, quarter by quarter",
+  scSub: (n, s, r) => `Each dot is a quarter (${n}): the change in the dollar index (across) and in the dollar's share (up). The line is fitted: a 1% stronger dollar has gone with ${s} pp more in its share (correlation ${r}).`,
+  scX: "Change in the dollar index, %", scY: "Change in the share, pp", fit: "Fitted line",
+  whereT: (b, e) => `Where the dollar's share went, ${b} to ${e}`,
+  whereSub: "The change in each currency's share, in percentage points, split into the effect of exchange rates and changes in holdings. Other currencies have no single exchange rate and are held at current values.",
+  hold: "Holdings", rates: "Exchange rates", total: "Total change",
+  goldT: "The dollar beside gold",
+  goldSub: "The dollar's share of foreign-exchange reserves (COFER), its share of foreign-exchange reserves plus gold at market value, and gold's share of the same. Gold: central banks' holdings (IMF IRFCL) at the IMF's gold price. The dollar part of unallocated reserves is taken to be as in the allocated ones.",
+  usdFx: "Dollar, % of FX reserves", usdAll: "Dollar, % of FX and gold", goldS: "Gold, % of FX and gold",
+  none: "The exchange rates could not be loaded, so this part is not available right now.",
+};
+// a straight line fitted by least squares: y = a + b·x, and the correlation
+function ols(xs, ys) {
+  const n = xs.length, mx = xs.reduce((s, v) => s + v, 0) / n, my = ys.reduce((s, v) => s + v, 0) / n;
+  let sxy = 0, sxx = 0, syy = 0;
+  for (let i = 0; i < n; i++) { sxy += (xs[i] - mx) * (ys[i] - my); sxx += (xs[i] - mx) ** 2; syy += (ys[i] - my) ** 2; }
+  const b = sxx ? sxy / sxx : 0;
+  return { a: my - b * mx, b, r: sxx && syy ? sxy / Math.sqrt(sxx * syy) : 0 };
+}
+const yearOf = p => { const [y, q] = p.split("-Q"); return q ? +y + q / 4 : +y + 1; };  // the end of the quarter or year, in years
+const dateOf = t => { const y = Math.floor(t + 1e-9), m = Math.round((t - y) * 12); return m ? `${y}-${String(m).padStart(2, "0")}-28` : `${y - 1}-12-31`; };
+// the dollar against the other reserve currencies: each quarter's change in their rates against the dollar (log),
+// weighted by their shares the quarter before, chained from the first quarter with a euro rate (= 100)
+function dollarIndex() {
+  const f = M.Q, out = f.periods.map(() => null);
+  const i0 = f.periods.findIndex(p => fin(rate("EUR", p)));
+  if (i0 < 0) return { y: out, i0 };
+  out[i0] = 100;
+  for (let i = i0 + 1; i < f.periods.length; i++) {
+    const p = f.periods[i], q = f.periods[i - 1];
+    let w = 0, d = 0;
+    for (const k of RATED) {
+      if (k === "USD") continue;
+      const s = f.share[k][i - 1];
+      if (!fin(s) || !fin(rate(k, p)) || !fin(rate(k, q))) continue;
+      w += s; d += s * Math.log(rate(k, p) / rate(k, q));
+    }
+    out[i] = w > 0 && fin(out[i - 1]) ? out[i - 1] * Math.exp(d / w) : null;
+  }
+  return { y: out, i0 };
+}
+// names at the ends of the lines, or (on a narrow screen, where they would squeeze the chart) a legend below it
+const endLabels = (el, traces, r) => el.clientWidth < 600
+  ? { showlegend: true, legend: { ...baseLayout().legend, orientation: "h", x: 0, y: -0.12, yanchor: "top" }, margin: { l: 8, r: 8, t: 8, b: 8 } }
+  : { showlegend: false, annotations: directLabels(traces), margin: { l: 8, r, t: 8, b: 8 } };
+function renderUsd() {
+  const el = document.getElementById("usd"), f = M.Q, A = M.A, n = f.periods.length - 1;
+  const seg = (key, opts) => `<div class="seg" role="group">${opts.map(([v, t]) => `<button type="button" data-u="${key}" data-v="${v}" aria-pressed="${state[key] === v}">${t}</button>`).join("")}</div>`;
+  const tile = (lab, value, note) => `<div class="tile"><div class="label">${lab}</div><div class="value">${value}</div><div class="note">${note}</div></div>`;
+  const pp = (v, d = 2) => signed(v, d, " pp");
+  // the share: yearly before 1999, then quarterly
+  const pre = A.periods.map((p, i) => ({ p, v: A.share.USD[i] })).filter(r => r.p < "1999" && fin(r.v));
+  const all = [...pre, ...f.periods.map((p, i) => ({ p, v: f.share.USD[i] })).filter(r => fin(r.v))];
+  const last = all.at(-1), yrAgo = f.share.USD[n - 4], peak = all.reduce((m, r) => r.v > m.v ? r : m, all[0]);
+  // the trend over the chosen window
+  const from = { "1999": "1999-Q1", "2008": "2008-Q1", "10y": f.periods[n - 39], "5y": f.periods[n - 19] }[state.uTrend] || f.periods[n - 39];
+  const win = all.filter(r => r.p >= from), fit = ols(win.map(r => yearOf(r.p)), win.map(r => r.v));
+  const t0 = yearOf(win[0].p), t1 = yearOf(last.p), t2 = t1 + 5, at = t => fit.a + fit.b * t;
+  // the base date for the exchange-rate split: quarters with every rate
+  const bases = f.periods.filter((p, i) => i < n && hasRates(p));
+  if (!bases.includes(state.uBase)) state.uBase = bases.includes("2016-Q4") ? "2016-Q4" : bases[0] || "";
+  const amt = f.bn.USD[n], amtYr = f.bn.USD[n - 4];
+  el.innerHTML = `<section class="card"><h2>${DX.title}</h2><p class="sub" style="margin:0">${DX.intro}</p>
+      <div class="tiles">${tile(`${dot("USD")}${DX.share}`, `${fmt(last.v, 1)}%`, `<span class="${cls(last.v - yrAgo)}">${pp(last.v - yrAgo)}</span> ${DX.inYear} · ${label(last.p)}`)}
+        ${tile(DX.peak, `${fmt(peak.v, 1)}%`, `${label(peak.p)} · <span class="${cls(last.v - peak.v)}">${pp(last.v - peak.v, 1)}</span> ${DX.sincePeak}`)}
+        ${tile(DX.amount, `$${fmt(amt / 1000, 2)} ${LANG === "no" ? "bill." : "tn"}`, `<span class="${cls(amt - amtYr)}">${signed((amt / amtYr - 1) * 100, 1, "%")}</span> ${DX.inYear}`)}
+        ${tile(DX.trend, `${signed(fit.b, 2)}`, `${DX.ppYear.trim()}, ${label(win[0].p)}–${label(last.p)}`)}</div></section>
+    <section class="card"><div class="card-head"><div><h2>${DX.trendT}</h2><p class="sub">${DX.trendSub(label(win[0].p), label(last.p), pp(fit.b), Math.floor(t2), fmt(at(t2), 1))}</p></div>
+      <div class="row">${seg("uTrend", DX.trendSeg)}</div></div><div class="chart" id="u-trend" style="height:400px"></div></section>
+    <section class="card"><div class="card-head"><div><h2>${DX.fxT}</h2><p class="sub">${DX.fxSub(label(state.uBase))}</p></div>
+      <div class="row"><label class="check">${DX.base}: <select id="u-base">${bases.map(p => `<option value="${p}"${p === state.uBase ? " selected" : ""}>${label(p)}</option>`).join("")}</select></label></div></div>
+      <p class="insight" id="u-fx-ins"></p><div class="chart" id="u-fx" style="height:360px"></div>
+      <h3 class="sub-h" id="u-where-t"></h3><p class="sub">${DX.whereSub}</p><div class="chart" id="u-where" style="height:380px"></div></section>
+    <section class="card"><h2>${DX.idxT}</h2><p class="sub" id="u-idx-sub"></p><div class="chart" id="u-idx" style="height:320px"></div>
+      <h3 class="sub-h">${DX.scT}</h3><p class="sub" id="u-sc-sub"></p><div class="chart" id="u-sc" style="height:420px"></div></section>
+    <section class="card"><h2>${DX.goldT}</h2><p class="sub">${DX.goldSub}</p><div class="chart" id="u-gold" style="height:380px"></div></section>`;
+
+  // 1. the share and its trend
+  const xs = all.map(r => xdate(r.p)), c1 = css("--s1");
+  plot(document.getElementById("u-trend"), [
+    { type: "scatter", mode: "lines", name: DX.actual, x: xs, y: all.map(r => r.v), line: { color: c1, width: 2 }, hovertemplate: `%{y:.2f}%<extra>${DX.actual}</extra>` },
+    { type: "scatter", mode: "lines", name: DX.trendL, x: [dateOf(t0), dateOf(t1)], y: [at(t0), at(t1)], line: { color: css("--text-secondary"), width: 1.5, dash: "dash" }, hoverinfo: "skip" },
+    { type: "scatter", mode: "lines", name: DX.ahead, x: [dateOf(t1), dateOf(t2)], y: [at(t1), at(t2)], line: { color: css("--text-secondary"), width: 1.5, dash: "dot" }, hoverinfo: "skip" },
+    { type: "scatter", mode: "markers", x: [xdate(peak.p)], y: [peak.v], marker: { color: c1, size: 9, line: { color: css("--surface"), width: 2 } }, hovertemplate: `${DX.peak}: %{y:.2f}% (${label(peak.p)})<extra></extra>`, showlegend: false },
+  ], baseLayout({ showlegend: false, hovermode: "closest", yaxis: { ticksuffix: "%" }, xaxis: { range: [xs[0], dateOf(t2 + 0.3)] },
+    annotations: [{ x: dateOf(t2), y: at(t2), text: `${fmt(at(t2), 1)}%`, xanchor: "left", yanchor: "middle", showarrow: false, xshift: 4, font: { color: css("--text-secondary"), size: 12 } }], margin: { l: 8, r: 56, t: 8, b: 8 } }));
+
+  // 2. actual share and at the base date's exchange rates; 3. where the share went
+  const b = state.uBase, ib = f.periods.indexOf(b);
+  if (ib < 0) { ["u-fx", "u-where"].forEach(id => empty(document.getElementById(id), DX.none)); }
+  else {
+    const C = constantShares(b), ie = lastIdx(C.USD), e = f.periods[ie], x = f.x.slice(ib);
+    const tr = [
+      { type: "scatter", mode: "lines", name: DX.actual, x, y: f.share.USD.slice(ib), line: { color: c1, width: 2 }, hovertemplate: `%{y:.2f}%<extra>${DX.actual}</extra>` },
+      { type: "scatter", mode: "lines", name: DX.atRates(label(b)), x, y: C.USD.slice(ib), line: { color: c1, width: 2, dash: "dot" }, hovertemplate: `%{y:.2f}%<extra>${esc(DX.atRates(label(b)))}</extra>` }];
+    const fxEl = document.getElementById("u-fx");
+    plot(fxEl, tr, baseLayout({ hovermode: "x unified", xaxis: { hoverformat: "%Y Q%q" }, yaxis: { ticksuffix: "%" }, ...endLabels(fxEl, tr, 150) }));
+    const a = f.share.USD[ib], z = f.share.USD[ie], fx = z - C.USD[ie];
+    document.getElementById("u-fx-ins").innerHTML = DX.fxIns(label(b), label(e), fmt(a, 2), fmt(z, 2), pp(z - a), pp(fx), pp(z - a - fx), fmt(C.USD[ie], 2));
+    document.getElementById("u-where-t").textContent = DX.whereT(label(b), label(e));
+    const rows = FX_CURS.filter(j => fin(f.share[j][ib]) && fin(f.share[j][ie]) && fin(C[j][ie])).map(j => {
+      const total = f.share[j][ie] - f.share[j][ib], fxj = f.share[j][ie] - C[j][ie];
+      return { j, total, fx: fxj, hold: total - fxj };
+    }).sort((p, q) => p.total - q.total);
+    const names = rows.map(r => r.j === "USD" ? `<b>${CUR[r.j].name}</b>` : CUR[r.j].name);
+    plot(document.getElementById("u-where"), [
+      { type: "bar", orientation: "h", name: DX.hold, y: names, x: rows.map(r => r.hold), marker: { color: css("--s1"), line: { color: css("--surface"), width: 1 } }, hovertemplate: `%{y}, ${DX.hold.toLowerCase()}: %{x:+.2f} pp<extra></extra>` },
+      { type: "bar", orientation: "h", name: DX.rates, y: names, x: rows.map(r => r.fx), marker: { color: css("--s4"), line: { color: css("--surface"), width: 1 } }, hovertemplate: `%{y}, ${DX.rates.toLowerCase()}: %{x:+.2f} pp<extra></extra>` },
+      { type: "scatter", mode: "markers", name: DX.total, y: names, x: rows.map(r => r.total), marker: { symbol: "diamond", size: 10, color: css("--text-primary"), line: { color: css("--surface"), width: 2 } }, hovertemplate: `%{y}, ${DX.total.toLowerCase()}: %{x:+.2f} pp<extra></extra>` },
+    ], baseLayout({ barmode: "relative", bargap: 0.35, hovermode: "closest", xaxis: { showgrid: true, zeroline: true, zerolinewidth: 1.5, ticksuffix: " pp" }, yaxis: { showgrid: false } }));
+  }
+
+  // 4. the dollar index, and its quarterly changes against the changes in the share
+  const D = dollarIndex();
+  if (D.i0 < 0) { ["u-idx", "u-sc"].forEach(id => empty(document.getElementById(id), DX.none)); }
+  else {
+    document.getElementById("u-idx-sub").textContent = DX.idxSub(label(f.periods[D.i0]));
+    plot(document.getElementById("u-idx"), [{ type: "scatter", mode: "lines", name: DX.idxName, x: f.x.slice(D.i0), y: D.y.slice(D.i0), line: { color: css("--s7"), width: 2 }, hovertemplate: `%{y:.1f}<extra>${DX.idxName}</extra>` }],
+      baseLayout({ showlegend: false, hovermode: "x unified", xaxis: { hoverformat: "%Y Q%q" }, yaxis: { tickformat: ".0f" },
+        shapes: [{ type: "line", xref: "paper", x0: 0, x1: 1, y0: 100, y1: 100, line: { color: css("--axis"), width: 1, dash: "dot" } }] }));
+    const pts = [];
+    for (let i = D.i0 + 1; i <= n; i++) {
+      const dx = fin(D.y[i]) && fin(D.y[i - 1]) ? (D.y[i] / D.y[i - 1] - 1) * 100 : null, dy = f.share.USD[i] - f.share.USD[i - 1];
+      if (fin(dx) && fin(dy)) pts.push({ p: f.periods[i], dx, dy });
+    }
+    const g = ols(pts.map(q => q.dx), pts.map(q => q.dy)), lo = Math.min(...pts.map(q => q.dx)), hi = Math.max(...pts.map(q => q.dx));
+    document.getElementById("u-sc-sub").textContent = DX.scSub(pts.length, fmt(g.b, 2), fmt(g.r, 2));
+    plot(document.getElementById("u-sc"), [
+      { type: "scatter", mode: "markers", x: pts.map(q => q.dx), y: pts.map(q => q.dy), customdata: pts.map(q => label(q.p)),
+        marker: { color: c1, size: 8, opacity: 0.8, line: { color: css("--surface"), width: 1 } }, hovertemplate: `%{customdata}: %{x:+.1f}%, %{y:+.2f} pp<extra></extra>` },
+      { type: "scatter", mode: "lines", name: DX.fit, x: [lo, hi], y: [g.a + g.b * lo, g.a + g.b * hi], line: { color: css("--text-secondary"), width: 1.5, dash: "dash" }, hoverinfo: "skip" },
+    ], baseLayout({ showlegend: false, hovermode: "closest", xaxis: { title: { text: DX.scX, font: { size: 12 } }, ticksuffix: "%", zeroline: true, showgrid: true },
+      yaxis: { title: { text: DX.scY, font: { size: 12 } }, ticksuffix: " pp", zeroline: true } }));
+  }
+
+  // 5. the dollar beside gold: world gold at the IMF's price, with the foreign-exchange reserves (the dollar's part of
+  // the unallocated ones as in the allocated)
+  if (!GT) GT = goldTonnes();
+  // only the quarters where the countries with figures hold most of the gold (the first quarters have few of them;
+  // later ones add small holders, which changes the total little)
+  const tIn = q => Object.values(GT.t).reduce((s, qs) => s + (fin(qs[q]) ? qs[q] : 0), 0), most = Math.max(...GT.quarters.map(tIn));
+  const gx = [], gU = [], gA = [], gG = [];
+  for (const q of GT.quarters.filter(q => tIn(q) >= 0.7 * most)) {
+    const i = f.periods.indexOf(q), price = GD.price[priceKey(q)];
+    if (i < 0 || !price || !fin(f.total[i]) || !fin(f.share.USD[i])) continue;
+    let t = 0; for (const qs of Object.values(GT.t)) if (fin(qs[q])) t += qs[q];
+    const gold = t * OZ_PER_T * price / 1e9, usd = f.share.USD[i] / 100 * f.total[i];
+    gx.push(xdate(q)); gU.push(f.share.USD[i]); gA.push(usd / (f.total[i] + gold) * 100); gG.push(gold / (f.total[i] + gold) * 100);
+  }
+  const gt = [
+    { type: "scatter", mode: "lines", name: DX.usdFx, x: gx, y: gU, line: { color: c1, width: 2 }, hovertemplate: `%{y:.1f}%<extra>${DX.usdFx}</extra>` },
+    { type: "scatter", mode: "lines", name: DX.usdAll, x: gx, y: gA, line: { color: c1, width: 2, dash: "dot" }, hovertemplate: `%{y:.1f}%<extra>${DX.usdAll}</extra>` },
+    { type: "scatter", mode: "lines", name: DX.goldS, x: gx, y: gG, line: { color: css("--s4"), width: 2 }, hovertemplate: `%{y:.1f}%<extra>${DX.goldS}</extra>` }];
+  const goldEl = document.getElementById("u-gold");
+  plot(goldEl, gt, baseLayout({ hovermode: "x unified", xaxis: { hoverformat: "%Y Q%q", range: [gx[0], gx.at(-1)] }, yaxis: { ticksuffix: "%", rangemode: "tozero" },
+    ...endLabels(goldEl, gt, 210) }));
+}
+document.getElementById("usd").addEventListener("click", e => {
+  const b = e.target.closest("button[data-u]"); if (!b) return;
+  state[b.dataset.u] = b.dataset.v; writeHash(); renderUsd();
+});
+document.getElementById("usd").addEventListener("change", e => {
+  if (e.target.id !== "u-base") return;
+  state.uBase = e.target.value; writeHash(); renderUsd();
+});
+
 function renderTab(tab) {
   if (tab === "shares") { drawShares(); renderSharesTable(); drawAmounts(); renderAmountsTable(); }
   else if (tab === "changes") drawChanges();
@@ -3324,6 +3537,7 @@ function renderTab(tab) {
   else if (tab === "countries") renderCountries();
   else if (tab === "country") renderSingle();
   else if (tab === "gold") renderGold();
+  else if (tab === "usd") renderUsd();
   else renderExplore();
 }
 function showTab(tab, focus = false) {
