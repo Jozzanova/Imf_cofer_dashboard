@@ -2131,10 +2131,18 @@ function drawGroups() {
       const ch = block.querySelector(".chart"), many = rs.length > 18;
       ch.style.height = `${many ? 340 : 300}px`;
       const names = rs.map(r => r.c.k === HOME ? `<b>${esc(r.c.name)}</b>` : esc(r.c.name));
+      // on a log scale the range reaches the labelled values below the smallest and above the largest bar,
+      // so the axis always has labels (a group of a few close values can otherwise fall between two of them)
+      let yax = yaxis;
+      if (log) {
+        const ticks = yaxis.tickvals, lo = Math.min(...rs.map(r => r.v)), hi = Math.max(...rs.map(r => r.v));
+        const below = ticks.filter(t => t <= lo).pop() ?? lo / 2, above = ticks.find(t => t >= hi) ?? hi * 1.5;
+        yax = { ...yaxis, range: [Math.log10(below), Math.log10(above)] };
+      }
       plot(ch, [{ type: "bar", x: names, y: rs.map(r => r.v),
         marker: { color: rs.map(r => r.c.k === HOME ? css("--text-primary") : css(st.cat.color)), line: { color: css("--surface"), width: 1 } },
         customdata: rs.map(r => `${r.c.name}: ${cFmt(r.v)} (${label(r.pt.p)})`), hovertemplate: "%{customdata}<extra></extra>" }],
-        baseLayout({ showlegend: false, hovermode: "closest", yaxis,
+        baseLayout({ showlegend: false, hovermode: "closest", yaxis: yax,
           // bars at most about 56px wide, however few countries a group has
           bargap: Math.max(0.25, 1 - 56 / ((ch.clientWidth || 1000) / rs.length)),
           xaxis: { tickangle: many ? -90 : rs.length > 8 ? -45 : 0, tickfont: { color: css("--text-secondary"), size: many ? 10 : 11 }, automargin: true },
