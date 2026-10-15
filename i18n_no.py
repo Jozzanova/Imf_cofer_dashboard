@@ -418,6 +418,8 @@ PAIRS = [
     ('placeholder="Search countries" aria-label="Search countries"', 'placeholder="Søk etter land" aria-label="Søk etter land"'),
     ('data-a="shown">Select those shown</button>', 'data-a="shown">Velg de som vises</button>'),
     ('data-a="none">Show all countries</button>', 'data-a="none">Vis alle land</button>'),
+    ('title="Switzerland, Japan, Norway, New Zealand, Sweden, Canada, the UK, Australia and the US">Norway and peers</button>',
+     'title="Sveits, Japan, Norge, New Zealand, Sverige, Canada, Storbritannia, Australia og USA">Norge og sammenlignbare land</button>'),
     ('role="group" aria-label="Countries"></div>', 'role="group" aria-label="Land"></div>'),
     ('${th("name", "Country")}${th("v", cUnit())}${th("d", state.cMeasure === "bn" ? "1 year, bn" : "1 year, pp")}<th>Economy · exchange rate</th>${th("p", "As of")}',
      '${th("name", "Land")}${th("v", cUnit())}${th("d", state.cMeasure === "bn" ? "1 år, mrd." : "1 år, pp")}<th>Økonomi · valutaregime</th>${th("p", "Per")}'),

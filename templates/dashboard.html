@@ -109,6 +109,7 @@
   .seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
   .seg button { font: inherit; font-size: 13px; padding: 5px 11px; border: 0; background: transparent; color: var(--text-secondary); cursor: pointer; }
   .seg button + button { border-left: 1px solid var(--border); }
+  #dt-peers[aria-pressed="true"] { background: var(--grid); font-weight: 600; }
   .seg button[aria-pressed="true"] { background: var(--grid); color: var(--text-primary); font-weight: 600; }
   .seg button:disabled { opacity: .4; cursor: not-allowed; }
   select { font: inherit; font-size: 13px; padding: 5px 8px; border-radius: 8px; border: 1px solid var(--axis); background: var(--page); color: var(--text-primary); max-width: 100%; }
@@ -407,6 +408,7 @@
               <div class="ms-list" id="dt-cty-list" role="group" aria-label="Countries"></div>
             </div>
           </div>
+          <button class="text-btn" type="button" id="dt-peers" aria-pressed="false" title="Switzerland, Japan, Norway, New Zealand, Sweden, Canada, the UK, Australia and the US">Norway and peers</button>
           <button class="text-btn" type="button" id="dt-csv">Download CSV</button>
         </div>
       </div>
@@ -1181,12 +1183,14 @@ function renderData() {
   document.getElementById("dt-metric-seg").hidden = cty;
   document.getElementById("dt-year").hidden = !cty;
   document.getElementById("dt-cty").hidden = !cty;
+  document.getElementById("dt-peers").hidden = !cty;
   if (!cty) dtPick.close();
   document.getElementById("controls").hidden = cty;
   document.getElementById("tab-data").style.marginTop = cty ? "16px" : "";  // no controls card above it then
   if (cty) {
     const { head, rows, all, d } = countryData();
     dtPick.setAll(all.map(r => ({ k: r.k, name: r.cells[0] })));
+    document.getElementById("dt-peers").setAttribute("aria-pressed", String(dtIsPeers()));
     document.getElementById("dt-sub").textContent = `${rows.length} ${rows.length === 1 ? "country" : "countries"}, ${state.dtYear === "latest" ? "each country's latest figures" : `end of ${state.dtYear}`}, largest reserves first. ` +
       "Reserves include gold at market value; exchange-rate regimes as measured over the last two years.";
     document.getElementById("dt-table").innerHTML = `<thead><tr>${head.map(h => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${rows.map(r =>
@@ -1259,6 +1263,13 @@ function countryPicker(id, key, onChange) {
   return { setAll(list) { all = list; render(); }, close };
 }
 const dtPick = countryPicker("dt-cty", "dtCty", () => renderData());
+// a ready-made set for the countries table: Norway and the countries it is usually compared with; a second click shows all again
+const DT_PEERS = ["CHE", "JPN", "NOR", "NZL", "SWE", "CAN", "GBR", "AUS", "USA"];
+const dtIsPeers = () => state.dtCty.length === DT_PEERS.length && DT_PEERS.every(k => state.dtCty.includes(k));
+document.getElementById("dt-peers").addEventListener("click", () => {
+  state.dtCty = dtIsPeers() ? [] : [...DT_PEERS];
+  writeHash(); renderData();
+});
 document.getElementById("dt-csv").addEventListener("click", () => {
   const q = s => /[",]/.test(s) ? `"${String(s).replace(/"/g, '""')}"` : String(s);
   const num = v => fin(v) ? String(+v.toFixed(6)) : "";
