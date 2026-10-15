@@ -448,7 +448,7 @@
         <div class="seg" id="g-scale-seg" role="group" aria-label="Scale"><button data-v="log">Log scale</button><button data-v="lin">Linear</button></div>
         <div class="seg" id="c-group-seg" role="group" aria-label="Group by"><button data-v="econ">Advanced vs emerging</button><button data-v="region">Region</button><button data-v="regime">Exchange-rate regime</button></div>
       </div>
-      <div class="map-tools" id="g-filters">
+      <div class="map-tools" id="grp-filters">
         <span class="lbl" style="color:var(--text-muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.03em">Include</span>
         <div class="chips">
           <button class="chip" type="button" data-f="grEcon:AE">Advanced</button><button class="chip" type="button" data-f="grEcon:EM">Emerging &amp; developing</button>
@@ -456,10 +456,10 @@
         <div class="chips">
           <button class="chip" type="button" data-f="grReg:peg">Pegged</button><button class="chip" type="button" data-f="grReg:managed">Managed</button><button class="chip" type="button" data-f="grReg:float">Floating</button>
         </div>
-        <div class="chips"><button class="chip" type="button" id="g-euro">Euro-area members</button></div>
-        <select id="g-geo" aria-label="Region"><option value="all">All regions</option><option value="eu">Europe</option><option value="ap">Asia and Pacific</option>
+        <div class="chips"><button class="chip" type="button" id="grp-euro">Euro-area members</button></div>
+        <select id="grp-geo" aria-label="Region"><option value="all">All regions</option><option value="eu">Europe</option><option value="ap">Asia and Pacific</option>
           <option value="am">Americas</option><option value="me">Middle East and Central Asia</option><option value="af">Sub-Saharan Africa</option></select>
-        <button class="link-btn" type="button" id="g-reset">Show all</button>
+        <button class="link-btn" type="button" id="grp-reset">Show all</button>
       </div>
       <div id="g-chart" class="chart" style="height:400px"></div>
       <div class="table-wrap" style="margin-top:12px"><table id="g-table"></table></div>
@@ -2073,13 +2073,13 @@ function grKeep(k) {
     && (state.grGeo === "all" || geoOf(k) === state.grGeo) && (state.grEuro || !(CD.groups?.euro || []).includes(k));
 }
 function syncGroupFilters() {
-  document.querySelectorAll("#g-filters .chip[data-f]").forEach(b => {
+  document.querySelectorAll("#grp-filters .chip[data-f]").forEach(b => {
     const [key, v] = b.dataset.f.split(":");
     b.setAttribute("aria-pressed", String(state[key].includes(v)));
   });
-  document.getElementById("g-euro").setAttribute("aria-pressed", String(state.grEuro));
-  document.getElementById("g-geo").value = state.grGeo;
-  document.getElementById("g-reset").hidden = grAll();
+  document.getElementById("grp-euro").setAttribute("aria-pressed", String(state.grEuro));
+  document.getElementById("grp-geo").value = state.grGeo;
+  document.getElementById("grp-reset").hidden = grAll();
 }
 function drawGroups() {
   const by = state.cGroup, G = GROUPINGS[by], bn = state.cMeasure === "bn";
@@ -2302,17 +2302,17 @@ document.getElementById("g-scale-seg").addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b) return;
   state.gScale = b.dataset.v; writeHash(); drawGroups();
 });
-document.getElementById("g-filters").addEventListener("click", e => {
+document.getElementById("grp-filters").addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b) return;
-  if (b.id === "g-euro") state.grEuro = !state.grEuro;
-  else if (b.id === "g-reset") Object.assign(state, { grEcon: ["AE", "EM"], grReg: ["peg", "managed", "float"], grGeo: "all", grEuro: true });
+  if (b.id === "grp-euro") state.grEuro = !state.grEuro;
+  else if (b.id === "grp-reset") Object.assign(state, { grEcon: ["AE", "EM"], grReg: ["peg", "managed", "float"], grGeo: "all", grEuro: true });
   else if (b.dataset.f) {
     const [key, v] = b.dataset.f.split(":");
     state[key] = state[key].includes(v) ? state[key].filter(x => x !== v) : [...state[key], v];
   } else return;
   writeHash(); drawGroups();
 });
-document.getElementById("g-geo").addEventListener("change", e => { state.grGeo = e.target.value; writeHash(); drawGroups(); });
+document.getElementById("grp-geo").addEventListener("change", e => { state.grGeo = e.target.value; writeHash(); drawGroups(); });
 document.getElementById("c-group-seg").addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b) return;
   state.cGroup = b.dataset.v; writeHash(); syncCountryControls(); drawGroups();
