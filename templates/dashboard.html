@@ -109,6 +109,9 @@
   .seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
   .seg button { font: inherit; font-size: 13px; padding: 5px 11px; border: 0; background: transparent; color: var(--text-secondary); cursor: pointer; }
   .seg button + button { border-left: 1px solid var(--border); }
+  .g-bar-block + .g-bar-block { margin-top: 14px; }
+  .g-bar-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; }
+  .g-bar-head .muted { font-size: 12px; }
   #dt-peers[aria-pressed="true"] { background: var(--grid); font-weight: 600; }
   .seg button[aria-pressed="true"] { background: var(--grid); color: var(--text-primary); font-weight: 600; }
   .seg button:disabled { opacity: .4; cursor: not-allowed; }
@@ -445,6 +448,7 @@
     <section class="card">
       <div class="card-head">
         <div><h2>Compare groups</h2><p class="sub" id="g-sub"></p></div>
+        <div class="seg" id="g-view-seg" role="group" aria-label="Chart"><button data-v="box">Box plot</button><button data-v="bars">Bars</button></div>
         <div class="seg" id="g-scale-seg" role="group" aria-label="Scale"><button data-v="log">Log scale</button><button data-v="lin">Linear</button></div>
         <div class="seg" id="c-group-seg" role="group" aria-label="Group by"><button data-v="econ">Advanced vs emerging</button><button data-v="region">Region</button><button data-v="regime">Exchange-rate regime</button></div>
       </div>
@@ -462,6 +466,7 @@
         <button class="link-btn" type="button" id="grp-reset">Show all</button>
       </div>
       <div id="g-chart" class="chart" style="height:400px"></div>
+      <div id="g-bars" hidden></div>
       <div class="table-wrap" style="margin-top:12px"><table id="g-table"></table></div>
       <p class="hint" id="g-note"></p>
     </section>
@@ -751,7 +756,7 @@ const state = {
   shView: "stack", shLog: false, amView: "stack", amLog: false, sel: "", shShow: [], amShow: [],
   chFrom: "", chTo: "", chMetric: "bn", chCur: "USD", dtMetric: "share", dtSet: "cur", dtYear: "latest", dtCty: [], scCty: "NOR", gYear: "t", gPer: "5y", gShare: "pct", gDec: "5y", gSel: [], gCty: [], gEcon: ["AE", "EM"], gReg: ["peg", "managed", "float"], gGeo: "all", gLog: false,
   raceMetric: "share", raceNoUSD: false, raceSpeed: "1", fxBase: "2016-Q4", fxCur: "USD", flShow: [], fxShow: [],
-  cMeasure: "pct", cGold: "with", cYear: "latest", cSort: "v", cDir: "desc", gb: "eu_AE_float~eu_AE_peg", cGroup: "regime", cFilter: "all", cLines: "regime", cAgg: "combined", gScale: "log",
+  cMeasure: "pct", cGold: "with", cYear: "latest", cSort: "v", cDir: "desc", gb: "eu_AE_float~eu_AE_peg", cGroup: "regime", gView: "box", cFilter: "all", cLines: "regime", cAgg: "combined", gScale: "log",
   bY: "bn", bColor: "region", bEcon: ["AE", "EM"], bReg: ["peg", "managed", "float"], bRegion: "all", grEcon: ["AE", "EM"], grReg: ["peg", "managed", "float"], grGeo: "all", grEuro: true, bHi: [], bSpeed: "1", bLabels: "10", cSel: ["CHE", "HKG", "SAU", "CHN", "JPN", "USA"],
 };
 const LIST_KEYS = new Set(["cur", "cSel", "bHi", "dtCty", "gSel", "gCty", "gEcon", "gReg", "grEcon", "grReg", "bEcon", "bReg", "shShow", "amShow", "flShow", "fxShow"]);
@@ -789,6 +794,7 @@ function readHash() {
   if (!["countries", "econ", "region", "regime"].includes(state.cLines)) state.cLines = "regime";
   if (!["combined", "median"].includes(state.cAgg)) state.cAgg = "combined";
   if (!["log", "lin"].includes(state.gScale)) state.gScale = "log";
+  if (!["box", "bars"].includes(state.gView)) state.gView = "box";
   if (!["bn", "pct"].includes(state.bY)) state.bY = "bn";
   if (!["econ", "region", "regime"].includes(state.bColor)) state.bColor = "region";
   if (!["1", "2", "4"].includes(state.bSpeed)) state.bSpeed = "1";
@@ -2097,15 +2103,46 @@ function drawGroups() {
   }).filter(st => st.n);  // a group the filters leave empty is left out
   const el = document.getElementById("g-chart");
   document.getElementById("g-sub").textContent = `${cUnit()}, ${goldWords()}, ${state.cYear === "latest" ? "latest figures" : `end of ${state.cYear}`}. ` +
-    `Each dot is a country; the box spans the middle half of each group and the line in it is the median. ${state.gScale === "log" ? "Log" : "Linear"} scale.`;
+    `${state.gView === "bars" ? "Each bar is a country, largest first; the dashed line is the median of the group." : "Each dot is a country; the box spans the middle half of each group and the line in it is the median."} ${state.gScale === "log" ? "Log" : "Linear"} scale.`;
   setPressed(document.getElementById("g-scale-seg"), state.gScale);
+  setPressed(document.getElementById("g-view-seg"), state.gView);
   const log = state.gScale === "log", drawn = r => !log || r.v > 0;
+  const barsEl = document.getElementById("g-bars"), bars = state.gView === "bars" && rows.length;
+  barsEl.querySelectorAll(".chart").forEach(c => Plotly.purge(c));
+  barsEl.innerHTML = ""; barsEl.hidden = !bars; el.hidden = !!bars;
   if (!rows.length) { empty(el, "No figures for this selection."); document.getElementById("g-table").innerHTML = ""; return; }
   const short = cat => cat.name.replace("Emerging and developing", "Emerging &<br>developing").replace("Latin America and the Caribbean", "Latin America &<br>Caribbean").replace("Middle East and Central Asia", "Middle East &<br>Central Asia").replace("Advanced economies", "Advanced<br>economies").replace("Sub-Saharan Africa", "Sub-Saharan<br>Africa");
   const homeRow = rows.find(r => r.c.k === HOME);
   // a log scale has no zero: countries with none (of gold, say) are counted in the table but not drawn
   const zeros = log ? rows.filter(r => !(r.v > 0)).length : 0;
-  plot(el, stats.filter(st => st.rs.some(drawn)).map(st => ({
+  const yaxis = log ? { type: "log", gridcolor: css("--grid"), tickvals: bn ? [0.1, 1, 10, 100, 1000] : [0.1, 0.3, 1, 3, 10, 30, 100, 300],
+      ticktext: bn ? ["$0.1 bn", "$1 bn", "$10 bn", "$100 bn", "$1,000 bn"] : ["0.1%", "0.3%", "1%", "3%", "10%", "30%", "100%", "300%"] }
+      : { type: "linear", gridcolor: css("--grid"), rangemode: "tozero", tickprefix: bn ? "$" : "", ticksuffix: bn ? "" : "%", tickformat: ",.0f" };
+  if (bars) {
+    // one chart per group, its countries sorted from the largest, names along the bottom
+    for (const st of stats) {
+      const rs = st.rs.filter(drawn).sort((a, b) => b.v - a.v);
+      if (!rs.length) continue;
+      const block = document.createElement("div");
+      block.className = "g-bar-block";
+      block.innerHTML = `<div class="g-bar-head"><span class="dot" style="background:${css(st.cat.color)}"></span><b>${esc(st.cat.name)}</b>` +
+        `<span class="muted">${rs.length} ${rs.length === 1 ? "country" : "countries"} · median ${cFmt(st.med)}</span></div><div class="chart"></div>`;
+      barsEl.append(block);
+      const ch = block.querySelector(".chart"), many = rs.length > 18;
+      ch.style.height = `${many ? 340 : 300}px`;
+      const names = rs.map(r => r.c.k === HOME ? `<b>${esc(r.c.name)}</b>` : esc(r.c.name));
+      plot(ch, [{ type: "bar", x: names, y: rs.map(r => r.v),
+        marker: { color: rs.map(r => r.c.k === HOME ? css("--text-primary") : css(st.cat.color)), line: { color: css("--surface"), width: 1 } },
+        customdata: rs.map(r => `${r.c.name}: ${cFmt(r.v)} (${label(r.pt.p)})`), hovertemplate: "%{customdata}<extra></extra>" }],
+        baseLayout({ showlegend: false, hovermode: "closest", yaxis,
+          // bars at most about 56px wide, however few countries a group has
+          bargap: Math.max(0.25, 1 - 56 / ((ch.clientWidth || 1000) / rs.length)),
+          xaxis: { tickangle: many ? -90 : rs.length > 8 ? -45 : 0, tickfont: { color: css("--text-secondary"), size: many ? 10 : 11 }, automargin: true },
+          shapes: fin(st.med) && (!log || st.med > 0) ? [{ type: "line", xref: "paper", x0: 0, x1: 1, yref: "y", y0: st.med, y1: st.med,
+            line: { color: css("--text-secondary"), width: 1.5, dash: "dash" } }] : [],
+          margin: { l: 8, r: 8, t: 8, b: 8 } }));
+    }
+  } else plot(el, stats.filter(st => st.rs.some(drawn)).map(st => ({
     type: "box", name: short(st.cat), y: st.rs.filter(drawn).map(r => r.v), boxpoints: "all", jitter: 0.6, pointpos: 0,
     marker: { color: css(st.cat.color), size: 6, opacity: 0.85, line: { color: css("--surface"), width: 1 } },
     line: { color: css(st.cat.color), width: 1.5 }, fillcolor: "rgba(0,0,0,0)",
@@ -2114,10 +2151,7 @@ function drawGroups() {
     text: [`<b>${esc(homeRow.c.name)}</b>`], textposition: "middle right", textfont: { size: 12.5, color: css("--text-primary") },
     marker: { size: 13, color: css(groupCat(by, homeRow.g).color), line: { color: css("--text-primary"), width: 2.5 } },
     hovertemplate: `${esc(homeRow.c.name)}: ${cFmt(homeRow.v)}<extra></extra>` }] : []), baseLayout({ showlegend: false, hovermode: "closest",
-    yaxis: log ? { type: "log", gridcolor: css("--grid"), tickvals: bn ? [0.1, 1, 10, 100, 1000] : [0.1, 0.3, 1, 3, 10, 30, 100, 300],
-      ticktext: bn ? ["$0.1 bn", "$1 bn", "$10 bn", "$100 bn", "$1,000 bn"] : ["0.1%", "0.3%", "1%", "3%", "10%", "30%", "100%", "300%"] }
-      : { type: "linear", gridcolor: css("--grid"), rangemode: "tozero", tickprefix: bn ? "$" : "", ticksuffix: bn ? "" : "%", tickformat: ",.0f" },
-    xaxis: { tickfont: { color: css("--text-secondary"), size: 11.5 } }, margin: { l: 8, r: 8, t: 8, b: 8 } }));
+    yaxis, xaxis: { tickfont: { color: css("--text-secondary"), size: 11.5 } }, margin: { l: 8, r: 8, t: 8, b: 8 } }));
   if (!grAll()) document.getElementById("g-sub").textContent += ` Filtered: ${rows.length} ${rows.length === 1 ? "country" : "countries"}.`;
   if (zeros) document.getElementById("g-sub").textContent += ` ${zeros} ${zeros === 1 ? "country has" : "countries have"} none and ${zeros === 1 ? "is" : "are"} left out of the chart.`;
   const f = v => cFmt(v);
@@ -2297,6 +2331,10 @@ document.getElementById("c-measure-seg").addEventListener("click", e => {
 document.getElementById("c-gold-seg").addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b) return;
   state.cGold = b.dataset.v; writeHash(); renderCountries();
+});
+document.getElementById("g-view-seg").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  state.gView = b.dataset.v; writeHash(); drawGroups();
 });
 document.getElementById("g-scale-seg").addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b) return;
