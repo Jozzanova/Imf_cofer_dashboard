@@ -30,7 +30,7 @@
     --neg: #e34948;
     --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
     --s5: #e87ba4; --s6: #008300; --s7: #4a3aa7; --s8: #e34948;
-    --other: #9c9b94; --unalloc: #c3c2b7;
+    --other: #9c9b94; --unalloc: #c3c2b7; --gold: #c99a06;
     --seq-1: #e4eefa; --seq-2: #a8c8ef; --seq-3: #5a98e3; --seq-4: #2268c4; --seq-5: #0b3470;
   }
   @media (prefers-color-scheme: dark) {
@@ -42,7 +42,7 @@
       --accent: #3987e5; --pos: #3987e5; --neg: #e66767;
       --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
       --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
-      --other: #8a8983; --unalloc: #4a4a47;
+      --other: #8a8983; --unalloc: #4a4a47; --gold: #e0b22a; --gold: #e0b22a;
       --seq-1: #15253a; --seq-2: #1d4f8f; --seq-3: #3987e5; --seq-4: #8fc1f8; --seq-5: #e8f3ff;
     }
   }
@@ -54,7 +54,7 @@
     --accent: #3987e5; --pos: #3987e5; --neg: #e66767;
     --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
     --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
-    --other: #8a8983; --unalloc: #4a4a47;
+    --other: #8a8983; --unalloc: #4a4a47; --gold: #e0b22a;
     --seq-1: #15253a; --seq-2: #1d4f8f; --seq-3: #3987e5; --seq-4: #8fc1f8; --seq-5: #e8f3ff;
   }
 
@@ -320,9 +320,10 @@
   <div role="tabpanel" id="tab-shares" aria-labelledby="tab-btn-shares">
     <section class="card">
       <div class="card-head">
-        <div><h2>Share of allocated reserves</h2><p class="sub" id="sh-sub"></p></div>
+        <div><h2 id="sh-h2">Share of allocated reserves</h2><p class="sub" id="sh-sub"></p></div>
         <div class="row">
           <div class="seg" id="sh-view-seg" role="group" aria-label="Chart type"><button data-v="lines">Lines</button><button data-v="stack">Stacked</button><button data-v="multi">One chart each</button></div>
+          <label class="check" id="sh-gold-label" title="Shares of total reserves, foreign exchange plus monetary gold at market value, for the countries that report both to the IMF"><input type="checkbox" id="sh-gold"> Include gold</label>
           <label class="check" id="sh-log-label"><input type="checkbox" id="sh-log"> Log scale</label>
         </div>
       </div>
@@ -680,6 +681,8 @@ const CURS = [
   { k: "OTHC", name: "Other currencies", color: "--other" },
 ];
 const CUR = Object.fromEntries(CURS.map(c => [c.k, c]));
+// gold is not a COFER currency: it joins the share charts only when "Include gold" is on (see goldShare)
+CUR.GLD = { k: "GLD", name: "Gold", color: "--gold" };
 const LEGACY = ["DEM", "FRF", "NLG", "ECU"];
 const BIG4 = ["USD", "EUR", "JPY", "GBP"];
 
@@ -755,7 +758,7 @@ const source = { kind: "snapshot", at: SNAPSHOT.downloaded, checking: true };
 // ---------- state (kept in the URL hash so a view can be bookmarked or shared) ----------
 const state = {
   tab: "shares", cur: CURS.map(c => c.k), freq: "Q", period: "all",
-  shView: "stack", shLog: false, amView: "stack", amLog: false, sel: "", shShow: [], amShow: [],
+  shView: "stack", shLog: false, shGold: false, amView: "stack", amLog: false, sel: "", shShow: [], amShow: [],
   chFrom: "", chTo: "", chMetric: "bn", chCur: "USD", dtMetric: "share", dtSet: "cur", dtYear: "latest", noGdp: "total", dtCty: [], scCty: "NOR", gYear: "t", gPer: "5y", gShare: "pct", gDec: "5y", gSel: [], gCty: [], gEcon: ["AE", "EM"], gReg: ["peg", "managed", "float"], gGeo: "all", gLog: false,
   raceMetric: "share", raceNoUSD: false, raceSpeed: "1", fxBase: "2016-Q4", fxCur: "USD", flShow: [], fxShow: [],
   cMeasure: "pct", cGold: "with", cYear: "latest", cSort: "v", cDir: "desc", gb: "eu_AE_float~eu_AE_peg", cGroup: "regime", gView: "box", cFilter: "all", cLines: "regime", cAgg: "combined", gScale: "log",
@@ -936,8 +939,11 @@ function bindLegendPick(kind, el) {
 }
 // the bars beside a chart: every chosen currency on the picked date, largest first
 function drawSide(kind) {
-  const f = F(), i = selIdx(), w = windowIdx(), py = perYear(), share = kind === "sh", src = share ? f.share : f.bn;
-  const items = selected().map(k => ({ k, name: CUR[k].name, color: css(CUR[k].color), v: src[k][i], prev: src[k][i - py] })).filter(it => fin(it.v));
+  const f = F(), w = windowIdx(), py = perYear(), share = kind === "sh", sd = share ? shareData() : null, src = share ? sd.share : f.bn;
+  let i = selIdx();
+  // with gold on, the newest quarters may lack a gold figure (not all countries have reported): show the latest that has one
+  if (share && sd.gold) while (i > w.i0 && !fin(sd.share.GLD[i])) i--;
+  const items = (share ? sd.keys : selected()).map(k => ({ k, name: CUR[k].name, color: css(CUR[k].color), v: src[k][i], prev: src[k][i - py] })).filter(it => fin(it.v));
   if (!share && f.unallocated[i] > 0) items.push({ k: "UN", name: "Unallocated", color: css("--unalloc"), v: f.unallocated[i], prev: f.unallocated[i - py] });
   items.sort((a, b) => b.v - a.v);
   document.getElementById(`${kind}-side-title`).textContent = `${share ? "Shares" : "US$ billions"}, ${label(f.periods[i])}${i === w.i1 ? " (latest)" : ""}`;
@@ -958,19 +964,50 @@ function drawSide(kind) {
   el.removeAllListeners?.("plotly_click");
   el.on("plotly_click", ev => { const k = ev.points?.[0]?.customdata?.[1]; if (k) pickCurrency(kind, k, !!(ev.event?.ctrlKey || ev.event?.metaKey)); });
 }
+// Gold's share of total reserves (foreign exchange plus monetary gold at market value), period by period, from the
+// countries that report both to the IMF's International Investment Position; returns fractions, and the reporter
+// counts. The newest periods, for which many countries have not yet reported, are cut where the count falls below
+// three quarters of the recent maximum, so an incomplete quarter never shows as a drop in gold.
+function goldShare(f) {
+  if (f._gold) return f._gold;
+  const q = state.freq === "Q", res = q ? CD.resQ : CD.resA, gold = q ? CD.goldQ : CD.goldA;
+  const g = [], n = [];
+  for (const p of f.periods) {
+    let R = 0, G = 0, k = 0;
+    for (const c of Object.keys(gold)) { const r = res[c]?.[p], v = gold[c]?.[p]; if (fin(r) && fin(v) && r > 0) { R += r; G += v; k++; } }
+    g.push(k ? G / R : null); n.push(k);
+  }
+  for (let i = n.length - 1; i > 0; i--) { const recent = Math.max(...n.slice(Math.max(0, i - 12), i)); if (recent && n[i] < 0.75 * recent) g[i] = null; else break; }
+  for (let i = 0; i < n.length; i++) if (n[i] < 10) g[i] = null;   // too few reporters in the early years to call it the world
+  return (f._gold = { g, n });
+}
+// the share series the charts and tables use: COFER's shares of allocated reserves, or, with "Include gold" on,
+// those shares scaled to total reserves including gold, plus gold itself
+function shareData() {
+  const f = F();
+  if (!state.shGold) return { share: f.share, keys: selected(), gold: null };
+  const { g, n } = goldShare(f), share = {};
+  for (const k of selected()) share[k] = f.share[k].map((v, i) => fin(v) && fin(g[i]) ? v * (1 - g[i]) : null);
+  share.GLD = g.map(v => fin(v) ? 100 * v : null);
+  return { share, keys: selected().concat("GLD"), gold: { g, n } };
+}
 function drawShares() {
-  const f = F(), w = windowIdx(), x = slice(f.x, w), ks = selected(), el = document.getElementById("sh-chart");
+  const f = F(), w = windowIdx(), x = slice(f.x, w), sd = shareData(), ks = sd.keys, el = document.getElementById("sh-chart");
   document.getElementById("sh-log-label").hidden = state.shView !== "lines";
+  document.getElementById("sh-h2").textContent = state.shGold ? "Share of reserves including gold" : "Share of allocated reserves";
+  const nRep = sd.gold ? sd.gold.n.filter((v, i) => fin(sd.gold.g[i]) && i >= w.i0 && i <= w.i1) : [];
   document.getElementById("sh-sub").textContent =
-    `${state.freq === "Q" ? "Quarterly" : "Year-end"}, ${label(f.periods[w.i0])} to ${label(f.periods[w.i1])}, % of reserves whose currency is known`;
+    `${state.freq === "Q" ? "Quarterly" : "Year-end"}, ${label(f.periods[w.i0])} to ${label(f.periods[w.i1])}, ` + (state.shGold
+      ? `% of total reserves: foreign exchange (COFER's shares, scaled) plus monetary gold at market value, with gold's share taken from the ${nRep.length ? `${Math.min(...nRep)} to ${Math.max(...nRep)}` : ""} countries reporting both to the IMF's International Investment Position`
+      : "% of reserves whose currency is known");
   setSplit("sh", state.shView !== "multi" && ks.length > 0);
-  if (!ks.length) return empty(el, "Pick at least one currency above.");
-  const series = ks.map(k => ({ k, y: slice(f.share[k], w) })).filter(s => s.y.some(fin));
+  if (!selected().length) return empty(el, "Pick at least one currency above.");
+  const series = ks.map(k => ({ k, y: slice(sd.share[k], w) })).filter(s => s.y.some(fin));
   if (state.shView === "multi") return drawMultiples(el, x, series, { unit: "%", d: 2, prefix: "", suffix: "%" });
   // back from one chart each: give the chart its normal height again and let Plotly measure it afresh
   if (el._multi) { el._multi = false; el.style.height = ""; Plotly.purge(el); }
   if (state.shView === "stack") {
-    const all = ks.length >= 9 && !state.shShow.length;
+    const all = selected().length >= 9 && !state.shShow.length;
     freshIfShownChanged("sh", el);
     plot(el, applyShown("sh", series.map(s => areaTrace(s.k, x, s.y, "%", 2))), baseLayout({
       hovermode: "x unified", xaxis: { hoverformat: hoverX() }, shapes: [selShape()], legend: legendCfg(),
@@ -1009,8 +1046,9 @@ function renderSharesTable() {
   const back = [state.freq === "Q" ? [1, "1 quarter"] : null, [py, "1 year"], [5 * py, "5 years"], [10 * py, "10 years"]].filter(Boolean);
   const head = `<tr><th>Currency</th><th>${label(f.periods[n])}</th>${back.map(([, t]) => `<th>vs ${t} earlier</th>`).join("")}
     <th>since ${label(f.periods[w.i0])}</th><th>Highest</th><th>Lowest</th></tr>`;
-  const rows = selected().map(k => {
-    const y = f.share[k], li = lastIdx(y);
+  const sd = shareData();
+  const rows = sd.keys.map(k => {
+    const y = sd.share[k], li = lastIdx(y);
     if (li < 0) return "";
     const ch = j => fin(y[li - j]) ? y[li] - y[li - j] : null;
     let hi = -1, lo = -1;
@@ -1025,8 +1063,9 @@ function renderSharesTable() {
       <td>${lo >= 0 ? `${fmt(y[lo], 2)}% <span class="muted">${label(f.periods[lo])}</span>` : "–"}</td></tr>`;
   }).join("");
   document.getElementById("sh-table").innerHTML = `<thead>${head}</thead><tbody>${rows}</tbody>`;
-  document.getElementById("sh-table-sub").textContent =
-    "Share of allocated reserves in %; changes in percentage points. Highest and lowest are within the period chosen above.";
+  document.getElementById("sh-table-sub").textContent = (state.shGold
+    ? "Share of total reserves including gold in %; changes in percentage points. "
+    : "Share of allocated reserves in %; changes in percentage points. ") + "Highest and lowest are within the period chosen above.";
 }
 
 // ---------- Amounts ----------
@@ -1355,6 +1394,7 @@ function syncControls() {
   setPressed(document.getElementById("am-view-seg"), state.amView);
   setPressed(document.getElementById("dt-metric-seg"), state.dtMetric);
   document.getElementById("sh-log").checked = state.shLog;
+  document.getElementById("sh-gold").checked = state.shGold;
   document.getElementById("am-log").checked = state.amLog;
   document.getElementById("controls").hidden = ["explore", "countries", "country", "gold"].includes(state.tab) || (state.tab === "data" && state.dtSet === "cty");
   document.getElementById("hint").textContent = state.tab === "changes"
@@ -1380,6 +1420,7 @@ bindSeg("dt-metric-seg", "dtMetric");
 bindSeg("dt-set-seg", "dtSet");
 document.getElementById("dt-year").addEventListener("change", e => { state.dtYear = e.target.value; writeHash(); renderData(); });
 document.getElementById("sh-log").addEventListener("change", e => { state.shLog = e.target.checked; onChange(); });
+document.getElementById("sh-gold").addEventListener("change", e => { state.shGold = e.target.checked; onChange(); });
 document.getElementById("am-log").addEventListener("change", e => { state.amLog = e.target.checked; onChange(); });
 document.getElementById("ch-from").addEventListener("change", e => { state.chFrom = e.target.value; onChange(); });
 document.getElementById("ch-to").addEventListener("change", e => { state.chTo = e.target.value; onChange(); });

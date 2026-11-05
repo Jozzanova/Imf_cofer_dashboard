@@ -21,7 +21,9 @@ reopens the same selection.
 
 Tabs:
 - **Currencies**: shares of allocated reserves as lines, stacked, or one chart per currency,
-  with the changes over 1 quarter, 1, 5 and 10 years and the highs and lows; and the same
+  with the changes over 1 quarter, 1, 5 and 10 years and the highs and lows ("Include gold" rescales
+  the shares to total reserves including monetary gold at market value and adds gold as a series, using
+  gold's share among the countries that report both reserves and gold to the IMF's IIP); and the same
   currencies in US$ billions (stacked, lines or one chart each), with growth rates. Beside each
   chart, bars show every currency on one date: the latest, or any date clicked on the chart.
 - **Changes**: the change between any two dates, by currency, in US$, % or share points, and
