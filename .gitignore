@@ -4,3 +4,5 @@ data/*
 !data/letters/
 output/
 site/
+.wrangler/
+node_modules/
