@@ -334,7 +334,7 @@
     </section>
     <section class="card">
       <h2>Shares and how they changed</h2>
-      <p class="sub" id="sh-table-sub"></p>
+      <p class="sub" id="sh-table-sub"></p><p class="hint" id="sh-gold-note"></p>
       <div class="table-wrap"><table id="sh-table"></table></div>
     </section>
     <section class="card">
@@ -403,6 +403,7 @@
         <div class="row">
           <div class="seg" id="dt-set-seg" role="group" aria-label="Dataset"><button data-v="cur">World, by currency</button><button data-v="cty">Countries</button></div>
           <div class="seg" id="dt-metric-seg" role="group" aria-label="Measure"><button data-v="share">Shares, %</button><button data-v="bn">US$ billions</button></div>
+          <label class="check" id="dt-gold-label" title="Shares of total reserves including monetary gold at market value, or, in US dollars, gold implied by that share"><input type="checkbox" id="dt-gold"> Include gold</label>
           <select id="dt-year" aria-label="Date"></select>
           <div class="ms" id="dt-cty">
             <button class="text-btn" type="button" id="dt-cty-btn" aria-haspopup="true" aria-expanded="false"></button>
@@ -758,7 +759,7 @@ const source = { kind: "snapshot", at: SNAPSHOT.downloaded, checking: true };
 // ---------- state (kept in the URL hash so a view can be bookmarked or shared) ----------
 const state = {
   tab: "shares", cur: CURS.map(c => c.k), freq: "Q", period: "all",
-  shView: "stack", shLog: false, shGold: false, amView: "stack", amLog: false, sel: "", shShow: [], amShow: [],
+  shView: "stack", shLog: false, shGold: false, dtGold: false, amView: "stack", amLog: false, sel: "", shShow: [], amShow: [],
   chFrom: "", chTo: "", chMetric: "bn", chCur: "USD", dtMetric: "share", dtSet: "cur", dtYear: "latest", noGdp: "total", dtCty: [], scCty: "NOR", gYear: "t", gPer: "5y", gShare: "pct", gDec: "5y", gSel: [], gCty: [], gEcon: ["AE", "EM"], gReg: ["peg", "managed", "float"], gGeo: "all", gLog: false,
   raceMetric: "share", raceNoUSD: false, raceSpeed: "1", fxBase: "2016-Q4", fxCur: "USD", flShow: [], fxShow: [],
   cMeasure: "pct", cGold: "with", cYear: "latest", cSort: "v", cDir: "desc", gb: "eu_AE_float~eu_AE_peg", cGroup: "regime", gView: "box", cFilter: "all", cLines: "regime", cAgg: "combined", gScale: "log",
@@ -971,21 +972,36 @@ function drawSide(kind) {
 function goldShare(f) {
   if (f._gold) return f._gold;
   const q = state.freq === "Q", res = q ? CD.resQ : CD.resA, gold = q ? CD.goldQ : CD.goldA;
-  const g = [], n = [];
-  for (const p of f.periods) {
-    let R = 0, G = 0, k = 0;
-    for (const c of Object.keys(gold)) { const r = res[c]?.[p], v = gold[c]?.[p]; if (fin(r) && fin(v) && r > 0) { R += r; G += v; k++; } }
-    g.push(k ? G / R : null); n.push(k);
+  // Countries join and leave the IMF's reporting over time (many report only at year-end), so the plain ratio over
+  // whoever reports jumps with the panel, not with gold. The series is therefore chain-linked: its level is the share
+  // in the latest period with a reasonably full panel, and each earlier period is reached by applying the change in the
+  // ratio measured over the countries present in both that period and the next. Composition changes then drop out.
+  const P = f.periods, pres = {};
+  for (const c of Object.keys(gold)) pres[c] = P.map(p => { const r = res[c]?.[p], v = gold[c]?.[p]; return fin(r) && fin(v) && r > 0; });
+  const cs = Object.keys(pres);
+  const n = P.map((p, j) => cs.filter(c => pres[c][j]).length);
+  const ratio = (j, set) => { let R = 0, G = 0; for (const c of set) { R += res[c][P[j]]; G += gold[c][P[j]]; } return R > 0 ? G / R : null; };
+  // the anchor: the latest period whose reporter count is at least three quarters of the recent maximum
+  let anchor = -1;
+  for (let j = P.length - 1; j >= 0; j--) { const recent = Math.max(...n.slice(Math.max(0, j - 12), j + 1)); if (n[j] >= 0.75 * recent && n[j] >= 10) { anchor = j; break; } }
+  const g = P.map(() => null);
+  if (anchor >= 0) {
+    g[anchor] = ratio(anchor, cs.filter(c => pres[c][anchor]));
+    for (let j = anchor - 1; j >= 0; j--) {
+      const common = cs.filter(c => pres[c][j] && pres[c][j + 1]);
+      if (common.length < 10) break;
+      const a = ratio(j, common), b = ratio(j + 1, common);
+      g[j] = a != null && b > 0 ? g[j + 1] * a / b : null;
+      if (g[j] == null) break;
+    }
   }
-  for (let i = n.length - 1; i > 0; i--) { const recent = Math.max(...n.slice(Math.max(0, i - 12), i)); if (recent && n[i] < 0.75 * recent) g[i] = null; else break; }
-  for (let i = 0; i < n.length; i++) if (n[i] < 10) g[i] = null;   // too few reporters in the early years to call it the world
   return (f._gold = { g, n });
 }
 // the share series the charts and tables use: COFER's shares of allocated reserves, or, with "Include gold" on,
 // those shares scaled to total reserves including gold, plus gold itself
-function shareData() {
+function shareData(withGold = state.shGold) {
   const f = F();
-  if (!state.shGold) return { share: f.share, keys: selected(), gold: null };
+  if (!withGold) return { share: f.share, keys: selected(), gold: null };
   const { g, n } = goldShare(f), share = {};
   for (const k of selected()) share[k] = f.share[k].map((v, i) => fin(v) && fin(g[i]) ? v * (1 - g[i]) : null);
   share.GLD = g.map(v => fin(v) ? 100 * v : null);
@@ -998,8 +1014,12 @@ function drawShares() {
   const nRep = sd.gold ? sd.gold.n.filter((v, i) => fin(sd.gold.g[i]) && i >= w.i0 && i <= w.i1) : [];
   document.getElementById("sh-sub").textContent =
     `${state.freq === "Q" ? "Quarterly" : "Year-end"}, ${label(f.periods[w.i0])} to ${label(f.periods[w.i1])}, ` + (state.shGold
-      ? `% of total reserves: foreign exchange (COFER's shares, scaled) plus monetary gold at market value, with gold's share taken from the ${nRep.length ? `${Math.min(...nRep)} to ${Math.max(...nRep)}` : ""} countries reporting both to the IMF's International Investment Position`
+      ? "% of total reserves including gold at market value"
       : "% of reserves whose currency is known");
+  // the method behind the gold share goes under the table, where there is room for it
+  document.getElementById("sh-gold-note").textContent = state.shGold
+    ? `Gold: COFER's currency shares are scaled to total reserves, foreign exchange plus monetary gold at market value. Gold's share is measured over the ${nRep.length ? `${Math.min(...nRep)} to ${Math.max(...nRep)}` : ""} countries reporting both to the IMF's International Investment Position, chain-linked so that countries joining or leaving the reporting do not move it; the newest quarters are left out until most countries have reported.`
+    : "";
   setSplit("sh", state.shView !== "multi" && ks.length > 0);
   if (!selected().length) return empty(el, "Pick at least one currency above.");
   const series = ks.map(k => ({ k, y: slice(sd.share[k], w) })).filter(s => s.y.some(fin));
@@ -1204,10 +1224,16 @@ function renderChangesTable(f, i0, i1) {
 
 // ---------- Data ----------
 function dataRows() {
-  const f = F(), w = windowIdx(), ks = selected(), share = state.dtMetric === "share";
-  const cols = ks.map(k => ({ name: CUR[k].name, y: share ? f.share[k] : f.bn[k], d: share ? 2 : 1 }));
+  const f = F(), w = windowIdx(), share = state.dtMetric === "share", sd = shareData(state.dtGold), ks = share ? sd.keys : selected();
+  const cols = ks.map(k => ({ name: k === "GLD" ? "Gold" : CUR[k].name, y: share ? sd.share[k] : f.bn[k], d: share ? 2 : 1 }));
   if (!share) {
     cols.push({ name: "Unallocated", y: f.unallocated, d: 1 }, { name: "Total FX reserves", y: f.total, d: 1 });
+    if (state.dtGold) {
+      // gold in US$ implied by its share of total reserves: gold = share / (1 - share) x FX reserves
+      const g = goldShare(f).g, gv = f.total.map((t, i) => fin(t) && fin(g[i]) && g[i] < 1 ? t * g[i] / (1 - g[i]) : null);
+      cols.push({ name: "Gold, implied from its share", y: gv, d: 1 }, { name: "Total reserves including gold", y: f.total.map((t, i) => fin(t) && fin(gv[i]) ? t + gv[i] : null), d: 1 },
+        { name: "Gold, % of total reserves", y: g.map(v => fin(v) ? 100 * v : null), d: 2 });
+    }
     // world GDP (IMF, World Economic Outlook) for the period's calendar year, and FX reserves against it
     const wgdp = f.periods.map(p => CD.gdp?.G001?.[p.slice(0, 4)] ?? null);
     cols.push({ name: "World GDP", y: wgdp, d: 0 }, { name: "FX reserves, % of world GDP", y: f.total.map((t, i) => fin(t) && wgdp[i] > 0 ? t / wgdp[i] * 100 : null), d: 1 });
@@ -1245,6 +1271,7 @@ function renderData() {
   setPressed(document.getElementById("dt-set-seg"), state.dtSet);
   const cty = state.dtSet === "cty";
   document.getElementById("dt-metric-seg").hidden = cty;
+  document.getElementById("dt-gold-label").hidden = cty;
   document.getElementById("dt-year").hidden = !cty;
   document.getElementById("dt-cty").hidden = !cty;
   document.getElementById("dt-peers").hidden = !cty;
@@ -1268,7 +1295,8 @@ function renderData() {
   }
   const { cols, rows } = dataRows();
   document.getElementById("dt-sub").textContent = state.dtMetric === "share"
-    ? "Share of allocated reserves, %, newest first" : "US$ billions at market exchange rates, newest first; world GDP for the period's calendar year";
+    ? (state.dtGold ? "Share of total reserves including gold at market value, %, newest first; gold's share chain-linked over the countries reporting both to the IMF" : "Share of allocated reserves, %, newest first")
+    : "US$ billions at market exchange rates, newest first; world GDP for the period's calendar year" + (state.dtGold ? "; gold implied by its share of total reserves" : "");
   document.getElementById("dt-hint").innerHTML = `"Download CSV" saves the table as shown: the currencies, frequency and period chosen above.
     The full dataset is on the <a href="https://data.imf.org/en/datasets/IMF.STA:COFER" target="_blank" rel="noopener">IMF data portal</a>.`;
   document.getElementById("dt-table").innerHTML =
@@ -1347,7 +1375,7 @@ document.getElementById("dt-csv").addEventListener("click", () => {
   } else {
     const { cols, rows } = dataRows();
     text = [["Period", ...cols.map(c => c.name)].map(q).join(","), ...rows.map(r => [r.p, ...r.vals.map(num)].join(","))].join("\n");
-    name = `cofer_${state.dtMetric === "share" ? "shares" : "usd_bn"}_${state.freq === "Q" ? "quarterly" : "yearly"}.csv`;
+    name = `cofer_${state.dtMetric === "share" ? "shares" : "usd_bn"}${state.dtGold ? "_incl_gold" : ""}_${state.freq === "Q" ? "quarterly" : "yearly"}.csv`;
   }
   const url = URL.createObjectURL(new Blob([text], { type: "text/csv" }));
   const link = Object.assign(document.createElement("a"), { href: url, download: name });
@@ -1395,6 +1423,7 @@ function syncControls() {
   setPressed(document.getElementById("dt-metric-seg"), state.dtMetric);
   document.getElementById("sh-log").checked = state.shLog;
   document.getElementById("sh-gold").checked = state.shGold;
+  document.getElementById("dt-gold").checked = state.dtGold;
   document.getElementById("am-log").checked = state.amLog;
   document.getElementById("controls").hidden = ["explore", "countries", "country", "gold"].includes(state.tab) || (state.tab === "data" && state.dtSet === "cty");
   document.getElementById("hint").textContent = state.tab === "changes"
@@ -1421,6 +1450,7 @@ bindSeg("dt-set-seg", "dtSet");
 document.getElementById("dt-year").addEventListener("change", e => { state.dtYear = e.target.value; writeHash(); renderData(); });
 document.getElementById("sh-log").addEventListener("change", e => { state.shLog = e.target.checked; onChange(); });
 document.getElementById("sh-gold").addEventListener("change", e => { state.shGold = e.target.checked; onChange(); });
+document.getElementById("dt-gold").addEventListener("change", e => { state.dtGold = e.target.checked; onChange(); });
 document.getElementById("am-log").addEventListener("change", e => { state.amLog = e.target.checked; onChange(); });
 document.getElementById("ch-from").addEventListener("change", e => { state.chFrom = e.target.value; onChange(); });
 document.getElementById("ch-to").addEventListener("change", e => { state.chTo = e.target.value; onChange(); });
