@@ -417,6 +417,7 @@
           <button class="text-btn" type="button" id="dt-peers" aria-pressed="false" title="Switzerland, Japan, Norway, New Zealand, Sweden, Canada, the UK, Australia and the US">Norway and peers</button>
           <button class="text-btn" type="button" id="dt-csv">Download CSV</button>
           <button class="text-btn" type="button" id="dt-xlsx">Download Excel</button>
+          <button class="text-btn" type="button" id="dt-xlsx2" title="Year-end shares by currency, one sheet without gold and one with, in the layout of a summary table">Download summary table (Excel)</button>
         </div>
       </div>
       <div class="table-wrap scroll-y"><table id="dt-table"></table></div>
@@ -972,7 +973,7 @@ function drawSide(kind) {
 // three quarters of the recent maximum, so an incomplete quarter never shows as a drop in gold.
 function goldShare(f) {
   if (f._gold) return f._gold;
-  const q = state.freq === "Q", res = q ? CD.resQ : CD.resA, gold = q ? CD.goldQ : CD.goldA;
+  const q = f === M.Q, res = q ? CD.resQ : CD.resA, gold = q ? CD.goldQ : CD.goldA;
   // Countries join and leave the IMF's reporting over time (many report only at year-end), so the plain ratio over
   // whoever reports jumps with the panel, not with gold. The series is therefore chain-linked: its level is the share
   // in the latest period with a reasonably full panel, and each earlier period is reached by applying the change in the
@@ -1338,6 +1339,7 @@ function renderData() {
   const cty = state.dtSet === "cty";
   document.getElementById("dt-metric-seg").hidden = cty;
   document.getElementById("dt-gold-label").hidden = cty;
+  document.getElementById("dt-xlsx2").hidden = cty;
   document.getElementById("dt-year").hidden = !cty;
   document.getElementById("dt-cty").hidden = !cty;
   document.getElementById("dt-peers").hidden = !cty;
@@ -1429,6 +1431,55 @@ const dtIsPeers = () => state.dtCty.length === DT_PEERS.length && DT_PEERS.every
 document.getElementById("dt-peers").addEventListener("click", () => {
   state.dtCty = dtIsPeers() ? [] : [...DT_PEERS];
   writeHash(); renderData();
+});
+// A summary workbook in a fixed layout: year-end shares by currency with a Sum column, one sheet without gold and one
+// with (gold as its own column, the currencies scaled to total reserves including gold), and the same by quarter.
+// Shares in percent with one decimal. Year-end figures are the fourth quarter's.
+document.getElementById("dt-xlsx2").addEventListener("click", () => {
+  const no = LANG === "no", f = M.Q, g = goldShare(f).g, c = (v, s) => ({ v, s });
+  const order = ["USD", "EUR", "JPY", "GBP", "OTHC", "CAD", "CNY", "AUD", "CHF"];
+  const colName = k => k === "OTHC" ? (no ? "Andre" : "Other") : k;
+  const T = no
+    ? { title: "Valutasammensetningen av verdens offisielle valutareserver", titleG: "Valutasammensetningen av verdens offisielle reserver medregnet gull",
+        sub: "Andel av samlede valutareserver ved utgangen av året. Prosent", subQ: "Andel av samlede valutareserver ved utgangen av kvartalet. Prosent",
+        subG: "Andel av samlede reserver medregnet monetært gull til markedsverdi ved utgangen av året. Prosent", subGQ: "Andel av samlede reserver medregnet monetært gull til markedsverdi ved utgangen av kvartalet. Prosent",
+        src: "Kilde: IMF (COFER). Årstallene er observasjonen for fjerde kvartal.", srcG: "Kilde: IMF (COFER; gull fra International Investment Position, andelen kjedet over landene som rapporterer både reserver og gull). Årstallene er observasjonen for fjerde kvartal.",
+        year: "År", period: "Kvartal", gold: "Gull", sum: "Sum", s1: "Ekskl. gull", s2: "Inkl. gull", s3: "Kvartal ekskl. gull", s4: "Kvartal inkl. gull", about: "Om", file: "valutareserver_andeler" }
+    : { title: "Currency composition of the world's official foreign exchange reserves", titleG: "Currency composition of the world's official reserves including gold",
+        sub: "Share of total foreign exchange reserves at the end of the year. Percent", subQ: "Share of total foreign exchange reserves at the end of the quarter. Percent",
+        subG: "Share of total reserves including monetary gold at market value at the end of the year. Percent", subGQ: "Share of total reserves including monetary gold at market value at the end of the quarter. Percent",
+        src: "Source: IMF (COFER). Yearly figures are the fourth quarter's.", srcG: "Source: IMF (COFER; gold from the International Investment Position, its share chain-linked over the countries reporting both reserves and gold). Yearly figures are the fourth quarter's.",
+        year: "Year", period: "Quarter", gold: "Gold", sum: "Sum", s1: "Excl. gold", s2: "Incl. gold", s3: "Quarterly excl. gold", s4: "Quarterly incl. gold", about: "About", file: "fx_reserves_shares" };
+  const sheet = (name, withGold, yearly) => {
+    const head = [yearly ? T.year : T.period, ...order.map(colName), ...(withGold ? [T.gold] : []), T.sum];
+    const rows = [[c(withGold ? T.titleG : T.title, "title")], [c(withGold ? (yearly ? T.subG : T.subGQ) : (yearly ? T.sub : T.subQ), "mut")], [c(withGold ? T.srcG : T.src, "mut")], [],
+      head.map((h, j) => c(h, j ? "hdrR" : "hdr"))];
+    // yearly: the fourth quarters, plus the latest quarter as the current year's row (marked *) when its fourth quarter is not in yet
+    let lastUsed = -1;
+    for (let i = f.periods.length - 1; i >= 0; i--) { const scale = withGold ? (fin(g[i]) ? 1 - g[i] : null) : 1; if (scale != null && fin(f.share.USD[i])) { lastUsed = i; break; } }
+    let partial = null;
+    f.periods.forEach((p, i) => {
+      const isLatestPartial = yearly && i === lastUsed && !p.endsWith("Q4");
+      if (yearly && !p.endsWith("Q4") && !isLatestPartial) return;
+      const scale = withGold ? (fin(g[i]) ? 1 - g[i] : null) : 1;
+      if (scale == null || !fin(f.share.USD[i])) return;
+      const vals = order.map(k => fin(f.share[k][i]) ? f.share[k][i] * scale : null), gv = withGold ? 100 * g[i] : 0;
+      const sum = vals.reduce((a, v) => a + (v || 0), 0) + gv;
+      if (isLatestPartial) partial = p;
+      rows.push([yearly ? p.slice(0, 4) + (isLatestPartial ? "*" : "") : label(p), ...vals.map(v => v == null ? null : c(v, "n1")), ...(withGold ? [c(gv, "n1")] : []), c(sum, "n1")]);
+    });
+    if (partial) rows.push([], [c(`* ${no ? "Siste kvartal" : "Latest quarter"}, ${label(partial)}`, "mut")]);
+    return { name, freeze: 5, cols: [11, ...head.slice(1).map(() => 9)], rows };
+  };
+  const sheets = [sheet(T.s1, false, true), sheet(T.s2, true, true), sheet(T.s3, false, false), sheet(T.s4, true, false),
+    { name: T.about, cols: [110], grid: false, rows: [[c(no ? "IMF COFER-dashbord" : "IMF COFER dashboard", "title")],
+      [c(`${no ? "Laget" : "Generated"} ${new Date().toISOString().slice(0, 16).replace("T", " ")} UTC; ${no ? "data lastet ned" : "data downloaded"} ${SNAPSHOT.downloaded || ""}`, "mut")], [],
+      [c(no ? "Andelene ekskl. gull er COFERs andeler av de fordelte valutareservene. Andelene inkl. gull er de samme andelene skalert med valutareservenes del av de samlede reservene, pluss gullets andel; summen er 100. Kanadiske og australske dollar vises for seg fra 2012 K4 og renminbi fra 2016 K4; før det inngår de i «Andre»."
+        : "Shares excl. gold are COFER's shares of allocated foreign exchange reserves. Shares incl. gold are the same shares scaled by foreign exchange's part of total reserves, plus gold's share; the row sums to 100. Canadian and Australian dollars are shown separately from 2012 Q4 and the renminbi from 2016 Q4; before that they are in \"Other\".", "wrap")]] }];
+  const url = URL.createObjectURL(XL.workbook(sheets));
+  const link = Object.assign(document.createElement("a"), { href: url, download: `${T.file}_${f.periods.at(-1)}.xlsx` });
+  document.body.append(link); link.click(); link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 });
 // the same table as an Excel workbook: a data sheet (numbers as numbers, header row frozen) and an About sheet
 document.getElementById("dt-xlsx").addEventListener("click", () => {

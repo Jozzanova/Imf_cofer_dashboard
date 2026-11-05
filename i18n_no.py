@@ -201,6 +201,8 @@ PAIRS = [
     ('<select id="dt-year" aria-label="Date">', '<select id="dt-year" aria-label="Dato">'),
     ('id="dt-csv">Download CSV</button>', 'id="dt-csv">Last ned CSV</button>'),
     ('id="dt-xlsx">Download Excel</button>', 'id="dt-xlsx">Last ned Excel</button>'),
+    ('title="Year-end shares by currency, one sheet without gold and one with, in the layout of a summary table">Download summary table (Excel)</button>',
+     'title="Andeler per valuta ved årsslutt, ett ark uten gull og ett med, i oppsettet til en oppsummeringstabell">Last ned oppsummeringstabell (Excel)</button>'),
     ('sheet = { name: "Countries", freeze: 1', 'sheet = { name: "Land", freeze: 1'),
     ('sheet = { name: state.dtMetric === "share" ? "Shares" : "US$ bn", freeze: 1', 'sheet = { name: state.dtMetric === "share" ? "Andeler" : "mrd. US$", freeze: 1'),
     ('[[c("Period", "hdr")]', '[[c("Periode", "hdr")]'),
