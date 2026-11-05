@@ -416,6 +416,7 @@
           <div id="dt-nogdp"></div>
           <button class="text-btn" type="button" id="dt-peers" aria-pressed="false" title="Switzerland, Japan, Norway, New Zealand, Sweden, Canada, the UK, Australia and the US">Norway and peers</button>
           <button class="text-btn" type="button" id="dt-csv">Download CSV</button>
+          <button class="text-btn" type="button" id="dt-xlsx">Download Excel</button>
         </div>
       </div>
       <div class="table-wrap scroll-y"><table id="dt-table"></table></div>
@@ -1222,6 +1223,67 @@ function renderChangesTable(f, i0, i1) {
   document.getElementById("ch-table").innerHTML = `<thead>${head}</thead><tbody>${body}${total}</tbody>`;
 }
 
+// ---------- Excel export: a small xlsx writer (zip container + SpreadsheetML with inline strings), no library needed ----------
+const XL = (() => {
+  const CRC = new Int32Array(256);
+  for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; CRC[n] = c; }
+  const crc32 = u => { let c = -1; for (let i = 0; i < u.length; i++) c = CRC[(c ^ u[i]) & 255] ^ (c >>> 8); return (c ^ -1) >>> 0; };
+  const enc = new TextEncoder();
+  const u16 = v => [v & 255, (v >> 8) & 255], u32 = v => [v & 255, (v >> 8) & 255, (v >> 16) & 255, (v >>> 24) & 255];
+  function zip(files) {
+    const parts = [], cd = []; let off = 0;
+    const d = new Date(), dT = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1), dD = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
+    for (const [name, text] of files) {
+      const nm = enc.encode(name), data = enc.encode(text), crc = crc32(data);
+      const head = new Uint8Array([...u32(0x04034b50), ...u16(20), ...u16(0x800), ...u16(0), ...u16(dT), ...u16(dD), ...u32(crc), ...u32(data.length), ...u32(data.length), ...u16(nm.length), ...u16(0)]);
+      parts.push(head, nm, data);
+      cd.push(new Uint8Array([...u32(0x02014b50), ...u16(20), ...u16(20), ...u16(0x800), ...u16(0), ...u16(dT), ...u16(dD), ...u32(crc), ...u32(data.length), ...u32(data.length), ...u16(nm.length), ...u16(0), ...u16(0), ...u16(0), ...u16(0), ...u32(0), ...u32(off)]), nm);
+      off += head.length + nm.length + data.length;
+    }
+    const cdLen = cd.reduce((a, x) => a + x.length, 0);
+    parts.push(...cd, new Uint8Array([...u32(0x06054b50), ...u16(0), ...u16(0), ...u16(files.length), ...u16(files.length), ...u32(cdLen), ...u32(off), ...u16(0)]));
+    return new Blob(parts, {type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  }
+  const xe = v => String(v).replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const colRef = c => { let r = ''; c++; while (c > 0) { const m = (c - 1) % 26; r = String.fromCharCode(65 + m) + r; c = Math.floor((c - 1) / 26); } return r; };
+  // cell styles: [numFmtId, fontId, fillId, borderId, alignment]
+  const XF = [[0, 0, 0, 0], [0, 1, 0, 0], [0, 2, 0, 0], [0, 1, 2, 1, 'hdr'], [164, 0, 0, 0], [165, 0, 0, 0], [3, 0, 0, 0], [166, 0, 0, 0], [0, 3, 0, 0], [167, 0, 0, 0],
+              [0, 1, 2, 1, 'hdrR'], [0, 4, 0, 0], [0, 0, 0, 0, 'wrap'], [164, 1, 0, 2], [0, 1, 0, 2], [165, 1, 0, 2], [166, 1, 0, 2], [3, 1, 0, 2], [0, 3, 0, 0, 'wrap']];
+  const ST = {txt: 0, b: 1, title: 2, hdr: 3, n1: 4, n2: 5, int: 6, pct: 7, mut: 8, n6: 9, hdrR: 10, sub: 11, wrap: 12, tn1: 13, tb: 14, tn2: 15, tpct: 16, tint: 17, mwrap: 18};
+  const ALIGN = {hdr: '<alignment vertical="center" wrapText="1"/>', hdrR: '<alignment horizontal="right" vertical="center" wrapText="1"/>', wrap: '<alignment vertical="top" wrapText="1"/>'};
+  const stylesXml = () => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="4"><numFmt numFmtId="164" formatCode="#,##0.0"/><numFmt numFmtId="165" formatCode="#,##0.00"/><numFmt numFmtId="166" formatCode="0.0%"/><numFmt numFmtId="167" formatCode="0.000000"/></numFmts><fonts count="5"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="14"/><name val="Calibri"/></font><font><i/><sz val="10"/><color rgb="FF6B7280"/><name val="Calibri"/></font><font><b/><sz val="12"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFEDEFF3"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="3"><border><left/><right/><top/><bottom/><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FF9AA3B2"/></bottom><diagonal/></border><border><left/><right/><top style="thin"><color rgb="FF9AA3B2"/></top><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="${XF.length}">${XF.map(([f, fo, fi, bo, al]) => `<xf numFmtId="${f}" fontId="${fo}" fillId="${fi}" borderId="${bo}" xfId="0"${f ? ' applyNumberFormat="1"' : ''}${fo ? ' applyFont="1"' : ''}${fi ? ' applyFill="1"' : ''}${bo ? ' applyBorder="1"' : ''}${al ? ' applyAlignment="1">' + ALIGN[al] + '</xf>' : '/>'}`).join('')}</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
+  function sheetXml(sh, first) {
+    let rows = '';
+    sh.rows.forEach((r, i) => {
+      let cells = '';
+      (r || []).forEach((c, j) => {
+        let v = c, st = 0;
+        if (c && typeof c === 'object') { v = c.v; st = ST[c.s] || 0; }
+        if (v == null || v === '') return;
+        const ref = colRef(j) + (i + 1);
+        if (typeof v === 'number') cells += isFinite(v) ? `<c r="${ref}" s="${st}"><v>${v}</v></c>` : `<c r="${ref}" t="inlineStr" s="${ST.mut}"><is><t>${v > 0 ? 'never' : '–'}</t></is></c>`;
+        else cells += `<c r="${ref}" t="inlineStr" s="${st}"><is><t xml:space="preserve">${xe(v)}</t></is></c>`;
+      });
+      if (cells) rows += `<row r="${i + 1}">${cells}</row>`;
+    });
+    const cols = (sh.cols || []).map((w, j) => `<col min="${j + 1}" max="${j + 1}" width="${w}" customWidth="1"/>`).join('');
+    const pane = sh.freeze ? `<pane ySplit="${sh.freeze}" topLeftCell="A${sh.freeze + 1}" activePane="bottomLeft" state="frozen"/>` : '';
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"${first ? ' tabSelected="1"' : ''} showGridLines="${sh.grid === false ? 0 : 1}">${pane}</sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/>${cols ? `<cols>${cols}</cols>` : ''}<sheetData>${rows}</sheetData></worksheet>`;
+  }
+  function workbook(sheets) {
+    const ns = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships', ct = 'application/vnd.openxmlformats-officedocument.spreadsheetml.';
+    const files = [
+      ['[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="${ct}sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="${ct}styles+xml"/>${sheets.map((_, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="${ct}worksheet+xml"/>`).join('')}</Types>`],
+      ['_rels/.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${ns}/officeDocument" Target="xl/workbook.xml"/></Relationships>`],
+      ['xl/workbook.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="${ns}"><sheets>${sheets.map((x, i) => `<sheet name="${xe(x.name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('')}</sheets></workbook>`],
+      ['xl/_rels/workbook.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${sheets.map((_, i) => `<Relationship Id="rId${i + 1}" Type="${ns}/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('')}<Relationship Id="rId${sheets.length + 1}" Type="${ns}/styles" Target="styles.xml"/></Relationships>`],
+      ['xl/styles.xml', stylesXml()]];
+    sheets.forEach((x, i) => files.push([`xl/worksheets/sheet${i + 1}.xml`, sheetXml(x, i === 0)]));
+    return zip(files);
+  }
+  return {workbook};
+})();
+
 // ---------- Data ----------
 function dataRows() {
   const f = F(), w = windowIdx(), share = state.dtMetric === "share", sd = shareData(state.dtGold), ks = share ? sd.keys : selected();
@@ -1363,6 +1425,31 @@ const dtIsPeers = () => state.dtCty.length === DT_PEERS.length && DT_PEERS.every
 document.getElementById("dt-peers").addEventListener("click", () => {
   state.dtCty = dtIsPeers() ? [] : [...DT_PEERS];
   writeHash(); renderData();
+});
+// the same table as an Excel workbook: a data sheet (numbers as numbers, header row frozen) and an About sheet
+document.getElementById("dt-xlsx").addEventListener("click", () => {
+  const c = (v, s) => ({ v, s }), num = (v, d) => fin(v) ? c(v, d === 0 ? "int" : d === 2 ? "n2" : "n1") : null;
+  let sheet, name, about;
+  if (state.dtSet === "cty") {
+    const { head, rows, d } = countryData();
+    sheet = { name: "Countries", freeze: 1, cols: head.map((h, j) => j === 0 ? 26 : j < 5 ? 18 : 16),
+      rows: [head.map((h, j) => c(h, d[j] == null ? "hdr" : "hdrR"))].concat(rows.map(r => r.cells.map((v, j) => d[j] == null ? (v ?? "") : num(v, d[j])))) };
+    name = `reserves_by_country_${state.dtYear === "latest" ? "latest" : state.dtYear}.xlsx`;
+    about = [`${rows.length} countries, ${state.dtYear === "latest" ? "each country's latest figures" : `end of ${state.dtYear}`}, largest reserves first. Reserves include gold at market value; US$ billions.`,
+      "Reserves: IMF, International Investment Position. GDP: IMF, World Economic Outlook (the latest year an estimate). Exchange-rate regimes as measured over the last two years from the IMF's monthly exchange rates."];
+  } else {
+    const { cols, rows } = dataRows();
+    sheet = { name: state.dtMetric === "share" ? "Shares" : "US$ bn", freeze: 1, cols: [12].concat(cols.map(() => 18)),
+      rows: [[c("Period", "hdr")].concat(cols.map(x => c(x.name, "hdrR")))].concat(rows.map(r => [label(r.p)].concat(r.vals.map((v, j) => num(v, cols[j].d))))) };
+    name = `cofer_${state.dtMetric === "share" ? "shares" : "usd_bn"}${state.dtGold ? "_incl_gold" : ""}_${state.freq === "Q" ? "quarterly" : "yearly"}.xlsx`;
+    about = [document.getElementById("dt-sub").textContent,
+      "Source: IMF, Currency Composition of Official Foreign Exchange Reserves (COFER), world totals." + (state.dtGold ? " Gold: monetary gold at market value from the IMF's International Investment Position, its share chain-linked over the countries reporting both reserves and gold; the currency shares are COFER's shares scaled to total reserves including gold." : "")];
+  }
+  const sheets = [sheet, { name: "About", cols: [110], grid: false, rows: [[c("IMF COFER dashboard", "title")], [c(`Generated ${new Date().toISOString().slice(0, 16).replace("T", " ")} UTC; data downloaded ${SNAPSHOT.downloaded || ""}`, "mut")], []].concat(about.map(t => [c(t, "wrap")])) }];
+  const url = URL.createObjectURL(XL.workbook(sheets));
+  const link = Object.assign(document.createElement("a"), { href: url, download: name });
+  document.body.append(link); link.click(); link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 });
 document.getElementById("dt-csv").addEventListener("click", () => {
   const q = s => /[",]/.test(s) ? `"${String(s).replace(/"/g, '""')}"` : String(s);
