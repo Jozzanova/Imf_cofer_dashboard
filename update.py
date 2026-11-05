@@ -308,6 +308,18 @@ def countries(raw: dict) -> dict:
     return data
 
 
+def letters() -> list:
+    """The dated letters written by the monthly routine: data/letters/YYYY-MM-DD.md (English) and, if present,
+    YYYY-MM-DD.no.md (Norwegian). The first '# ' line is the title."""
+    out = {}
+    for p in sorted((ROOT / "data" / "letters").glob("*.md")) if (ROOT / "data" / "letters").exists() else []:
+        text = p.read_text(encoding="utf-8")
+        date, lang = (p.stem[:-3], "no") if p.stem.endswith(".no") else (p.stem, "en")
+        title = next((l.lstrip("# ").strip() for l in text.splitlines() if l.startswith("# ")), date)
+        out.setdefault(date, {"date": date})[lang] = {"title": title, "text": text}
+    return [out[k] for k in sorted(out)]
+
+
 def mainland_share(text: str) -> dict:
     """SSB's GDP (json-stat2) -> mainland Norway's share of GDP: each full year's, and the latest four quarters'
     (used for the years after the last full one, the IMF's estimates included)."""
@@ -368,7 +380,7 @@ def main():
         STATUS.write_text(json.dumps(status), encoding="utf-8")
     status["latest"] = latest_quarter(text)
 
-    data = {"csv": text, "er": er, "countries": {**countries(raw), "noFn": mainland_share(raw["ssb"])}, "gold": gold_data(raw), **status}
+    data = {"csv": text, "er": er, "countries": {**countries(raw), "noFn": mainland_share(raw["ssb"])}, "gold": gold_data(raw), "letters": letters(), **status}
     template = TEMPLATE.read_text(encoding="utf-8")
     page = lambda tpl, d: tpl.replace("__SNAPSHOT__", json.dumps(d, separators=(",", ":")).replace("</", "<\\/"))
     OUTPUT.parent.mkdir(exist_ok=True)

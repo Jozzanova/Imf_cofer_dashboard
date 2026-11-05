@@ -292,6 +292,7 @@
     <button role="tab" id="tab-btn-data" data-tab="data" aria-controls="tab-data">Data</button>
     <button role="tab" id="tab-btn-country" data-tab="country" aria-controls="tab-country">Single country</button>
     <button role="tab" id="tab-btn-explore" data-tab="explore" aria-controls="tab-explore">Explore ✦</button>
+    <button role="tab" id="tab-btn-letter" data-tab="letter" aria-controls="tab-letter">Letter</button>
   </nav>
 
   <section class="card controls" id="controls" aria-label="Selection">
@@ -561,6 +562,17 @@
   <div role="tabpanel" id="tab-country" aria-labelledby="tab-btn-country" hidden><div id="slides"></div></div>
 
   <!-- Explore -->
+  <div role="tabpanel" id="tab-letter" aria-labelledby="tab-btn-letter" hidden>
+    <section class="card">
+      <div class="card-head">
+        <div><h2>Reserves letter</h2>
+          <p class="sub" id="letter-sub">A dated note each month: the currency composition when a new COFER quarter is in, central banks' gold, and Norway's reserves, written by the monthly agent from the figures on this page.</p></div>
+        <div class="row"><label class="check">Date <select id="letter-sel" aria-label="Letter date"></select></label></div>
+      </div>
+      <div class="md" id="letter-body"></div>
+    </section>
+  </div>
+
   <div role="tabpanel" id="tab-explore" aria-labelledby="tab-btn-explore" hidden>
     <section class="card">
       <div class="card-head">
@@ -768,7 +780,7 @@ const state = {
   bY: "bn", bColor: "region", bEcon: ["AE", "EM"], bReg: ["peg", "managed", "float"], bRegion: "all", grEcon: ["AE", "EM"], grReg: ["peg", "managed", "float"], grGeo: "all", grEuro: true, bHi: [], bSpeed: "1", bLabels: "10", cSel: ["CHE", "HKG", "SAU", "CHN", "JPN", "USA"],
 };
 const LIST_KEYS = new Set(["cur", "cSel", "bHi", "dtCty", "gSel", "gCty", "gEcon", "gReg", "grEcon", "grReg", "bEcon", "bReg", "shShow", "amShow", "flShow", "fxShow"]);
-const TABS = ["shares", "changes", "countries", "gold", "data", "country", "explore"];
+const TABS = ["shares", "changes", "countries", "gold", "data", "country", "explore", "letter"];
 function readHash() {
   const p = new URLSearchParams(location.hash.slice(1));
   for (const [k, v] of p) {
@@ -3537,7 +3549,31 @@ function renderTab(tab) {
   else if (tab === "countries") renderCountries();
   else if (tab === "country") renderSingle();
   else if (tab === "gold") renderGold();
+  else if (tab === "letter") renderLetter();
   else renderExplore();
+}
+// ---------- Letter ----------
+// a minimal Markdown renderer for the letters: headings, paragraphs, bullet lists, bold, links
+function md(text) {
+  const lines = text.split(/\r?\n/); let h = "", inList = false, para = [];
+  const inline = s => esc(s).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\[(.+?)\]\((https?:[^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  const flush = () => { if (para.length) { h += `<p>${inline(para.join(" "))}</p>`; para = []; } if (inList) { h += "</ul>"; inList = false; } };
+  for (const l of lines) {
+    const m = l.match(/^(#{1,3})\s+(.*)/);
+    if (m) { flush(); h += `<h${m[1].length + 1}>${inline(m[2])}</h${m[1].length + 1}>`; continue; }
+    if (/^\s*[-*]\s+/.test(l)) { if (para.length) { h += `<p>${inline(para.join(" "))}</p>`; para = []; } if (!inList) { h += "<ul>"; inList = true; } h += `<li>${inline(l.replace(/^\s*[-*]\s+/, ""))}</li>`; continue; }
+    if (!l.trim()) { flush(); continue; }
+    if (inList) { h += "</ul>"; inList = false; }
+    para.push(l.trim());
+  }
+  flush(); return h;
+}
+function renderLetter() {
+  const L = (SNAPSHOT.letters || []).slice().sort((a, b) => b.date.localeCompare(a.date)), sel = document.getElementById("letter-sel"), body = document.getElementById("letter-body");
+  if (!L.length) { sel.innerHTML = `<option>${LANG === "no" ? "ingen ennå" : "none yet"}</option>`; body.innerHTML = `<p class="muted">${LANG === "no" ? "Ingen brev er skrevet ennå. Den månedlige rutinen skriver det første ved neste kjøring." : "No letter has been written yet. The monthly routine writes the first one on its next run."}</p>`; return; }
+  if (!sel.options.length || sel.options.length !== L.length) sel.innerHTML = L.map(l => `<option value="${l.date}">${l.date}</option>`).join("");
+  const show = () => { const l = L.find(x => x.date === sel.value) || L[0]; const v = l[LANG] || l.en || l.no; body.innerHTML = md(v.text) + (l[LANG] ? "" : `<p class="muted">${LANG === "no" ? "Brevet finnes bare på engelsk." : "This letter exists only in Norwegian."}</p>`); };
+  sel.onchange = show; show();
 }
 function showTab(tab, focus = false) {
   state.tab = tab;
