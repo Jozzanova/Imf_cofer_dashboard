@@ -1009,7 +1009,11 @@ function shareData(withGold = state.shGold) {
   return { share, keys: selected().concat("GLD"), gold: { g, n } };
 }
 function drawShares() {
-  const f = F(), w = windowIdx(), x = slice(f.x, w), sd = shareData(), ks = sd.keys, el = document.getElementById("sh-chart");
+  const f = F(), sd = shareData(), ks = sd.keys, el = document.getElementById("sh-chart");
+  // with gold on, the newest quarters may have no gold figure yet: end the chart at the last one that has
+  const w = { ...windowIdx() };
+  if (sd.gold) { let i1 = w.i1; while (i1 > w.i0 && !fin(sd.gold.g[i1])) i1--; w.i1 = i1; }
+  const x = slice(f.x, w);
   document.getElementById("sh-log-label").hidden = state.shView !== "lines";
   document.getElementById("sh-h2").textContent = state.shGold ? "Share of reserves including gold" : "Share of allocated reserves";
   const nRep = sd.gold ? sd.gold.n.filter((v, i) => fin(sd.gold.g[i]) && i >= w.i0 && i <= w.i1) : [];
