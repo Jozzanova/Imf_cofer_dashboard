@@ -38,22 +38,21 @@
    "asof": "2026-09-30",
    "basis": "actual",
    "gold": "none held",
-   "quality": "computed",
+   "quality": "official",
    "shares": {
-    "USD": 55,
-    "EUR": 28,
-    "JPY": 7,
-    "GBP": 6,
-    "CNY": 2,
-    "OTH": 2
+    "USD": 50.0,
+    "EUR": 34.0,
+    "GBP": 7.0,
+    "JPY": 7.0,
+    "CNY": 2.0
    },
-   "note": "Combined fixed-income and equity portfolios, computed from the quarterly report's tables (fixed income: USD 50, EUR 34, GBP 7, JPY 7, CNY 2; equities mostly in dollars). The petroleum buffer portfolio has no currency split.",
+   "note": "The fixed-income portfolio (NOK 528.8 bn), as the quarterly report prints it; the equity portfolio is reported separately by currency (mostly dollars) and the petroleum buffer portfolio has no currency split.",
    "source": {
     "title": "Norges Bank, Management of the foreign exchange reserves, Q3 2026",
     "url": "https://www.norges-bank.no/en/news-events/publications/Report-on-the-management-of-the-foreign-exchange-reserves/",
     "freq": "quarterly"
    },
-   "note_no": "Rente- og aksjeporteføljen samlet, regnet ut fra tabellene i kvartalsrapporten (renteporteføljen: USD 50, EUR 34, GBP 7, JPY 7, CNY 2; aksjene for det meste i dollar). Petroleumsbufferporteføljen har ingen valutafordeling."
+   "note_no": "Renteporteføljen (528,8 mrd. kroner), slik kvartalsrapporten oppgir den; aksjeporteføljen rapporteres for seg etter valuta (for det meste dollar), og petroleumsbufferporteføljen har ingen valutafordeling."
   },
   "SWE": {
    "institution": "Sveriges Riksbank",
