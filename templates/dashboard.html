@@ -3492,7 +3492,7 @@ function buildSlides() {
   const AC = (AL.countries || {}), al = AC[ME], order = ["USD", "EUR", "GBP", "JPY", "CNY", "CAD", "AUD", "GLD", "OTH"], cap = x => x.charAt(0).toUpperCase() + x.slice(1);
   const fw = M.Q || F(), wi = lastIdx(fw.share.USD);
   const world = k => k === "GLD" ? null : k === "OTH" ? (fw.share.OTHC ? fw.share.OTHC[wi] : null) + (fw.share.CHF ? fw.share.CHF[wi] || 0 : 0) : (fw.share[k] ? fw.share[k][wi] : null);
-  if (al) {
+  if (al && al.quality !== "secondary") {   // a press-confirmed entry stays in the table but gets no chart of its own
     const ks = order.filter(k => fin(al.shares[k]) || fin(world(k)));
     const top = order.filter(k => fin(al.shares[k])).sort((a, b) => al.shares[b] - al.shares[a]);
     const lc = s => /^(US|SDR)/.test(s) ? s : s.charAt(0).toLowerCase() + s.slice(1);
