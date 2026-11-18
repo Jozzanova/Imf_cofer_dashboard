@@ -12,6 +12,10 @@ a fresh clone of this repository; the raw data is not in it and is downloaded by
 `update.py` writes `output/dashboard.html` (English) and `output/dashboard-no.html` (Norwegian). If a download fails it
 stops with an error; report it and try once more before giving up. Dependencies: Python 3 standard library only.
 
+Once a year, in the first quarter, also refresh `data/allocations.json` from the central banks' new annual reports (the
+sources are in the file) and, each quarter, `data/china_iip.json` from SAFE's IIP spreadsheet; both are hand-curated and
+the page cannot fetch them itself.
+
 ## 2. Decide what the letter covers
 
 The brief states the latest COFER quarter and the previous letter's date. COFER is published at the end of March, June,

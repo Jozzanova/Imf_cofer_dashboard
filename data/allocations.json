@@ -1,0 +1,706 @@
+{
+ "meta": {
+  "title": "Currency allocation of foreign exchange reserves as disclosed by the central banks themselves",
+  "compiled": "2026-11-18",
+  "note": "Shares in per cent of the foreign exchange reserves (gold excluded unless 'gold' says 'included', in which case GLD is a share). 'quality': official = the percentages are printed in the source; computed = derived from amounts the source prints; benchmark = the published target allocation, not actual holdings; exposure = a balance-sheet currency exposure, not a reserve allocation; secondary = official figures confirmed only through the press; compiled = taken from the BOFIT dataset (Laser, Mihailov and Weidner 2024), not from the central bank directly. Currencies: USD, EUR, GBP, JPY, CNY, CAD, AUD, GLD (gold), OTH (all others).",
+  "notDisclosed": {
+   "JPN": "The Ministry of Finance and the Bank of Japan publish no currency shares; only the SDR-basket split in the IMF template.",
+   "SGP": "The Monetary Authority of Singapore last wrote (2021/22) that about three quarters of the reserves are in dollars, euro, yen and sterling, the dollar forming the bulk; no figures since.",
+   "IND": "The Reserve Bank of India publishes the split by instrument, not by currency; the currency weights are set with the government and not published.",
+   "IDN": "Bank Indonesia publishes no currency split.",
+   "THA": "The Bank of Thailand publishes no currency split; only the SDR-basket split in the IMF template.",
+   "MYS": "Bank Negara Malaysia publishes no currency split; the IMF template shows about a quarter outside the SDR-basket currencies.",
+   "SAU": "The Saudi Central Bank publishes no currency split and leaves the IMF template's currency lines blank.",
+   "GBR": "The Exchange Equalisation Account's accounts give the reserves by region of issuer, not by currency; the allocation is confidential.",
+   "FRA": "The Banque de France says only that the reserves are principally in US dollars.",
+   "HUN": "The Magyar Nemzeti Bank names its bond currencies but publishes no shares; the exposure is basically in euro.",
+   "TUR": "The Central Bank of the Republic of Türkiye publishes only the split between foreign exchange and gold; the last currency split is a one-off figure for 2017.",
+   "CHN": "SAFE disclosed only the dollar share, last for end-2019 (55 per cent), in a box that its 2024 and 2025 annual reports no longer carry; the IMF template gives the SDR-basket split."
+  },
+  "notDisclosed_no": {
+   "JPN": "Finansdepartementet og Bank of Japan publiserer ingen valutaandeler; bare SDR-kurvefordelingen i IMFs reservemal.",
+   "SGP": "Monetary Authority of Singapore skrev sist (2021/22) at om lag tre firedeler av reservene er i dollar, euro, yen og pund, med dollar som den største; ingen tall siden.",
+   "IND": "Reserve Bank of India publiserer fordelingen etter instrument, ikke etter valuta; valutavektene fastsettes sammen med regjeringen og publiseres ikke.",
+   "IDN": "Bank Indonesia publiserer ingen valutafordeling.",
+   "THA": "Bank of Thailand publiserer ingen valutafordeling; bare SDR-kurvefordelingen i IMFs reservemal.",
+   "MYS": "Bank Negara Malaysia publiserer ingen valutafordeling; IMFs reservemal viser om lag en firedel utenfor SDR-kurvens valutaer.",
+   "SAU": "Den saudiarabiske sentralbanken publiserer ingen valutafordeling og lar valutalinjene i IMFs reservemal stå tomme.",
+   "GBR": "Regnskapet for Exchange Equalisation Account gir reservene etter utsteders region, ikke etter valuta; allokeringen er fortrolig.",
+   "FRA": "Banque de France sier bare at reservene hovedsakelig er i amerikanske dollar.",
+   "HUN": "Magyar Nemzeti Bank navngir obligasjonsvalutaene, men publiserer ingen andeler; eksponeringen er i hovedsak i euro.",
+   "TUR": "Den tyrkiske sentralbanken publiserer bare fordelingen mellom valuta og gull; siste valutafordeling er et enkeltstående tall for 2017.",
+   "CHN": "SAFE oppga bare dollarandelen, sist for utgangen av 2019 (55 prosent), i en ramme som årsrapportene for 2024 og 2025 ikke lenger har; IMFs reservemal gir SDR-kurvefordelingen."
+  }
+ },
+ "countries": {
+  "NOR": {
+   "institution": "Norges Bank",
+   "asof": "2026-09-30",
+   "basis": "actual",
+   "gold": "none held",
+   "quality": "computed",
+   "shares": {
+    "USD": 55,
+    "EUR": 28,
+    "JPY": 7,
+    "GBP": 6,
+    "CNY": 2,
+    "OTH": 2
+   },
+   "note": "Combined fixed-income and equity portfolios, computed from the quarterly report's tables (fixed income: USD 50, EUR 34, GBP 7, JPY 7, CNY 2; equities mostly in dollars). The petroleum buffer portfolio has no currency split.",
+   "source": {
+    "title": "Norges Bank, Management of the foreign exchange reserves, Q3 2026",
+    "url": "https://www.norges-bank.no/en/news-events/publications/Report-on-the-management-of-the-foreign-exchange-reserves/",
+    "freq": "quarterly"
+   },
+   "note_no": "Rente- og aksjeporteføljen samlet, regnet ut fra tabellene i kvartalsrapporten (renteporteføljen: USD 50, EUR 34, GBP 7, JPY 7, CNY 2; aksjene for det meste i dollar). Petroleumsbufferporteføljen har ingen valutafordeling."
+  },
+  "SWE": {
+   "institution": "Sveriges Riksbank",
+   "asof": "2025-12-31",
+   "basis": "actual",
+   "gold": "excluded",
+   "quality": "computed",
+   "shares": {
+    "USD": 69.8,
+    "EUR": 17.6,
+    "GBP": 5.1,
+    "AUD": 5.1,
+    "OTH": 2.4
+   },
+   "note": "Computed from the annual report's amounts by currency; the strategic allocation decided for 2026 is USD 70, EUR 17.5, GBP 5, AUD 5, NOK 2.5. Part of the dollar and euro holdings is hedged.",
+   "source": {
+    "title": "Sveriges Riksbank, Annual Report 2025, and the decision on the strategic allocation for 2026",
+    "url": "https://www.riksbank.se/en-gb/markets/the-gold-and-foreign-currency-reserve/the-foreign-currency-reserve",
+    "freq": "annual"
+   },
+   "note_no": "Regnet ut fra årsrapportens beløp per valuta; den strategiske allokeringen vedtatt for 2026 er USD 70, EUR 17,5, GBP 5, AUD 5, NOK 2,5. Deler av dollar- og eurobeholdningen er valutasikret."
+  },
+  "DNK": {
+   "institution": "Danmarks Nationalbank",
+   "asof": "2025-12-31",
+   "basis": "actual",
+   "gold": "excluded",
+   "quality": "computed",
+   "shares": {
+    "EUR": 80.8,
+    "JPY": 10.7,
+    "USD": 7.1,
+    "OTH": 1.4
+   },
+   "note": "Gross foreign exchange reserve by currency, computed from the annual report; after hedging the exposure is entirely in euro.",
+   "source": {
+    "title": "Danmarks Nationalbank, Annual Report 2025",
+    "url": "https://www.nationalbanken.dk/en/about_danmarks_nationalbank/riskmanagement/Pages/default.aspx",
+    "freq": "annual"
+   },
+   "note_no": "Brutto valutareserve per valuta, regnet ut fra årsrapporten; etter valutasikring er hele eksponeringen i euro."
+  },
+  "FIN": {
+   "institution": "Bank of Finland",
+   "asof": "2025-12-31",
+   "basis": "actual",
+   "gold": "excluded",
+   "quality": "official",
+   "shares": {
+    "USD": 79.4,
+    "GBP": 10.3,
+    "JPY": 10.3
+   },
+   "note": "Foreign exchange securities; the SDR holding and investment funds are outside the split.",
+   "source": {
+    "title": "Bank of Finland, Financial Statements 2025",
+    "url": "https://annualreport.bankoffinland.fi/2025/annual-report-of-operations/management-of-financial-assets/",
+    "freq": "annual"
+   },
+   "note_no": "Verdipapirer i utenlandsk valuta; SDR-beholdningen og fondsandelene er utenfor fordelingen."
+  },
+  "ISL": {
+   "institution": "Central Bank of Iceland",
+   "asof": "2025-12-31",
+   "basis": "actual",
+   "gold": "included",
+   "quality": "computed",
+   "shares": {
+    "EUR": 64.1,
+    "USD": 29.9,
+    "GLD": 3.6,
+    "JPY": 0.7,
+    "GBP": 0.7,
+    "OTH": 1.0
+   },
+   "note": "Gross reserve assets by currency, computed from the annual report's note.",
+   "source": {
+    "title": "Central Bank of Iceland, Annual Report 2025",
+    "url": "https://cb.is/about-the-bank/international-reserves",
+    "freq": "annual"
+   },
+   "note_no": "Brutto reserveaktiva per valuta, regnet ut fra noten i årsrapporten."
+  },
+  "CHE": {
+   "institution": "Swiss National Bank",
+   "asof": "2026-09-30",
+   "basis": "actual",
+   "gold": "excluded",
+   "quality": "official",
+   "shares": {
+    "USD": 37,
+    "EUR": 39,
+    "JPY": 7,
+    "GBP": 6,
+    "CAD": 3,
+    "OTH": 8
+   },
+   "note": "Currency allocation of the foreign exchange reserves including derivatives; 'other' is mainly Australian dollar, renminbi, Danish krone, Hong Kong dollar, won, Swedish krona and Singapore dollar.",
+   "source": {
+    "title": "Swiss National Bank, Breakdown of investments at end of Q3 2026",
+    "url": "https://www.snb.ch/en/the-snb/mandates-goals/investment-assets/reserves-bonds",
+    "freq": "quarterly"
+   },
+   "note_no": "Valutafordelingen av valutareservene medregnet derivater; «andre» er i hovedsak australske dollar, renminbi, danske kroner, Hongkong-dollar, won, svenske kroner og Singapore-dollar."
+  },
+  "EZB": {
+   "institution": "European Central Bank (own reserves)",
+   "asof": "2025-12-31",
+   "basis": "actual",
+   "gold": "excluded",
+   "quality": "computed",
+   "shares": {
+    "USD": 78.2,
+    "JPY": 20.7,
+    "CNY": 1.1
+   },
+   "note": "The ECB's own foreign reserves; the annual accounts state the dollar share (78 per cent) and give the yen and renminbi holdings in currency units.",
+   "source": {
+    "title": "ECB, Annual Accounts 2025",
+    "url": "https://www.ecb.europa.eu/press/annual-reports-financial-statements/annual/annual-accounts/html/ecb.annualaccounts2025~ba3b593c99.en.html",
+    "freq": "annual"
+   },
+   "note_no": "ESBs egne valutareserver; årsregnskapet oppgir dollarandelen (78 prosent) og beholdningene av yen og renminbi i valutaenheter."
+  },
+  "DEU": {
+   "institution": "Deutsche Bundesbank",
+   "asof": "2025-12-31",
+   "basis": "actual",
+   "gold": "excluded",
+   "quality": "computed",
+   "shares": {
+    "USD": 82.3,
+    "CAD": 5.0,
+    "GBP": 4.9,
+    "AUD": 3.5,
+    "JPY": 3.5,
+    "CNY": 0.8
+   },
+   "note": "Claims on non-euro-area residents in foreign currency, computed from the annual accounts; the gold and the IMF position are separate and larger.",
+   "source": {
+    "title": "Deutsche Bundesbank, Annual Report 2025, annual accounts",
+    "url": "https://publikationen.bundesbank.de/content/988046",
+    "freq": "annual"
+   },
+   "note_no": "Fordringer i utenlandsk valuta på ikke-residenter utenfor euroområdet, regnet ut fra årsregnskapet; gullet og IMF-posisjonen er atskilt og større."
+  },
+  "ITA": {
+   "institution": "Banca d'Italia",
+   "asof": "2025-12-31",
+   "basis": "actual",
+   "gold": "excluded",
+   "quality": "official",
+   "shares": {
+    "USD": 64.2,
+    "GBP": 6.5,
+    "JPY": 6.5,
+    "AUD": 4.9,
+    "CAD": 2.9,
+    "OTH": 15.0
+   },
+   "note": "Net foreign currency assets; 'other' includes the net IMF and SDR position (14 per cent).",
+   "source": {
+    "title": "Banca d'Italia, Bilancio di esercizio 2025, figure 9",
+    "url": "https://www.bancaditalia.it/pubblicazioni/bilancio-esercizio/index.html",
+    "freq": "annual"
+   },
+   "note_no": "Netto fordringer i utenlandsk valuta; «andre» omfatter netto IMF- og SDR-posisjon (14 prosent)."
+  },
+  "CZE": {
+   "institution": "Czech National Bank",
+   "asof": "2026-09-30",
+   "basis": "actual",
+   "gold": "included",
+   "quality": "official",
+   "shares": {
+    "EUR": 47.5,
+    "USD": 28.2,
+    "GLD": 7.0,
+    "CAD": 6.9,
+    "AUD": 3.5,
+    "GBP": 3.3,
+    "JPY": 2.4,
+    "OTH": 1.2
+   },
+   "note": "Currency allocation of the international reserves including gold; 'other' is Swedish krona and the SDR holding. Equities are about a quarter of the reserves.",
+   "source": {
+    "title": "Czech National Bank, Information on the international reserves as of 30 September 2026",
+    "url": "https://www.cnb.cz/en/financial-markets/foreign-exchange-market/quarterly-information-on-the-cnbs-international-reserves/",
+    "freq": "quarterly"
+   },
+   "note_no": "Valutafordelingen av de internasjonale reservene medregnet gull; «andre» er svenske kroner og SDR-beholdningen. Aksjer er om lag en firedel av reservene."
+  },
+  "POL": {
+   "institution": "Narodowy Bank Polski",
+   "asof": "2024-12-31",
+   "basis": "benchmark",
+   "gold": "excluded",
+   "quality": "secondary",
+   "shares": {
+    "USD": 42,
+    "EUR": 20,
+    "GBP": 12,
+    "CAD": 10,
+    "AUD": 8,
+    "OTH": 8
+   },
+   "note": "Strategic currency structure of the reserves excluding gold, from the annual activity report; 'other' is Norwegian krone (5) and New Zealand dollar (3). The report could not be opened by the automated check and the figures rest on the Polish Press Agency's account of it.",
+   "source": {
+    "title": "NBP, Sprawozdanie z działalności NBP w 2024 roku",
+    "url": "https://nbp.pl/o-nbp/zarzadzanie-rezerwami-dewizowymi/",
+    "freq": "annual"
+   },
+   "note_no": "Strategisk valutastruktur for reservene uten gull, fra årsrapporten om virksomheten; «andre» er norske kroner (5) og newzealandske dollar (3). Rapporten lot seg ikke åpne maskinelt, og tallene bygger på det polske nyhetsbyrået PAPs gjengivelse."
+  },
+  "ROU": {
+   "institution": "National Bank of Romania",
+   "asof": "2024-12-31",
+   "basis": "actual",
+   "gold": "excluded",
+   "quality": "official",
+   "shares": {
+    "EUR": 50.8,
+    "USD": 26.3,
+    "OTH": 22.9
+   },
+   "note": "The strategic ranges are euro 40 to 75, dollar 10 to 35, other at most 35 per cent.",
+   "source": {
+    "title": "National Bank of Romania, Annual Report 2024",
+    "url": "https://www.bnr.ro/uploads/2025-06-23annualreport2024_documentpdf_545_1759914105.pdf",
+    "freq": "annual"
+   },
+   "note_no": "De strategiske intervallene er euro 40 til 75, dollar 10 til 35, andre høyst 35 prosent."
+  },
+  "SRB": {
+   "institution": "National Bank of Serbia",
+   "asof": "2024-12-31",
+   "basis": "actual",
+   "gold": "excluded",
+   "quality": "official",
+   "shares": {
+    "EUR": 69.8,
+    "USD": 26.4,
+    "GBP": 1.4,
+    "CAD": 1.4,
+    "OTH": 1.0
+   },
+   "note": "Foreign exchange reserves excluding gold, which is 13 per cent of the gross reserves.",
+   "source": {
+    "title": "National Bank of Serbia, Annual Report on Activities and Results 2024",
+    "url": "https://www.nbs.rs/export/sites/NBS_site/documents-eng/publikacije/godisnji-izvestaj/annual_report_2024.pdf",
+    "freq": "annual"
+   },
+   "note_no": "Valutareserver uten gull, som utgjør 13 prosent av bruttoreservene."
+  },
+  "ISR": {
+   "institution": "Bank of Israel",
+   "asof": "2024-12-31",
+   "basis": "benchmark",
+   "gold": "none held",
+   "quality": "benchmark",
+   "shares": {
+    "USD": 62,
+    "EUR": 20,
+    "GBP": 5,
+    "JPY": 5,
+    "CAD": 3.5,
+    "AUD": 3.5,
+    "CNY": 1
+   },
+   "note": "The published benchmark; the financial statements give the actual holdings only as dollar 62, euro 20, other 18 per cent.",
+   "source": {
+    "title": "Bank of Israel, Investment of the Foreign Exchange Reserves, Annual Report 2024",
+    "url": "https://www.boi.org.il/en/communication-and-publications/regular-publications/foreign-exchange-reserves-reports/",
+    "freq": "annual"
+   },
+   "note_no": "Den publiserte referanseallokeringen; regnskapet oppgir den faktiske beholdningen bare som dollar 62, euro 20, andre 18 prosent."
+  },
+  "CAN": {
+   "institution": "Department of Finance and Bank of Canada (Exchange Fund Account)",
+   "asof": "2026-03-31",
+   "basis": "actual",
+   "gold": "none held",
+   "quality": "official",
+   "shares": {
+    "USD": 70,
+    "EUR": 16,
+    "GBP": 8,
+    "JPY": 6
+   },
+   "note": "Liquid reserves at market value; the policy requires at least half in dollars and a mix that matches the foreign-currency debt. The monthly release of October 2026 gives USD 65.7, EUR 17.0, GBP 9.5, JPY 7.7.",
+   "source": {
+    "title": "Report on the Management of Canada's Official International Reserves 2025-26",
+    "url": "https://www.canada.ca/en/department-finance/services/publications/official-international-reserves/2026.html",
+    "freq": "annual and monthly"
+   },
+   "note_no": "Likvide reserver til markedsverdi; retningslinjene krever minst halvparten i dollar og en sammensetning som svarer til valutagjelden. Månedsrapporten for oktober 2026 gir USD 65,7, EUR 17,0, GBP 9,5, JPY 7,7."
+  },
+  "USA": {
+   "institution": "US Treasury (Exchange Stabilization Fund) and Federal Reserve (System Open Market Account)",
+   "asof": "2026-09-30",
+   "basis": "actual",
+   "gold": "excluded",
+   "quality": "computed",
+   "shares": {
+    "EUR": 67.2,
+    "JPY": 32.8
+   },
+   "note": "The foreign currency portfolios hold only euro and yen; gold and SDRs dominate the headline reserves and are outside this split.",
+   "source": {
+    "title": "Federal Reserve Bank of New York, Treasury and Federal Reserve Foreign Exchange Operations, Q3 2026",
+    "url": "https://www.newyorkfed.org/markets/quar_reports",
+    "freq": "quarterly"
+   },
+   "note_no": "Valutaporteføljene holder bare euro og yen; gull og SDR dominerer de samlede reservene og er utenfor fordelingen."
+  },
+  "MEX": {
+   "institution": "Banco de México",
+   "asof": "2025-12-31",
+   "basis": "exposure",
+   "gold": "included",
+   "quality": "exposure",
+   "shares": {
+    "USD": 86.9,
+    "GLD": 7.7,
+    "OTH": 5.4
+   },
+   "note": "Net foreign currency position by currency from the audited financial statements, a balance-sheet exposure including forwards, not a reserve allocation; 'other' includes the SDR holding.",
+   "source": {
+    "title": "Banco de México, Estados Financieros 2025, nota 4m",
+    "url": "https://www.banxico.org.mx/publicaciones-y-prensa/estado-de-cuenta-consolidado-mensual-y-balance-gen/%7B37661634-D871-48A7-65B8-18764F2F6F35%7D.pdf",
+    "freq": "annual"
+   },
+   "note_no": "Netto valutaposisjon per valuta fra det reviderte regnskapet, en balanseeksponering medregnet terminer, ikke en reserveallokering; «andre» omfatter SDR-beholdningen."
+  },
+  "BRA": {
+   "institution": "Banco Central do Brasil",
+   "asof": "2025-12-31",
+   "basis": "actual",
+   "gold": "included",
+   "quality": "official",
+   "shares": {
+    "USD": 72.0,
+    "GLD": 7.2,
+    "EUR": 6.6,
+    "CNY": 5.9,
+    "GBP": 2.8,
+    "JPY": 2.2,
+    "CAD": 1.7,
+    "AUD": 1.3,
+    "OTH": 0.2
+   },
+   "note": "Year-end allocation of the international reserves; the benchmark hedges the currency mix of the external debt. The report carries a ten-year table (dollar 83 per cent in 2016).",
+   "source": {
+    "title": "Banco Central do Brasil, International Reserves Management Report 2026",
+    "url": "https://www.bcb.gov.br/content/publications/irmr/international_reserves_management_report_2026.pdf",
+    "freq": "annual"
+   },
+   "note_no": "Fordelingen av de internasjonale reservene ved årsslutt; referanseporteføljen sikrer valutasammensetningen i utenlandsgjelden. Rapporten har en tiårstabell (dollar 83 prosent i 2016)."
+  },
+  "CHL": {
+   "institution": "Banco Central de Chile",
+   "asof": "2025-12-31",
+   "basis": "actual",
+   "gold": "excluded",
+   "quality": "official",
+   "shares": {
+    "USD": 73,
+    "CNY": 6,
+    "CAD": 6,
+    "AUD": 5,
+    "GBP": 3,
+    "EUR": 3,
+    "OTH": 4
+   },
+   "note": "Actual currency exposure of the investment portfolio; the benchmark is USD 74, CNY 6, CAD 6, AUD 5, GBP 3, EUR 3, KRW 3.",
+   "source": {
+    "title": "Banco Central de Chile, Estados Financieros 2025, nota 5",
+    "url": "https://www.bcentral.cl/documents/33528/133480/estados_financieros_2025.pdf",
+    "freq": "annual"
+   },
+   "note_no": "Faktisk valutaeksponering i investeringsporteføljen; referansen er USD 74, CNY 6, CAD 6, AUD 5, GBP 3, EUR 3, KRW 3."
+  },
+  "COL": {
+   "institution": "Banco de la República",
+   "asof": "2024-12-31",
+   "basis": "actual",
+   "gold": "excluded",
+   "quality": "official",
+   "shares": {
+    "USD": 85.4,
+    "CAD": 5.1,
+    "AUD": 4.6,
+    "EUR": 3.0,
+    "CNY": 1.6,
+    "OTH": 0.3
+   },
+   "note": "Investment portfolio, 92 per cent of the reserves.",
+   "source": {
+    "title": "Banco de la República, Informe de Administración de las Reservas Internacionales 2025",
+    "url": "https://www.banrep.gov.co/es/publicaciones-investigaciones/informe-reservas-internacionales/2025",
+    "freq": "annual"
+   },
+   "note_no": "Investeringsporteføljen, 92 prosent av reservene."
+  },
+  "PER": {
+   "institution": "Banco Central de Reserva del Perú",
+   "asof": "2026-09-30",
+   "basis": "actual",
+   "gold": "included",
+   "quality": "official",
+   "shares": {
+    "USD": 82,
+    "OTH": 11,
+    "GLD": 7
+   },
+   "note": "Effective currency exposure of the foreign exchange position; the other currencies are not itemised.",
+   "source": {
+    "title": "BCRP, Nota de Estudios 79-2026",
+    "url": "https://www.bcrp.gob.pe/docs/Publicaciones/Notas-Estudios/2026/nota-de-estudios-79-2026.pdf",
+    "freq": "monthly"
+   },
+   "note_no": "Effektiv valutaeksponering i valutaposisjonen; de andre valutaene er ikke spesifisert."
+  },
+  "AUS": {
+   "institution": "Reserve Bank of Australia",
+   "asof": "2026-06-30",
+   "basis": "benchmark",
+   "gold": "excluded",
+   "quality": "benchmark",
+   "shares": {
+    "USD": 45,
+    "EUR": 30,
+    "JPY": 5,
+    "CAD": 5,
+    "CNY": 5,
+    "GBP": 5,
+    "OTH": 5
+   },
+   "note": "Benchmark allocation; 'other' is the Korean won. In 2024-25 the dollar weight was cut from 55 to 45 and the euro raised from 20 to 30. Gold is managed outside the benchmark.",
+   "source": {
+    "title": "Reserve Bank of Australia, Annual Report 2026, table 2.2.4",
+    "url": "https://www.rba.gov.au/publications/annual-reports/rba/2026/pdf/rba-annual-report-2026-part-2.pdf",
+    "freq": "annual"
+   },
+   "note_no": "Referanseallokering; «andre» er koreanske won. I 2024–25 ble dollarvekten satt ned fra 55 til 45 og euro opp fra 20 til 30. Gullet forvaltes utenfor referansen."
+  },
+  "NZL": {
+   "institution": "Reserve Bank of New Zealand",
+   "asof": "2026-06-30",
+   "basis": "actual",
+   "gold": "none held",
+   "quality": "computed",
+   "shares": {
+    "USD": 43.7,
+    "EUR": 15.5,
+    "GBP": 14.7,
+    "AUD": 9.5,
+    "CAD": 9.0,
+    "JPY": 3.9,
+    "CNY": 3.7
+   },
+   "note": "The unhedged part of the reserves (NZ$7.8 bn of a total capacity of NZ$27 bn); the benchmark is USD 50, EUR 15, GBP 15, CAD 10, AUD 10.",
+   "source": {
+    "title": "Reserve Bank of New Zealand, Annual Report 2026, note 13",
+    "url": "https://www.rbnz.govt.nz/about-us/corporate-publications/our-annual-reports/annual-report-2026",
+    "freq": "annual"
+   },
+   "note_no": "Den usikrede delen av reservene (7,8 mrd. NZD av en samlet kapasitet på 27 mrd.); referansen er USD 50, EUR 15, GBP 15, CAD 10, AUD 10."
+  },
+  "KOR": {
+   "institution": "Bank of Korea",
+   "asof": "2025-12-31",
+   "basis": "actual",
+   "gold": "excluded",
+   "quality": "official",
+   "shares": {
+    "USD": 69.5,
+    "OTH": 30.5
+   },
+   "note": "Only the dollar share is published (2019 to 2025: 69.1, 67.7, 68.3, 72.0, 70.9, 71.9, 69.5).",
+   "source": {
+    "title": "Bank of Korea, Annual Report 2025, table II-15",
+    "url": "https://www.bok.or.kr/portal/main/contents.do?menuNo=200413",
+    "freq": "annual"
+   },
+   "note_no": "Bare dollarandelen publiseres (2019 til 2025: 69,1, 67,7, 68,3, 72,0, 70,9, 71,9, 69,5)."
+  },
+  "HKG": {
+   "institution": "Hong Kong Monetary Authority (Exchange Fund)",
+   "asof": "2025-12-31",
+   "basis": "actual",
+   "gold": "excluded",
+   "quality": "official",
+   "shares": {
+    "USD": 79.5,
+    "OTH": 20.5
+   },
+   "note": "Whole Exchange Fund including forwards; 'other' is the Hong Kong dollar (5.8) and mainly euro, renminbi, sterling and yen.",
+   "source": {
+    "title": "HKMA, Annual Report 2025, Reserves Management, table 3",
+    "url": "https://www.hkma.gov.hk/media/eng/publication-and-research/annual-report/2025/17_Reserves_Management.pdf",
+    "freq": "annual"
+   },
+   "note_no": "Hele Exchange Fund medregnet terminer; «andre» er Hongkong-dollar (5,8) og i hovedsak euro, renminbi, pund og yen."
+  },
+  "CHN": {
+   "institution": "State Administration of Foreign Exchange",
+   "asof": "2019-12-31",
+   "basis": "actual",
+   "gold": "excluded",
+   "quality": "official",
+   "shares": {
+    "USD": 55,
+    "OTH": 45
+   },
+   "note": "Only the dollar share was ever disclosed, in a box of the annual report (1995: 79; 2014: 58; 2019: 55 per cent); the 2024 and 2025 reports no longer carry it. The IMF template gives the split into SDR-basket and other currencies.",
+   "source": {
+    "title": "SAFE, Annual Report 2023, box 5",
+    "url": "https://www.safe.gov.cn/en/file/file/20241129/91df03d20b464c8eafa51612666849e6.pdf",
+    "freq": "discontinued"
+   },
+   "note_no": "Bare dollarandelen ble noen gang oppgitt, i en ramme i årsrapporten (1995: 79; 2014: 58; 2019: 55 prosent); rapportene for 2024 og 2025 har den ikke lenger. IMFs reservemal gir fordelingen mellom SDR-kurvens valutaer og andre."
+  },
+  "RUS": {
+   "institution": "Bank of Russia",
+   "asof": "2022-01-01",
+   "basis": "actual",
+   "gold": "included",
+   "quality": "official",
+   "shares": {
+    "EUR": 33.9,
+    "GLD": 21.5,
+    "CNY": 17.1,
+    "USD": 10.9,
+    "GBP": 6.2,
+    "OTH": 10.4
+   },
+   "note": "The quarterly series was suspended on 30 March 2022; later annual reports say the liquid assets are now renminbi, gold and cash.",
+   "source": {
+    "title": "Bank of Russia, Annual Report 2021, chart 32",
+    "url": "https://www.cbr.ru/Collection/Collection/File/43443/ar_2021_e.pdf",
+    "freq": "discontinued"
+   },
+   "note_no": "Kvartalsserien ble stanset 30. mars 2022; senere årsrapporter sier at de likvide aktivaene nå er renminbi, gull og kontanter."
+  },
+  "ZAF": {
+   "institution": "South African Reserve Bank",
+   "asof": "2026-03-31",
+   "basis": "actual",
+   "gold": "included",
+   "quality": "official",
+   "shares": {
+    "USD": 51.7,
+    "GLD": 23.9,
+    "CNY": 5.6,
+    "EUR": 3.2,
+    "GBP": 2.6,
+    "OTH": 13.0
+   },
+   "note": "Concentration-risk note of the financial statements on the gold and foreign exchange reserves; 'other' includes the SDR holding.",
+   "source": {
+    "title": "South African Reserve Bank, Annual Report 2025/26, group financial statements, note 29.1.3",
+    "url": "https://www.resbank.co.za/content/dam/sarb/publications/reports/annual-reports/2026/chapters/financials/group-financials-25-26.pdf",
+    "freq": "annual"
+   },
+   "note_no": "Note om konsentrasjonsrisiko i regnskapet, for gull- og valutareservene; «andre» omfatter SDR-beholdningen."
+  },
+  "PHL": {
+   "institution": "Bangko Sentral ng Pilipinas",
+   "asof": "2025-12-31",
+   "basis": "exposure",
+   "gold": "excluded",
+   "quality": "computed",
+   "shares": {
+    "USD": 95.4,
+    "OTH": 4.6
+   },
+   "note": "Foreign currency financial assets by currency from the audited financial statements' currency-risk note; 'other' is almost entirely the SDR holding.",
+   "source": {
+    "title": "BSP, Audited Financial Statements 2025, note 3.1.1",
+    "url": "https://www.bsp.gov.ph/Pages/AboutTheBank/AuditedFinancialStatements/2025FS/BSP2025_Part1-Notes_to_FS.pdf",
+    "freq": "annual"
+   },
+   "note_no": "Finansielle eiendeler i utenlandsk valuta per valuta fra regnskapets note om valutarisiko; «andre» er nesten bare SDR-beholdningen."
+  },
+  "TUR": {
+   "institution": "Central Bank of the Republic of Türkiye",
+   "asof": "2023-12-31",
+   "basis": "actual",
+   "gold": "excluded",
+   "quality": "compiled",
+   "shares": {
+    "USD": 52.0,
+    "EUR": 28.4,
+    "JPY": 0.1,
+    "OTH": 19.5
+   },
+   "note": "From the BOFIT dataset; the central bank itself publishes no current currency split.",
+   "source": {
+    "title": "Laser, Mihailov and Weidner, BOFIT Policy Brief 6/2024, data appendix",
+    "url": "https://www.econstor.eu/bitstream/10419/302554/2/1902140915-Data-Appendix.xls",
+    "freq": "annual"
+   },
+   "note_no": "Fra BOFIT-datasettet; sentralbanken selv publiserer ingen aktuell valutafordeling."
+  },
+  "UKR": {
+   "institution": "National Bank of Ukraine",
+   "asof": "2023-12-31",
+   "basis": "actual",
+   "gold": "excluded",
+   "quality": "compiled",
+   "shares": {
+    "USD": 86.7,
+    "EUR": 9.1,
+    "JPY": 1.1,
+    "CNY": 1.8,
+    "GBP": 1.1,
+    "OTH": 0.2
+   },
+   "note": "From the BOFIT dataset.",
+   "source": {
+    "title": "Laser, Mihailov and Weidner, BOFIT Policy Brief 6/2024, data appendix",
+    "url": "https://www.econstor.eu/bitstream/10419/302554/2/1902140915-Data-Appendix.xls",
+    "freq": "annual"
+   },
+   "note_no": "Fra BOFIT-datasettet."
+  },
+  "KAZ": {
+   "institution": "National Bank of Kazakhstan",
+   "asof": "2021-12-31",
+   "basis": "actual",
+   "gold": "excluded",
+   "quality": "compiled",
+   "shares": {
+    "USD": 79.1,
+    "EUR": 11.5,
+    "JPY": 0.6,
+    "GBP": 2.6,
+    "OTH": 6.2
+   },
+   "note": "From the BOFIT dataset.",
+   "source": {
+    "title": "Laser, Mihailov and Weidner, BOFIT Policy Brief 6/2024, data appendix",
+    "url": "https://www.econstor.eu/bitstream/10419/302554/2/1902140915-Data-Appendix.xls",
+    "freq": "annual"
+   },
+   "note_no": "Fra BOFIT-datasettet."
+  }
+ }
+}

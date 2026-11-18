@@ -6,3 +6,5 @@ output/
 site/
 .wrangler/
 node_modules/
+!data/allocations.json
+!data/china_iip.json

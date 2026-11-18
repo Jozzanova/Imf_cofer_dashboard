@@ -80,6 +80,20 @@ PEG_ANCHORS = {"AUS": "AUD", "CHE": "CHF", "ZAF": "ZAR", "IND": "INR", "SGP": "S
 IRFCL_GOLD_Q_URL = "https://api.imf.org/external/sdmx/3.0/data/dataflow/IMF.STA/IRFCL/+/*.IRFCLDT1_IRFCL56_USD.*.Q"
 # For the Gold tab: the monetary authorities' gold in fine troy ounces, quarter by quarter (IMF, IRFCL), and the
 # gold price in US$ per troy ounce, month by month (IMF, Primary Commodity Prices). The same as GOLD_URLS in the template.
+# The reserve template (IMF, IRFCL) line by line, for the Single country tab's "reserve template" slide and the
+# disclosed-allocation slide: official reserve assets, other foreign currency assets outside the reserves (section I.B),
+# the predetermined short-term net drains (section II: forwards, futures, swaps, loans and deposits falling due), and
+# the memo item splitting the reserves into currencies in the SDR basket and others (section IV). Monthly, in US$.
+IRFCL_URLS = {
+    "irfclOff": "https://api.imf.org/external/sdmx/3.0/data/dataflow/IMF.STA/IRFCL/+/*.IRFCLDT1_IRFCL65_USD.*.M?startPeriod=2010-01",
+    "irfclOfc": "https://api.imf.org/external/sdmx/3.0/data/dataflow/IMF.STA/IRFCL/+/*.IRFCLDT1_IRFCL42_USD.*.M?startPeriod=2010-01",
+    "irfclDrain": "https://api.imf.org/external/sdmx/3.0/data/dataflow/IMF.STA/IRFCL/+/*.IRFCLDT2_USD.*.M?startPeriod=2010-01",
+    "irfclFwd": "https://api.imf.org/external/sdmx/3.0/data/dataflow/IMF.STA/IRFCL/+/*.IRFCLDT2_IRFCL1T_SHP_USD.*.M?startPeriod=2010-01",
+    "irfclXb": "https://api.imf.org/external/sdmx/3.0/data/dataflow/IMF.STA/IRFCL/+/*.IRFCLDT4_IRFCL11_DIC_XDRB_USD.*.M?startPeriod=2010-01",
+    "irfclXn": "https://api.imf.org/external/sdmx/3.0/data/dataflow/IMF.STA/IRFCL/+/*.IRFCLDT4_IRFCL11_DIC_XXDR_USD.*.M?startPeriod=2010-01",
+}
+ALLOCATIONS = ROOT / "data" / "allocations.json"     # the central banks' own disclosed currency allocations, curated with sources
+
 GOLD_URLS = {
     "goldVol": "https://api.imf.org/external/sdmx/3.0/data/dataflow/IMF.STA/IRFCL/+/*.IRFCLDT1_IRFCL56V_FTO.*.Q",
     "goldPrice": "https://api.imf.org/external/sdmx/3.0/data/dataflow/IMF.RES/PCPS/+/G001.PGOLD.USD.M",
@@ -262,6 +276,48 @@ def gold_price(text: str) -> dict:
     return out
 
 
+def reserve_template(raw: dict) -> dict:
+    """The IRFCL lines -> {country: {"p": [periods], "off": [...], "ofc": [...], "dr": [...], "fwd": [...], "xb": [...], "xn": [...]}}
+    in US$ billions, quarter-end months plus the latest month of each series (the memo currency split is often annual)."""
+    cols = {"off": "irfclOff", "ofc": "irfclOfc", "dr": "irfclDrain", "fwd": "irfclFwd", "xb": "irfclXb", "xn": "irfclXn"}
+    per_country: dict = {}
+    for key, rk in cols.items():
+        text = raw.get(rk) or ""
+        if not text.startswith("STRUCTURE"):
+            continue
+        lines = text.strip().splitlines()
+        h = lines[0].split(",")
+        c, t, v = (h.index(n) for n in ("COUNTRY", "TIME_PERIOD", "OBS_VALUE"))
+        for line in lines[1:]:
+            f = line.split(",")
+            if len(f) <= max(c, t, v) or f[v] in ("", "NaN"):
+                continue
+            try:
+                val = float(f[v]) / 1e9
+            except ValueError:
+                continue
+            per_country.setdefault(f[c], {}).setdefault(key, {})[f[t].replace("-M", "-")] = round(val, 3)
+    out = {}
+    for ctry, d in per_country.items():
+        periods = sorted(set().union(*(s.keys() for s in d.values())))
+        latest = {k: max(s) for k, s in d.items()}
+        keep = [p for p in periods if p[-2:] in ("03", "06", "09", "12") or p in latest.values()]
+        out[ctry] = {"p": keep, **{k: [d.get(k, {}).get(p) for p in keep] for k in cols}}
+    return out
+
+
+def china_iip() -> dict:
+    """data/china_iip.json: the asset side of China's international investment position (SAFE, quarterly), extracted from
+    SAFE's spreadsheet, for the China slide on the state banks' foreign assets beside the reserves."""
+    p = ROOT / "data" / "china_iip.json"
+    return json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
+
+
+def allocations() -> dict:
+    """data/allocations.json: the currency allocations the central banks themselves publish, with sources (hand-curated)."""
+    return json.loads(ALLOCATIONS.read_text(encoding="utf-8")) if ALLOCATIONS.exists() else {}
+
+
 def gold_data(raw: dict) -> dict:
     """For the Gold tab: gold in millions of troy ounces and at market value (US$ billions, to check the ounces'
     units with) by country and quarter, and the gold price. The page does the rest."""
@@ -357,6 +413,7 @@ def main():
         raw["irgQ"] = (RAW.parent / "irgQ.csv").read_text(encoding="utf-8")
         raw["ssb"] = (RAW.parent / "ssb.json").read_text(encoding="utf-8")
         raw.update({k: (RAW.parent / f"{k}.csv").read_text(encoding="utf-8") for k in GOLD_URLS})
+        raw.update({k: (RAW.parent / f"{k}.csv").read_text(encoding="utf-8") for k in IRFCL_URLS if (RAW.parent / f"{k}.csv").exists()})
         status = json.loads(STATUS.read_text(encoding="utf-8")) if STATUS.exists() else {}
     else:
         text, er = download(DATA_URL), download(ER_URL)
@@ -365,6 +422,7 @@ def main():
         raw["erHist"] = download(ER_HISTORY_URL)
         raw["irgQ"] = download(IRFCL_GOLD_Q_URL)
         raw.update({k: download(url) for k, url in GOLD_URLS.items()})
+        raw.update({k: download(url) for k, url in IRFCL_URLS.items()})
         for k, url in (("names", NAMES_URL), ("groups", GROUPS_URL)):
             with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "cofer-dashboard"}), timeout=120) as res:
                 raw[k] = res.read().decode("utf-8")
@@ -380,7 +438,8 @@ def main():
         STATUS.write_text(json.dumps(status), encoding="utf-8")
     status["latest"] = latest_quarter(text)
 
-    data = {"csv": text, "er": er, "countries": {**countries(raw), "noFn": mainland_share(raw["ssb"])}, "gold": gold_data(raw), "letters": letters(), **status}
+    data = {"csv": text, "er": er, "countries": {**countries(raw), "noFn": mainland_share(raw["ssb"])}, "gold": gold_data(raw), "letters": letters(),
+            "irfcl": reserve_template(raw), "alloc": allocations(), "chinaIip": china_iip(), **status}
     template = TEMPLATE.read_text(encoding="utf-8")
     page = lambda tpl, d: tpl.replace("__SNAPSHOT__", json.dumps(d, separators=(",", ":")).replace("</", "<\\/"))
     OUTPUT.parent.mkdir(exist_ok=True)

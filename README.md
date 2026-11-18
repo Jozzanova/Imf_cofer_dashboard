@@ -52,6 +52,15 @@ Tabs:
   US$, with world GDP and FX reserves as % of it), or every country (reserves with and without
   gold, gold, GDP and % of GDP, with its economy, region and exchange-rate regime; a selector with a
   search box picks which countries to show and download).
+- **Single country**: four further slides (added 18 November 2026): the country's IMF reserve template (official reserves,
+  other foreign currency assets outside the reserves, predetermined drains including forwards and swaps, and the share of
+  reserves in SDR-basket currencies; IMF IRFCL, fetched by update.py), the currency allocation the central bank itself
+  discloses against the world's COFER shares (data/allocations.json, hand-curated with the source of every figure and a
+  quality tag: official, computed, benchmark, exposure, secondary or compiled), a table of every central bank that
+  discloses with the ones that do not named, and for China a slide of SAFE's own international investment position
+  (data/china_iip.json, extracted from SAFE's spreadsheet) beside the reserves, with Brad W. Setser's argument about
+  state-bank foreign assets stated as his estimate. The allocations file needs a yearly pass through the central banks'
+  annual reports; the China file a quarterly download from SAFE.
 - **Single country**: a slide set comparing any country (Norway to start) with similar countries
   (the same kind of economy with the same exchange-rate regime; euro-area members with each other; at
   most the 15 closest in GDP) and with advanced and emerging economies with floating, managed and

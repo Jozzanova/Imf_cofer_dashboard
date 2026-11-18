@@ -675,6 +675,8 @@
 
 <script>
 const SNAPSHOT = __SNAPSHOT__;
+// the reserve template (IMF IRFCL) by country, the central banks' disclosed currency allocations and China's IIP asset side
+const IR = SNAPSHOT.irfcl || {}, AL = SNAPSHOT.alloc || {}, CNIIP = SNAPSHOT.chinaIip || null;
 // The page's language: update.py writes an English page and a Norwegian one (i18n_no.py) from this template.
 const LANG = "en";
 const SEPARATORS = ".,";  // Plotly's decimal and thousands separators
@@ -3257,6 +3259,17 @@ const ST = LANG === "no" ? {
   s1t: n => `${n}: reservene i sammenheng`, s2t: n => `${n} og lignende land`, s3t: "Flytende eller fast valutakurs", s4t: n => `Over tid: ${n} og gruppenes median`, s5t: "Gull i reservene", s6t: "De lignende landene i detalj",
   gdpRev: "Norges BNP etter SSBs hovedrevisjon av nasjonalregnskapet (november 2025), som løftet BNP-nivået med om lag 4 %; eldre kilder viser lavere BNP.",
   latest: p => `Siste tall per ${p}.`, none: "Ingen nyere tall for dette landet.",
+  // the reserve template, the disclosed allocation and China's wider foreign assets
+  s7t: n => `${n}: reservemalen til IMF`, s8t: n => `${n}: valutafordelingen sentralbanken selv oppgir`, s9t: "Hvem oppgir valutafordelingen", s10t: "Kina: utenlandske fordringer utenfor reservene",
+  tplSrc: "Kilde: IMF, International Reserves and Foreign Currency Liquidity (reservemalen landene selv rapporterer), månedlig; verdier i milliarder US$.",
+  tplRows: ["Offisielle reserver", "Andre fordringer i utenlandsk valuta utenfor reservene (del I.B)", "Forhåndsbestemte netto utbetalinger de neste tolv månedene (del II)", "Herav terminer, futures og bytteavtaler, kortposisjon", "Andel av reservene i SDR-kurvens valutaer (dollar, euro, yen, pund, renminbi)"],
+  tplHead: ["", "Verdi", "Per"], curNames: {USD: "US-dollar", EUR: "Euro", GBP: "Pund", JPY: "Yen", CNY: "Renminbi", CAD: "Canadiske dollar", AUD: "Australske dollar", GLD: "Gull", OTH: "Andre"},
+  allocCountry: n => n, allocWorld: "Verden (COFER, allokerte reserver)", basis: {actual: "faktisk beholdning", benchmark: "referanseallokering", exposure: "balanseeksponering"},
+  quality: {official: "prosentandeler slik sentralbanken oppgir dem", computed: "regnet ut fra beløpene sentralbanken oppgir", benchmark: "sentralbankens publiserte referanseallokering, ikke faktisk beholdning", exposure: "en balanseeksponering per valuta, ikke en reserveallokering", secondary: "offisielle tall, her bare bekreftet gjennom pressen", compiled: "hentet fra BOFIT-datasettet (Laser, Mihailov og Weidner 2024), ikke fra sentralbanken direkte"},
+  goldIn: "gull inngår i fordelingen", goldOut: "gull holdes utenfor", noGold: "sentralbanken holder ikke gull",
+  whoHead: ["Land", "Per", "USD", "EUR", "GBP", "JPY", "CNY", "CAD+AUD", "Gull", "Andre", "Grunnlag"],
+  chinaRows: ["Offisielle reserver", "Innskudd i utlandet", "Utlån til utlandet", "Gjeldspapirer", "Handelskreditter"],
+
 } : {
   tab: n => `${n} compared with similar countries`, pick: "Country",
   intro: "Slides comparing a country's foreign exchange reserves with similar countries and with countries with floating and fixed exchange rates, advanced and emerging. Choose the country; each slide can be downloaded as a PNG (16:9, white background) for presentations.",
@@ -3271,6 +3284,17 @@ const ST = LANG === "no" ? {
   s1t: n => `${n}: reserves in context`, s2t: n => `${n} and similar countries`, s3t: "Floating or fixed exchange rates", s4t: n => `Over time: ${n} and the groups' medians`, s5t: "Gold in the reserves", s6t: "The similar countries in detail",
   gdpRev: "Norway's GDP after Statistics Norway's main revision of the national accounts (November 2025), which raised its level by about 4%; older sources show a lower GDP.",
   latest: p => `Latest figures as of ${p}.`, none: "No recent figures for this country.",
+  // the reserve template, the disclosed allocation and China's wider foreign assets
+  s7t: n => `${n}: the IMF reserve template`, s8t: n => `${n}: the currency allocation the central bank discloses`, s9t: "Who discloses the currency allocation", s10t: "China: foreign assets beyond the reserves",
+  tplSrc: "Source: IMF, International Reserves and Foreign Currency Liquidity (the reserve template each country files), monthly; values in US$ billions.",
+  tplRows: ["Official reserve assets", "Other foreign currency assets outside the reserves (section I.B)", "Predetermined net drains over the next twelve months (section II)", "Of which forwards, futures and swaps, short position", "Share of reserves in SDR-basket currencies (dollar, euro, yen, sterling, renminbi)"],
+  tplHead: ["", "Value", "As of"], curNames: {USD: "US dollar", EUR: "Euro", GBP: "Sterling", JPY: "Yen", CNY: "Renminbi", CAD: "Canadian dollar", AUD: "Australian dollar", GLD: "Gold", OTH: "Other"},
+  allocCountry: n => n, allocWorld: "World (COFER, allocated reserves)", basis: {actual: "actual holdings", benchmark: "benchmark allocation", exposure: "balance-sheet exposure"},
+  quality: {official: "percentages as the central bank prints them", computed: "computed from the amounts the central bank prints", benchmark: "the central bank's published benchmark, not actual holdings", exposure: "a balance-sheet exposure by currency, not a reserve allocation", secondary: "official figures, confirmed here only through the press", compiled: "taken from the BOFIT dataset (Laser, Mihailov and Weidner 2024), not from the central bank directly"},
+  goldIn: "gold is inside the split", goldOut: "gold is held outside the split", noGold: "the central bank holds no gold",
+  whoHead: ["Country", "As of", "USD", "EUR", "GBP", "JPY", "CNY", "CAD+AUD", "Gold", "Other", "Basis"],
+  chinaRows: ["Official reserve assets", "Deposits abroad", "Loans abroad", "Debt securities", "Trade credit"],
+
 };
 const medianOf = vs => { const s = vs.filter(fin).sort((a, b) => a - b), n = s.length; return n ? (n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2) : null; };
 function slideRows() {
@@ -3446,6 +3470,77 @@ function buildSlides() {
     table: { head: [ST.country, ST.pctGdp, ST.bn, ST.d5, ST.goldShare, ST.regime],
       rows: peers.map(r => [(star(r) ? "★ " : "") + r.name, pctTxt(r.pct), fmt(r.res, 0), signed(r.d5, 1), pctTxt(r.goldShare ?? 0), r.note]),
       home: peers.indexOf(me) } });
+  // 7: the reserve template the country files with the IMF
+  const ir = IR[ME];
+  const lastOf = (arr, ps) => { for (let i = arr.length - 1; i >= 0; i--) if (fin(arr[i])) return { v: arr[i], p: ps[i] }; return null; };
+  if (ir) {
+    const off = lastOf(ir.off, ir.p), ofc = lastOf(ir.ofc, ir.p), dr = lastOf(ir.dr, ir.p), fwd = lastOf(ir.fwd, ir.p);
+    let basket = null;
+    for (let i = ir.p.length - 1; i >= 0; i--) if (fin(ir.xb[i]) && fin(ir.xn[i]) && ir.xb[i] + ir.xn[i] > 0) { basket = { v: 100 * ir.xb[i] / (ir.xb[i] + ir.xn[i]), p: ir.p[i] }; break; }
+    const bn = v => fin(v) ? `${fmt(v, 1)}` : "–", per = x => x ? x.p : "–";
+    const ofcTxt = ofc && ofc.v > 0.5 ? (no ? `, og ${bn(ofc.v)} mrd. i andre fordringer i utenlandsk valuta utenfor reservene` : `, and $${bn(ofc.v)} bn of other foreign currency assets outside the reserves`) : "";
+    const drTxt = dr ? (no ? ` Forhåndsbestemte netto ${dr.v < 0 ? "utbetalinger" : "innbetalinger"} de neste tolv månedene er ${bn(Math.abs(dr.v))} mrd. US$${fwd && Math.abs(fwd.v) > 0.5 ? `, herav ${bn(Math.abs(fwd.v))} mrd. i terminer, futures og bytteavtaler` : ""}.` : ` Predetermined net ${dr.v < 0 ? "outflows" : "inflows"} over the next twelve months are $${bn(Math.abs(dr.v))} bn${fwd && Math.abs(fwd.v) > 0.5 ? `, of which $${bn(Math.abs(fwd.v))} bn in forwards, futures and swaps` : ""}.`) : "";
+    const bTxt = basket ? (no ? ` ${pctTxt(basket.v)} av reservene er i SDR-kurvens valutaer (per ${basket.p}); resten er i andre valutaer.` : ` ${pctTxt(basket.v)} of the reserves are in SDR-basket currencies (as of ${basket.p}); the rest is in other currencies.`) : (no ? " Landet fyller ikke ut malens linje om valutafordeling." : " The country leaves the template's currency line blank.");
+    slides.push({ title: ST.s7t(N),
+      comment: no ? `${N} rapporterer ${bn(off && off.v)} mrd. US$ i offisielle reserver (per ${per(off)})${ofcTxt}.${drTxt}${bTxt}`
+                  : `${N} reports official reserves of $${bn(off && off.v)} bn (as of ${per(off)})${ofcTxt}.${drTxt}${bTxt}`,
+      refs: ST.tplSrc,
+      table: { head: ST.tplHead, rows: [[ST.tplRows[0], bn(off && off.v), per(off)], [ST.tplRows[1], bn(ofc && ofc.v), per(ofc)], [ST.tplRows[2], bn(dr && dr.v), per(dr)],
+        [ST.tplRows[3], bn(fwd && fwd.v), per(fwd)], [ST.tplRows[4], basket ? pctTxt(basket.v) : "–", basket ? basket.p : "–"]], home: -1 } });
+  }
+  // 8: the allocation the central bank itself discloses, against the world's COFER shares
+  const AC = (AL.countries || {}), al = AC[ME], order = ["USD", "EUR", "GBP", "JPY", "CNY", "CAD", "AUD", "GLD", "OTH"], cap = x => x.charAt(0).toUpperCase() + x.slice(1);
+  const fw = M.Q || F(), wi = lastIdx(fw.share.USD);
+  const world = k => k === "GLD" ? null : k === "OTH" ? (fw.share.OTHC ? fw.share.OTHC[wi] : null) + (fw.share.CHF ? fw.share.CHF[wi] || 0 : 0) : (fw.share[k] ? fw.share[k][wi] : null);
+  if (al) {
+    const ks = order.filter(k => fin(al.shares[k]) || fin(world(k)));
+    const top = order.filter(k => fin(al.shares[k])).sort((a, b) => al.shares[b] - al.shares[a]);
+    const lc = s => /^(US|SDR)/.test(s) ? s : s.charAt(0).toLowerCase() + s.slice(1);
+    const lead = top.slice(0, 3).map(k => `${lc(ST.curNames[k])} ${pctTxt(al.shares[k])}`).join(", ");
+    const usd = al.shares.USD, wusd = world("USD");
+    const cmpTxt = fin(usd) && fin(wusd) ? (no ? ` Dollarandelen er ${comp(usd, wusd)} verdens allokerte reserver i COFER (${pctTxt(wusd)}, ${label(fw.periods[wi])}).` : ` The dollar share is ${comp(usd, wusd)} the world's allocated reserves in COFER (${pctTxt(wusd)}, ${label(fw.periods[wi])}).`) : "";
+    const goldTxt = al.gold === "included" ? ST.goldIn : al.gold === "none held" ? ST.noGold : ST.goldOut;
+    slides.push({ title: ST.s8t(N),
+      comment: (no ? `${al.institution} oppgir ${ST.basis[al.basis] || al.basis} per ${al.asof}: ${lead}. ${cap(ST.quality[al.quality] || "")}; ${goldTxt}.${cmpTxt} ${al.note_no || al.note || ""}`
+                   : `${al.institution} discloses its ${ST.basis[al.basis] || al.basis} as of ${al.asof}: ${lead}. ${cap(ST.quality[al.quality] || "")}; ${goldTxt}.${cmpTxt} ${al.note || ""}`).trim(),
+      refs: `${no ? "Kilde" : "Source"}: ${al.source.title} (${al.source.freq}), ${al.source.url}. ${no ? "Verdensandelene: IMF COFER." : "World shares: IMF COFER."}`,
+      fig: () => ({
+        data: [{ type: "bar", name: N, x: ks.map(k => ST.curNames[k]), y: ks.map(k => al.shares[k] ?? null), marker: { color: css("--s1") }, text: ks.map(k => fin(al.shares[k]) ? pctTxt(al.shares[k]) : ""), textposition: "outside", cliponaxis: false, textfont: { size: 12, color: css("--text-secondary") }, hovertemplate: "%{x}: %{text}<extra>" + esc(N) + "</extra>" },
+               { type: "bar", name: ST.allocWorld, x: ks.map(k => ST.curNames[k]), y: ks.map(k => world(k)), marker: { color: css("--text-muted"), opacity: 0.55 }, text: ks.map(k => fin(world(k)) ? pctTxt(world(k)) : ""), textposition: "outside", cliponaxis: false, textfont: { size: 11, color: css("--text-muted") }, hovertemplate: "%{x}: %{text}<extra>COFER</extra>" }],
+        layout: baseLayout({ barmode: "group", bargap: 0.25, showlegend: true, legend: { orientation: "h", y: 1.12 }, yaxis: { ticksuffix: no ? " %" : "%", rangemode: "tozero", showgrid: true }, xaxis: { showgrid: false }, margin: { l: 44, r: 8, t: 40, b: 36 } }) }) });
+  }
+  // 9: every central bank that discloses, with the chosen country starred and the ones that do not disclose named
+  const who = Object.entries(AC).map(([k, v]) => ({ k, v, name: gName(k), usd: v.shares.USD ?? -1 })).sort((a, b) => b.usd - a.usd || a.name.localeCompare(b.name));
+  if (who.length) {
+    const cell = x => fin(x) ? fmt(x, x >= 10 ? 0 : 1) : "–";
+    const nd = (no ? (AL.meta || {}).notDisclosed_no : null) || (AL.meta || {}).notDisclosed || {};
+    const ndTxt = no ? `Oppgir ingen valutafordeling: ${Object.keys(nd).map(gName).join(", ")}.` : `No currency split published by: ${Object.keys(nd).map(gName).join(", ")}.`;
+    const mine = nd[ME] ? ` ${N}: ${nd[ME]}` : "";
+    slides.push({ title: ST.s9t,
+      comment: no ? `${who.length} sentralbanker oppgir selv hvordan valutareservene er fordelt på valutaer, med ulik presisjon og ulike datoer; tabellen er sortert etter dollarandel. IMFs COFER gir bare summen for verden (dollar ${pctTxt(world("USD"))}, euro ${pctTxt(world("EUR"))}, ${label(fw.periods[wi])}). ${ndTxt}${mine}`
+                  : `${who.length} central banks disclose how their reserves are split by currency, with varying precision and dates; the table is sorted by the dollar share. The IMF's COFER gives only the world total (dollar ${pctTxt(world("USD"))}, euro ${pctTxt(world("EUR"))}, ${label(fw.periods[wi])}). ${ndTxt}${mine}`,
+      refs: no ? "Kilder: sentralbankenes egne rapporter og regnskaper, som angitt i lysbildet for hvert land; sammenstilt 18. november 2026. Grunnlag: F = faktisk beholdning, R = referanseallokering, E = balanseeksponering, B = BOFIT-datasettet." : "Sources: the central banks' own reports and accounts, as named on each country's slide; compiled 18 November 2026. Basis: A = actual holdings, B = benchmark, E = balance-sheet exposure, D = the BOFIT dataset.",
+      table: { head: ST.whoHead, rows: who.map(({ k, v, name }) => [(k === ME ? "★ " : "") + name, v.asof.slice(0, 7), cell(v.shares.USD), cell(v.shares.EUR), cell(v.shares.GBP), cell(v.shares.JPY), cell(v.shares.CNY),
+          cell((v.shares.CAD || 0) + (v.shares.AUD || 0) || null), cell(v.shares.GLD), cell(v.shares.OTH), v.quality === "compiled" ? (no ? "B" : "D") : v.basis === "benchmark" ? (no ? "R" : "B") : v.basis === "exposure" ? "E" : (no ? "F" : "A")]),
+        home: who.findIndex(w => w.k === ME) } });
+  }
+  // 10: China's foreign assets beyond the reserves (SAFE's own IIP), the point behind the "hidden reserves" argument
+  if (ME === "CHN" && CNIIP && CNIIP.series) {
+    const s = CNIIP.series, ps = s.periods, li = lastIdx(s.reserves);
+    const parts = [["reserves", ST.chinaRows[0], "--s1"], ["dep", ST.chinaRows[1], "--s3"], ["loans", ST.chinaRows[2], "--s4"], ["pfDebt", ST.chinaRows[3], "--s5"], ["trade", ST.chinaRows[4], "--s6"]];
+    const banks = (s.loansBanks[li] || 0) + (s.depBanks[li] || 0) + (s.pfDebtBanks[li] || 0);
+    const irc = IR.CHN, ofcC = irc ? lastOf(irc.ofc, irc.p) : null, fwdC = irc ? lastOf(irc.fwd, irc.p) : null;
+    slides.push({ title: ST.s10t,
+      comment: no
+        ? `SAFEs egen utenriksregnskapsstatistikk (IIP) viser at Kinas utenlandske fordringer er langt større enn reservene: per ${ps[li]} var de offisielle reservene ${fmt(s.reserves[li], 0)} mrd. US$, mens innskudd, utlån og gjeldspapirer i utlandet utgjorde ${fmt(s.dep[li] + s.loans[li] + s.pfDebt[li], 0)} mrd., hvorav ${fmt(banks, 0)} mrd. hos bankene (sektordeling finnes fra utgangen av 2025). Reservemalen til IMF viser dessuten ${ofcC ? fmt(ofcC.v, 0) : "–"} mrd. i andre fordringer i utenlandsk valuta utenfor reservene og ${fwdC && Math.abs(fwdC.v) > 0.5 ? fmt(Math.abs(fwdC.v), 0) + " mrd. i" : "ingen"} terminer og bytteavtaler. Brad W. Setser (Council on Foreign Relations) argumenterer for at mye av bankenes utenlandske fordringer er statlig styrt valuta flyttet ut av reservene gjennom bytteavtaler og innskudd, og anslår de statskontrollerte fordringene utenfor reservene til nær 3 000 mrd. (statsbankene og utviklingsbankene) pluss CIC; SAFE oppgir bankenes netto dollarfordringer på utlandet til ${fmt(704.9, 0)} mrd. ved utgangen av juni 2026. Anslagene er Setsers; figuren viser bare SAFEs offisielle tall, og hvor mye av bankenes fordringer som er statens, kan ikke leses av dem.`
+        : `SAFE's own international investment position shows foreign assets far larger than the reserves: as of ${ps[li]} official reserves were $${fmt(s.reserves[li], 0)} bn, while deposits, loans and debt securities abroad came to $${fmt(s.dep[li] + s.loans[li] + s.pfDebt[li], 0)} bn, of which $${fmt(banks, 0)} bn at the banks (the sector split exists from end-2025). The IMF reserve template adds $${ofcC ? fmt(ofcC.v, 0) : "–"} bn of other foreign currency assets outside the reserves and ${fwdC && Math.abs(fwdC.v) > 0.5 ? "$" + fmt(Math.abs(fwdC.v), 0) + " bn of" : "no"} forwards and swaps. Brad W. Setser (Council on Foreign Relations) argues that much of the banks' foreign assets is state-directed foreign exchange moved out of the reserves through swaps and deposits, and puts the state-controlled foreign assets outside the reserves at close to $3 trillion (the state commercial banks and the policy banks) plus CIC; SAFE reports the banks' net dollar claims on the rest of the world at $${fmt(704.9, 0)} bn at end-June 2026. The estimates are Setser's; the chart shows only SAFE's official figures, and how much of the banks' assets is the state's cannot be read from them.`,
+      refs: no
+        ? "Kilder: SAFE, China's International Investment Position (kvartalsvis, aktivasiden), https://www.safe.gov.cn/en/2018/0928/1459.html; SAFE, External Financial Assets and Liabilities of China's Banking Sector, juni 2026, https://www.safe.gov.cn/en/2026/0929/2459.html; IMF IRFCL; Brad W. Setser, «Three Questions About China's Hidden Foreign Exchange Assets», CFR, 11. november 2026, https://www.cfr.org/articles/three-questions-about-chinas-hidden-foreign-exchange-assets, og «How to Hide Your Foreign Exchange Reserves», CFR, 29. juni 2023."
+        : "Sources: SAFE, China's International Investment Position (quarterly, asset side), https://www.safe.gov.cn/en/2018/0928/1459.html; SAFE, External Financial Assets and Liabilities of China's Banking Sector, June 2026, https://www.safe.gov.cn/en/2026/0929/2459.html; IMF IRFCL; Brad W. Setser, \"Three Questions About China's Hidden Foreign Exchange Assets\", CFR, 11 November 2026, https://www.cfr.org/articles/three-questions-about-chinas-hidden-foreign-exchange-assets, and \"How to Hide Your Foreign Exchange Reserves\", CFR, 29 June 2023.",
+      fig: () => ({
+        data: parts.map(([k, name, col]) => ({ type: "bar", name, x: ps, y: s[k], marker: { color: css(col) }, hovertemplate: "%{x}: $%{y:,.0f} bn<extra>" + esc(name) + "</extra>" })),
+        layout: baseLayout({ barmode: "stack", bargap: 0.15, showlegend: true, legend: { orientation: "h", y: 1.12 }, yaxis: { tickprefix: "$", ticksuffix: " bn", showgrid: true }, xaxis: { showgrid: false, tickformat: "%Y" }, margin: { l: 60, r: 8, t: 40, b: 36 } }) }) });
+  }
   return slides;
 }
 function renderSingle() {
